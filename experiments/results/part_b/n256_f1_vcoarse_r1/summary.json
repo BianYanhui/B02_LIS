@@ -1,0 +1,28 @@
+{
+  "cell_id": "n256_f1_vcoarse_r1",
+  "n": 256,
+  "f_hz": 1,
+  "view": "coarse",
+  "rep": 1,
+  "duration_s": 20.0,
+  "actual_elapsed_s": 20.014915943145752,
+  "n_state_updates": 5120,
+  "n_dispatch_queries": 3604,
+  "n_deadline_missed": 0,
+  "size": {
+    "avg": 382.9171875,
+    "p50": 383,
+    "p95": 385,
+    "p99": 386,
+    "min": 377,
+    "max": 388
+  },
+  "build_us_p95": 16.009,
+  "ser_us_p95": 2.827,
+  "deser_us_p95": 5.72,
+  "merge_us_p95": 1.406,
+  "total_us_p95": 27.186,
+  "dispatch_latency_us_p50": 393.761,
+  "dispatch_latency_us_p95": 409.726,
+  "dispatch_latency_us_p99": 427.117
+}

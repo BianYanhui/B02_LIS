@@ -1,0 +1,28 @@
+{
+  "cell_id": "n64_f10_vrich_r1",
+  "n": 64,
+  "f_hz": 10,
+  "view": "rich",
+  "rep": 1,
+  "duration_s": 20.0,
+  "actual_elapsed_s": 20.057992219924927,
+  "n_state_updates": 12800,
+  "n_dispatch_queries": 2030,
+  "n_deadline_missed": 0,
+  "size": {
+    "avg": 12685.1440625,
+    "p50": 12685,
+    "p95": 12739,
+    "p99": 12761,
+    "min": 12576,
+    "max": 12800
+  },
+  "build_us_p95": 1107.548,
+  "ser_us_p95": 44.276,
+  "deser_us_p95": 174.677,
+  "merge_us_p95": 30.631,
+  "total_us_p95": 1355.29,
+  "dispatch_latency_us_p50": 71.224,
+  "dispatch_latency_us_p95": 120.806,
+  "dispatch_latency_us_p99": 124.344
+}

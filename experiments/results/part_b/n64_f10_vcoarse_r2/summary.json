@@ -1,0 +1,28 @@
+{
+  "cell_id": "n64_f10_vcoarse_r2",
+  "n": 64,
+  "f_hz": 10,
+  "view": "coarse",
+  "rep": 2,
+  "duration_s": 20.0,
+  "actual_elapsed_s": 20.019288539886475,
+  "n_state_updates": 12800,
+  "n_dispatch_queries": 3800,
+  "n_deadline_missed": 0,
+  "size": {
+    "avg": 382.2225,
+    "p50": 382,
+    "p95": 384,
+    "p99": 385,
+    "min": 375,
+    "max": 387
+  },
+  "build_us_p95": 16.5,
+  "ser_us_p95": 2.855,
+  "deser_us_p95": 5.8,
+  "merge_us_p95": 1.243,
+  "total_us_p95": 27.734,
+  "dispatch_latency_us_p50": 86.118,
+  "dispatch_latency_us_p95": 99.292,
+  "dispatch_latency_us_p99": 102.34
+}

@@ -1,0 +1,20 @@
+{
+  "gpu_model": "Tesla T4 (4x)",
+  "gpu_memory": "15 GB each",
+  "vllm_version": "0.10.2",
+  "torch_version": "2.8.0+cu128",
+  "transformers_version": "4.55.2",
+  "model": "/home/byh/.cache/modelscope/qwen/Qwen2.5-1.5B-Instruct",
+  "vllm_launch_params": {
+    "gpu_memory_utilization": 0.6,
+    "max_model_len": 2048,
+    "max_num_seqs": 64,
+    "enable_prefix_caching": true,
+    "swap_space": 4,
+    "block_size": 16,
+    "enforce_eager": true
+  },
+  "serialization": "orjson",
+  "n_vllm_instances": 4,
+  "network": "loopback (single host)"
+}

@@ -1,0 +1,1254 @@
+{
+  "cells": [
+    {
+      "cell_id": "chatbot_none_f1_r1",
+      "rc": 0,
+      "elapsed_s": 105.39470100402832,
+      "workload": "chatbot",
+      "state_view": "none",
+      "freq_hz": 1.0,
+      "rep": 1,
+      "policy": "round-robin",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 66.73417091369629,
+      "state_updates_collected": 105,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_none_f1_r2",
+      "rc": 0,
+      "elapsed_s": 102.40365171432495,
+      "workload": "chatbot",
+      "state_view": "none",
+      "freq_hz": 1.0,
+      "rep": 2,
+      "policy": "round-robin",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 65.62339568138123,
+      "state_updates_collected": 102,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_none_f10_r1",
+      "rc": 0,
+      "elapsed_s": 111.28625655174255,
+      "workload": "chatbot",
+      "state_view": "none",
+      "freq_hz": 10.0,
+      "rep": 1,
+      "policy": "round-robin",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 73.16942238807678,
+      "state_updates_collected": 1109,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_none_f10_r2",
+      "rc": 0,
+      "elapsed_s": 122.98791265487671,
+      "workload": "chatbot",
+      "state_view": "none",
+      "freq_hz": 10.0,
+      "rep": 2,
+      "policy": "round-robin",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 79.15445327758789,
+      "state_updates_collected": 1226,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_none_f50_r1",
+      "rc": 0,
+      "elapsed_s": 111.02346634864807,
+      "workload": "chatbot",
+      "state_view": "none",
+      "freq_hz": 50.0,
+      "rep": 1,
+      "policy": "round-robin",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 69.930837392807,
+      "state_updates_collected": 1571,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_none_f50_r2",
+      "rc": 0,
+      "elapsed_s": 109.41343688964844,
+      "workload": "chatbot",
+      "state_view": "none",
+      "freq_hz": 50.0,
+      "rep": 2,
+      "policy": "round-robin",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 69.62923312187195,
+      "state_updates_collected": 1501,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_coarse_f1_r1",
+      "rc": 0,
+      "elapsed_s": 109.4441282749176,
+      "workload": "chatbot",
+      "state_view": "coarse",
+      "freq_hz": 1.0,
+      "rep": 1,
+      "policy": "coarse",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 69.03904032707214,
+      "state_updates_collected": 109,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_coarse_f1_r2",
+      "rc": 0,
+      "elapsed_s": 111.43941354751587,
+      "workload": "chatbot",
+      "state_view": "coarse",
+      "freq_hz": 1.0,
+      "rep": 2,
+      "policy": "coarse",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 68.78337955474854,
+      "state_updates_collected": 111,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_coarse_f10_r1",
+      "rc": 0,
+      "elapsed_s": 106.68837380409241,
+      "workload": "chatbot",
+      "state_view": "coarse",
+      "freq_hz": 10.0,
+      "rep": 1,
+      "policy": "coarse",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 68.71886372566223,
+      "state_updates_collected": 1063,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_coarse_f10_r2",
+      "rc": 0,
+      "elapsed_s": 106.6853015422821,
+      "workload": "chatbot",
+      "state_view": "coarse",
+      "freq_hz": 10.0,
+      "rep": 2,
+      "policy": "coarse",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 69.69523453712463,
+      "state_updates_collected": 1063,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_coarse_f50_r1",
+      "rc": 0,
+      "elapsed_s": 104.65924429893494,
+      "workload": "chatbot",
+      "state_view": "coarse",
+      "freq_hz": 50.0,
+      "rep": 1,
+      "policy": "coarse",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 67.77073049545288,
+      "state_updates_collected": 1458,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_coarse_f50_r2",
+      "rc": 0,
+      "elapsed_s": 108.13411498069763,
+      "workload": "chatbot",
+      "state_view": "coarse",
+      "freq_hz": 50.0,
+      "rep": 2,
+      "policy": "coarse",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 68.72301173210144,
+      "state_updates_collected": 1512,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_rich_f1_r1",
+      "rc": 0,
+      "elapsed_s": 110.4116415977478,
+      "workload": "chatbot",
+      "state_view": "rich",
+      "freq_hz": 1.0,
+      "rep": 1,
+      "policy": "rich",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 68.42737817764282,
+      "state_updates_collected": 110,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_rich_f1_r2",
+      "rc": 0,
+      "elapsed_s": 108.39688515663147,
+      "workload": "chatbot",
+      "state_view": "rich",
+      "freq_hz": 1.0,
+      "rep": 2,
+      "policy": "rich",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 67.76078796386719,
+      "state_updates_collected": 108,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_rich_f10_r1",
+      "rc": 0,
+      "elapsed_s": 109.6894142627716,
+      "workload": "chatbot",
+      "state_view": "rich",
+      "freq_hz": 10.0,
+      "rep": 1,
+      "policy": "rich",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 69.70069599151611,
+      "state_updates_collected": 1093,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_rich_f10_r2",
+      "rc": 0,
+      "elapsed_s": 112.04194450378418,
+      "workload": "chatbot",
+      "state_view": "rich",
+      "freq_hz": 10.0,
+      "rep": 2,
+      "policy": "rich",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 72.48389601707458,
+      "state_updates_collected": 1116,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_rich_f50_r1",
+      "rc": 0,
+      "elapsed_s": 108.9613709449768,
+      "workload": "chatbot",
+      "state_view": "rich",
+      "freq_hz": 50.0,
+      "rep": 1,
+      "policy": "rich",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 68.31864356994629,
+      "state_updates_collected": 1484,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_rich_f50_r2",
+      "rc": 0,
+      "elapsed_s": 114.9872133731842,
+      "workload": "chatbot",
+      "state_view": "rich",
+      "freq_hz": 50.0,
+      "rep": 2,
+      "policy": "rich",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 75.32759022712708,
+      "state_updates_collected": 1573,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_sketch_f1_r1",
+      "rc": 0,
+      "elapsed_s": 115.44039678573608,
+      "workload": "chatbot",
+      "state_view": "sketch",
+      "freq_hz": 1.0,
+      "rep": 1,
+      "policy": "sketch",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 75.56946039199829,
+      "state_updates_collected": 115,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_sketch_f1_r2",
+      "rc": 0,
+      "elapsed_s": 116.4456992149353,
+      "workload": "chatbot",
+      "state_view": "sketch",
+      "freq_hz": 1.0,
+      "rep": 2,
+      "policy": "sketch",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 72.79421997070312,
+      "state_updates_collected": 116,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_sketch_f10_r1",
+      "rc": 0,
+      "elapsed_s": 111.40380859375,
+      "workload": "chatbot",
+      "state_view": "sketch",
+      "freq_hz": 10.0,
+      "rep": 1,
+      "policy": "sketch",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 71.73179054260254,
+      "state_updates_collected": 1110,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_sketch_f10_r2",
+      "rc": 0,
+      "elapsed_s": 112.98725771903992,
+      "workload": "chatbot",
+      "state_view": "sketch",
+      "freq_hz": 10.0,
+      "rep": 2,
+      "policy": "sketch",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 71.91157341003418,
+      "state_updates_collected": 1126,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_sketch_f50_r1",
+      "rc": 0,
+      "elapsed_s": 109.93845748901367,
+      "workload": "chatbot",
+      "state_view": "sketch",
+      "freq_hz": 50.0,
+      "rep": 1,
+      "policy": "sketch",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 67.4159197807312,
+      "state_updates_collected": 1552,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "chatbot_sketch_f50_r2",
+      "rc": 0,
+      "elapsed_s": 110.17792868614197,
+      "workload": "chatbot",
+      "state_view": "sketch",
+      "freq_hz": 50.0,
+      "rep": 2,
+      "policy": "sketch",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_total": 300,
+        "n_ok": 300,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "measurement_summary": {
+        "n_total": 600,
+        "n_ok": 600,
+        "success_rate": 1.0,
+        "achieved_rps": 10.0
+      },
+      "actual_measurement_elapsed_s": 70.44429159164429,
+      "state_updates_collected": 1523,
+      "n_workflows_in_table": 0
+    },
+    {
+      "cell_id": "agentic_none_f1_r1",
+      "rc": 0,
+      "elapsed_s": 64.38728976249695,
+      "workload": "agentic",
+      "state_view": "none",
+      "freq_hz": 1.0,
+      "rep": 1,
+      "policy": "round-robin",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 35.41213870048523,
+      "state_updates_collected": 64,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_none_f1_r2",
+      "rc": 0,
+      "elapsed_s": 66.44655752182007,
+      "workload": "agentic",
+      "state_view": "none",
+      "freq_hz": 1.0,
+      "rep": 2,
+      "policy": "round-robin",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 47.11698937416077,
+      "state_updates_collected": 66,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_none_f10_r1",
+      "rc": 0,
+      "elapsed_s": 60.33933925628662,
+      "workload": "agentic",
+      "state_view": "none",
+      "freq_hz": 10.0,
+      "rep": 1,
+      "policy": "round-robin",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 41.056336402893066,
+      "state_updates_collected": 599,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_none_f10_r2",
+      "rc": 0,
+      "elapsed_s": 68.03690648078918,
+      "workload": "agentic",
+      "state_view": "none",
+      "freq_hz": 10.0,
+      "rep": 2,
+      "policy": "round-robin",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 46.74382734298706,
+      "state_updates_collected": 676,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_none_f50_r1",
+      "rc": 0,
+      "elapsed_s": 64.17473340034485,
+      "workload": "agentic",
+      "state_view": "none",
+      "freq_hz": 50.0,
+      "rep": 1,
+      "policy": "round-robin",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 19,
+        "success_rate": 0.95
+      },
+      "actual_measurement_elapsed_s": 37.338611125946045,
+      "state_updates_collected": 909,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_none_f50_r2",
+      "rc": 0,
+      "elapsed_s": 74.21857619285583,
+      "workload": "agentic",
+      "state_view": "none",
+      "freq_hz": 50.0,
+      "rep": 2,
+      "policy": "round-robin",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 51.97325301170349,
+      "state_updates_collected": 1048,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_coarse_f1_r1",
+      "rc": 0,
+      "elapsed_s": 75.38351941108704,
+      "workload": "agentic",
+      "state_view": "coarse",
+      "freq_hz": 1.0,
+      "rep": 1,
+      "policy": "coarse",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 48.97844362258911,
+      "state_updates_collected": 75,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_coarse_f1_r2",
+      "rc": 0,
+      "elapsed_s": 98.39114356040955,
+      "workload": "agentic",
+      "state_view": "coarse",
+      "freq_hz": 1.0,
+      "rep": 2,
+      "policy": "coarse",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 68.88947033882141,
+      "state_updates_collected": 98,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_coarse_f10_r1",
+      "rc": 0,
+      "elapsed_s": 101.43542838096619,
+      "workload": "agentic",
+      "state_view": "coarse",
+      "freq_hz": 10.0,
+      "rep": 1,
+      "policy": "coarse",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 74.31682062149048,
+      "state_updates_collected": 1010,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_coarse_f10_r2",
+      "rc": 0,
+      "elapsed_s": 76.18322968482971,
+      "workload": "agentic",
+      "state_view": "coarse",
+      "freq_hz": 10.0,
+      "rep": 2,
+      "policy": "coarse",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 57.52326321601868,
+      "state_updates_collected": 758,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_coarse_f50_r1",
+      "rc": 0,
+      "elapsed_s": 82.70114707946777,
+      "workload": "agentic",
+      "state_view": "coarse",
+      "freq_hz": 50.0,
+      "rep": 1,
+      "policy": "coarse",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 57.12509298324585,
+      "state_updates_collected": 1169,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_coarse_f50_r2",
+      "rc": 0,
+      "elapsed_s": 85.67623329162598,
+      "workload": "agentic",
+      "state_view": "coarse",
+      "freq_hz": 50.0,
+      "rep": 2,
+      "policy": "coarse",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 56.52090764045715,
+      "state_updates_collected": 1249,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_rich_f1_r1",
+      "rc": 0,
+      "elapsed_s": 87.43873023986816,
+      "workload": "agentic",
+      "state_view": "rich",
+      "freq_hz": 1.0,
+      "rep": 1,
+      "policy": "rich",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 60.43153142929077,
+      "state_updates_collected": 87,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_rich_f1_r2",
+      "rc": 0,
+      "elapsed_s": 94.43893957138062,
+      "workload": "agentic",
+      "state_view": "rich",
+      "freq_hz": 1.0,
+      "rep": 2,
+      "policy": "rich",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 60.0223753452301,
+      "state_updates_collected": 94,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_rich_f10_r1",
+      "rc": 0,
+      "elapsed_s": 79.6858983039856,
+      "workload": "agentic",
+      "state_view": "rich",
+      "freq_hz": 10.0,
+      "rep": 1,
+      "policy": "rich",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 53.76337957382202,
+      "state_updates_collected": 793,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_rich_f10_r2",
+      "rc": 0,
+      "elapsed_s": 81.33718347549438,
+      "workload": "agentic",
+      "state_view": "rich",
+      "freq_hz": 10.0,
+      "rep": 2,
+      "policy": "rich",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 55.297985553741455,
+      "state_updates_collected": 809,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_rich_f50_r1",
+      "rc": 0,
+      "elapsed_s": 75.47433280944824,
+      "workload": "agentic",
+      "state_view": "rich",
+      "freq_hz": 50.0,
+      "rep": 1,
+      "policy": "rich",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 49.72810482978821,
+      "state_updates_collected": 1049,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_rich_f50_r2",
+      "rc": 0,
+      "elapsed_s": 91.63741970062256,
+      "workload": "agentic",
+      "state_view": "rich",
+      "freq_hz": 50.0,
+      "rep": 2,
+      "policy": "rich",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 69.3302354812622,
+      "state_updates_collected": 1269,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_sketch_f1_r1",
+      "rc": 0,
+      "elapsed_s": 90.38710904121399,
+      "workload": "agentic",
+      "state_view": "sketch",
+      "freq_hz": 1.0,
+      "rep": 1,
+      "policy": "sketch",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 67.58731603622437,
+      "state_updates_collected": 90,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_sketch_f1_r2",
+      "rc": 0,
+      "elapsed_s": 94.41125226020813,
+      "workload": "agentic",
+      "state_view": "sketch",
+      "freq_hz": 1.0,
+      "rep": 2,
+      "policy": "sketch",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 68.71167492866516,
+      "state_updates_collected": 94,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_sketch_f10_r1",
+      "rc": 0,
+      "elapsed_s": 78.68995404243469,
+      "workload": "agentic",
+      "state_view": "sketch",
+      "freq_hz": 10.0,
+      "rep": 1,
+      "policy": "sketch",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 53.60040879249573,
+      "state_updates_collected": 783,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_sketch_f10_r2",
+      "rc": 0,
+      "elapsed_s": 78.28903770446777,
+      "workload": "agentic",
+      "state_view": "sketch",
+      "freq_hz": 10.0,
+      "rep": 2,
+      "policy": "sketch",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 49.923052072525024,
+      "state_updates_collected": 779,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_sketch_f50_r1",
+      "rc": 0,
+      "elapsed_s": 76.47174096107483,
+      "workload": "agentic",
+      "state_view": "sketch",
+      "freq_hz": 50.0,
+      "rep": 1,
+      "policy": "sketch",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 52.79382300376892,
+      "state_updates_collected": 1067,
+      "n_workflows_in_table": 20
+    },
+    {
+      "cell_id": "agentic_sketch_f50_r2",
+      "rc": 0,
+      "elapsed_s": 80.95823526382446,
+      "workload": "agentic",
+      "state_view": "sketch",
+      "freq_hz": 50.0,
+      "rep": 2,
+      "policy": "sketch",
+      "warmup_s": 30.0,
+      "duration_s": 60.0,
+      "warmup_summary": {
+        "n_workflows": 9,
+        "n_ok_workflows": 9,
+        "success_rate": 1.0
+      },
+      "measurement_summary": {
+        "n_workflows": 20,
+        "n_ok_workflows": 20,
+        "success_rate": 1.0
+      },
+      "actual_measurement_elapsed_s": 56.42824149131775,
+      "state_updates_collected": 1170,
+      "n_workflows_in_table": 20
+    }
+  ],
+  "failed": [],
+  "total_elapsed_s": 4577.06930398941
+}

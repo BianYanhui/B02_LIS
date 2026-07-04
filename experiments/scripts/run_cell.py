@@ -139,6 +139,11 @@ async def run_chatbot(dispatcher: Dispatcher, n_requests: int, target_rps: float
     with open(out_log, "w") as f:
         for r in results:
             f.write(orjson.dumps(r).decode() + "\n")
+    # Also write to request_log file for aggregation
+    req_log_path = out_log.replace("_chatbot.jsonl", "_request_log.jsonl")
+    with open(req_log_path, "w") as f:
+        for r in dispatcher.request_log:
+            f.write(orjson.dumps(r).decode() + "\n")
     n_ok = sum(1 for r in results if r["success"])
     return {
         "n_total": len(results),
@@ -258,6 +263,11 @@ async def run_agentic(dispatcher: Dispatcher, n_workflows: int, step_counts: lis
     with open(out_log, "w") as f:
         for r in workflow_results:
             f.write(orjson.dumps(r).decode() + "\n")
+    # Also write per-step request log
+    req_log_path = out_log.replace("_workflow.jsonl", "_request_log.jsonl")
+    with open(req_log_path, "w") as f:
+        for r in dispatcher.request_log:
+            f.write(orjson.dumps(r).decode() + "\n")
     n_ok = sum(1 for r in workflow_results if r["success"])
     return {
         "n_workflows": len(workflow_results),
@@ -376,6 +386,6 @@ if __name__ == "__main__":
     ap.add_argument("--rep", type=int, default=1)
     ap.add_argument("--warmup-s", type=float, default=30)
     ap.add_argument("--duration-s", type=float, default=60)
-    ap.add_argument("--n-workflows", type=int, default=40)
+    ap.add_argument("--n-workflows", type=int, default=20)
     args = ap.parse_args()
     run_cell(args)

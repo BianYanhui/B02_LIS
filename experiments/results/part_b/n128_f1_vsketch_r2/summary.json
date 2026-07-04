@@ -1,0 +1,28 @@
+{
+  "cell_id": "n128_f1_vsketch_r2",
+  "n": 128,
+  "f_hz": 1,
+  "view": "sketch",
+  "rep": 2,
+  "duration_s": 20.0,
+  "actual_elapsed_s": 20.03359627723694,
+  "n_state_updates": 2560,
+  "n_dispatch_queries": 3733,
+  "n_deadline_missed": 0,
+  "size": {
+    "avg": 747.237890625,
+    "p50": 747,
+    "p95": 755,
+    "p99": 758,
+    "min": 731,
+    "max": 763
+  },
+  "build_us_p95": 194.289,
+  "ser_us_p95": 6.495,
+  "deser_us_p95": 15.542,
+  "merge_us_p95": 2.609,
+  "total_us_p95": 218.91,
+  "dispatch_latency_us_p50": 183.413,
+  "dispatch_latency_us_p95": 204.083,
+  "dispatch_latency_us_p99": 212.757
+}

@@ -1,0 +1,28 @@
+{
+  "cell_id": "n256_f10_vrich_r1",
+  "n": 256,
+  "f_hz": 10,
+  "view": "rich",
+  "rep": 1,
+  "duration_s": 20.0,
+  "actual_elapsed_s": 20.87886071205139,
+  "n_state_updates": 12454,
+  "n_dispatch_queries": 27,
+  "n_deadline_missed": 0,
+  "size": {
+    "avg": 38528.34037257106,
+    "p50": 38528,
+    "p95": 38585,
+    "p99": 38605,
+    "min": 38413,
+    "max": 38635
+  },
+  "build_us_p95": 1376.684,
+  "ser_us_p95": 44.952,
+  "deser_us_p95": 222.112,
+  "merge_us_p95": 60.569,
+  "total_us_p95": 1689.112,
+  "dispatch_latency_us_p50": 293.883,
+  "dispatch_latency_us_p95": 372.368,
+  "dispatch_latency_us_p99": 403.562
+}

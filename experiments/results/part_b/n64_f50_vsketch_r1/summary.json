@@ -1,0 +1,28 @@
+{
+  "cell_id": "n64_f50_vsketch_r1",
+  "n": 64,
+  "f_hz": 50,
+  "view": "sketch",
+  "rep": 1,
+  "duration_s": 20.0,
+  "actual_elapsed_s": 20.092253923416138,
+  "n_state_updates": 64000,
+  "n_dispatch_queries": 3014,
+  "n_deadline_missed": 0,
+  "size": {
+    "avg": 567.46453125,
+    "p50": 568,
+    "p95": 573,
+    "p99": 575,
+    "min": 552,
+    "max": 580
+  },
+  "build_us_p95": 110.981,
+  "ser_us_p95": 5.296,
+  "deser_us_p95": 11.481,
+  "merge_us_p95": 2.033,
+  "total_us_p95": 130.198,
+  "dispatch_latency_us_p50": 98.465,
+  "dispatch_latency_us_p95": 106.407,
+  "dispatch_latency_us_p99": 111.223
+}
