@@ -15,3 +15,7 @@ poc/.venv/
 *.log
 poc/**/logs/
 poc/**/cache/
+# experiment runtime artefacts
+experiments/results/**/*.pid
+experiments/results/**/*.log
+experiments/results/**/*.jsonl.tmp
