@@ -25,6 +25,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger("workload")
 
 
+# Fixed model id (must match what vLLM registered)
+MODEL_ID = "/home/byh/.cache/modelscope/qwen/Qwen2.5-1.5B-Instruct"
+
+
 # ---------------------------------------------------------------------------
 # Sample prompts (deterministic)
 # ---------------------------------------------------------------------------
@@ -121,7 +125,7 @@ async def run_chatbot(
         # Make the actual call to vLLM
         vllm_start = time.time_ns()
         body = {
-            "model": url,  # vLLM uses model name as registered id; but OpenAI API ignores this
+            "model": MODEL_ID,
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": random.randint(64, 128),
             "temperature": 0.7,
@@ -268,6 +272,7 @@ async def run_agentic(
                 # call vLLM for the step generation
                 vllm_start = time.time_ns()
                 body = {
+                    "model": MODEL_ID,
                     "messages": [
                         {"role": "user", "content": f"Step {step+1}/{total_steps}: {random_prompt(64, 128)}"}
                     ],

@@ -198,8 +198,12 @@ def run_part_a_cell(workload: str, state_view: str, freq_hz: float, rep: int) ->
         )
     rc2 = wk["proc"].wait()
     log.info("[%s] measurement workload rc=%d", cell_id, rc2)
-    # 4) Wait for collector to finish (slight overrun)
-    rc1 = coll["proc"].wait(timeout=duration_s + 30)
+    # 4) Wait for collector to finish (allow up to total_s + 30s buffer)
+    rc1 = coll["proc"].wait(timeout=total_s + 30)
+    if rc1 is None:
+        log.warning("[%s] collector timed out, killing", cell_id)
+        coll["proc"].kill()
+        rc1 = -1
     log.info("[%s] collector rc=%d", cell_id, rc1)
     summary = {
         "cell_id": cell_id,

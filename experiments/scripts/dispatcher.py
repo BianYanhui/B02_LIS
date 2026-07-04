@@ -18,6 +18,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field, asdict
@@ -174,11 +175,21 @@ def policy_round_robin(state_view, request, ctx) -> str:
     return min(instances, key=lambda i: ctx["last_assigned_at"].get(i, 0))
 
 
+def _tiebreak_key(i: str) -> tuple:
+    """Stable tiebreaker: instance index for deterministic ordering across calls."""
+    try:
+        idx = int(i.split("_")[-1])
+    except Exception:
+        idx = 0
+    # add a tiny random offset so subsequent ties pick different instances
+    return (idx + random.random() * 0.01,)
+
+
 def policy_coarse(state_view, request, ctx) -> str:
     """α * (waiting + running) + β * kv_usage."""
     instances = ctx["instances"]
     alpha, beta = ctx["alpha"], ctx["beta"]
-    def score(i: str) -> float:
+    def score(i: str) -> tuple:
         v = state_view.get(i, {})
         rt = v.get("runtime", v)  # Coarse has no 'runtime' key, rich does
         if "num_requests_waiting" in rt:
@@ -189,7 +200,7 @@ def policy_coarse(state_view, request, ctx) -> str:
             w = rt.get("load_q", 0)
             r = 0
             kv = rt.get("kv_cache_usage_q", 0) / 100.0
-        return alpha * (w + r) + beta * kv
+        return (alpha * (w + r) + beta * kv,) + _tiebreak_key(i)
     return min(instances, key=score)
 
 
