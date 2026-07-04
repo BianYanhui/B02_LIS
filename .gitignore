@@ -1,1 +1,17 @@
 docx/prompt/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Virtualenvs (kept inside B02 for reproducibility)
+.venv/
+venv/
+poc/.venv/
+
+# Logs and local-only run artifacts
+*.log
+poc/**/logs/
+poc/**/cache/
