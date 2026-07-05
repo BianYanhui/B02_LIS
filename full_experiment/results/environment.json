@@ -1,0 +1,22 @@
+{
+  "hostname": "yhs1 (192.168.2.125)",
+  "gpu_model": "Tesla T4 (8x total: 2 instances per GPU)",
+  "gpu_memory": "15 GB per card (8 instances \u00d7 ~5 GB)",
+  "vllm_version": "0.10.2",
+  "torch_version": "2.8.0+cu128",
+  "transformers_version": "4.55.2",
+  "model": "/home/byh/.cache/modelscope/qwen/Qwen2.5-1.5B-Instruct",
+  "vllm_launch_params": {
+    "gpu_memory_utilization": 0.4,
+    "max_model_len": 2048,
+    "max_num_seqs": 24,
+    "enable_prefix_caching": true,
+    "swap_space": 2,
+    "block_size": 16,
+    "enforce_eager": true
+  },
+  "n_vllm_instances": 8,
+  "ports": "8000-8007",
+  "serialization": "orjson",
+  "network": "loopback (single host)"
+}

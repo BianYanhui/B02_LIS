@@ -203,7 +203,8 @@ async def stress_cell(n, f_hz, view, rep, duration_s, n_workflows_per_inst=8):
     def q(xs, p):
         if not xs: return 0
         xs = sorted(xs)
-        return xs[max(0, min(len(xs)-1, int(round(p/100*(len(xs)-1))))]
+        idx = max(0, min(len(xs)-1, int(round(p / 100.0 * (len(xs) - 1)))))
+        return xs[idx]
     summary = {
         "cell_id": cell_id, "n": n, "f_hz": f_hz, "view": view, "rep": rep,
         "duration_s": duration_s, "n_updates": n_updates,

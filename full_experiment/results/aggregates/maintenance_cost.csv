@@ -1,0 +1,5 @@
+workload,view,freq_hz,traffic_Bps,p95_total_update_us,p95_ser_us,p95_deser_us,p95_merge_us
+agentic,sketch,10.0,28584,94.4,,,
+bursty,sketch,10.0,28621,91.3,,,
+mixed,sketch,10.0,28622,85.8,,,
+prefix,locality,10.0,28383,87.7,,,

@@ -1,0 +1,194 @@
+[
+  {
+    "cell_id": "round-robin_chatbot_none_f1_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "round-robin_chatbot_none_f1_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "round-robin_chatbot_none_f10_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "round-robin_chatbot_none_f10_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "round-robin_chatbot_none_f50_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "round-robin_chatbot_none_f50_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "coarse_chatbot_coarse_f1_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "coarse_chatbot_coarse_f1_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "coarse_chatbot_coarse_f10_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "coarse_chatbot_coarse_f10_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "coarse_chatbot_coarse_f50_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "coarse_chatbot_coarse_f50_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "rich_chatbot_rich_f1_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "rich_chatbot_rich_f1_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "rich_chatbot_rich_f10_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "rich_chatbot_rich_f10_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "rich_chatbot_rich_f50_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "rich_chatbot_rich_f50_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "sketch_chatbot_sketch_f1_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "sketch_chatbot_sketch_f1_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "sketch_chatbot_sketch_f10_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "sketch_chatbot_sketch_f10_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "sketch_chatbot_sketch_f50_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "sketch_chatbot_sketch_f50_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "round-robin_agentic_none_f1_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "round-robin_agentic_none_f1_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "round-robin_agentic_none_f10_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "round-robin_agentic_none_f10_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "round-robin_agentic_none_f50_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "round-robin_agentic_none_f50_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "coarse_agentic_coarse_f1_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "coarse_agentic_coarse_f1_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "coarse_agentic_coarse_f10_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "coarse_agentic_coarse_f10_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "coarse_agentic_coarse_f50_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "coarse_agentic_coarse_f50_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "rich_agentic_rich_f1_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "rich_agentic_rich_f1_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "rich_agentic_rich_f10_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "rich_agentic_rich_f10_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "rich_agentic_rich_f50_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "rich_agentic_rich_f50_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "sketch_agentic_sketch_f1_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "sketch_agentic_sketch_f1_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "sketch_agentic_sketch_f10_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "sketch_agentic_sketch_f10_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "sketch_agentic_sketch_f50_r1",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  },
+  {
+    "cell_id": "sketch_agentic_sketch_f50_r2",
+    "error": "'Dispatcher' object has no attribute 'state_updates'"
+  }
+]

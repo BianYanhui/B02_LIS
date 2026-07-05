@@ -40,7 +40,7 @@ log = logging.getLogger("full")
 sys.path.insert(0, os.path.expanduser("~/B02/experiments/scripts"))
 sys.path.insert(0, os.path.expanduser("~/B02/tradeoff_experiments/scripts"))
 from dispatcher import (
-    Dispatcher, DispatcherConfig, WorkflowRecord, POLICIES,
+    Dispatcher, DispatcherConfig, WorkflowRecord,
 )
 from workloads import MODEL_ID, TOOL_NAMES, random_prompt
 
@@ -72,7 +72,7 @@ def make_prefix(name: str, target_tokens: int) -> str:
     return s[:target_tokens * 4]
 
 
-def streaming_request(session, url, messages, max_tokens):
+async def streaming_request(session, url, messages, max_tokens):
     """Streaming OpenAI call, returns timing details."""
     vllm_start = time.time_ns()
     first_token_ns = 0
@@ -259,7 +259,10 @@ async def run_workload_for_cell(policy, workload, view, freq_hz, n_workflows, n_
         workflow_results.append(wf_rec)
 
     sem = asyncio.Semaphore(concurrent)
-    async def with_sem(idx): async with sem: await one_workflow(idx)
+
+    async def with_sem(idx):
+        async with sem:
+            await one_workflow(idx)
     await asyncio.gather(*[asyncio.create_task(with_sem(i)) for i in range(n_workflows)])
     stop.set()
     th.join(timeout=10)
@@ -285,13 +288,14 @@ async def run_workload_for_cell(policy, workload, view, freq_hz, n_workflows, n_
     decisions = [r["decision_us"] for r in request_log if r.get("decision_us") is not None]
     wcs = [wf["workflow_completion_ms"] for wf in workflow_results if wf["success"]]
 
-    dispatch_decisions = []
-    for u in dispatcher.state_updates.values() if dispatcher.state_updates else []:
-        pass
+    sizes = []
     f_path = f"{CELLS}/{policy}_{workload}_{view}_f{freq_hz:g}_r{rep}/state_updates.jsonl"
     if os.path.exists(f_path):
-        # Already exist from collector
-        pass
+        with open(f_path) as f:
+            for line in f:
+                d = json.loads(line)
+                for inst, dd in d.get("per_instance", {}).items():
+                    sizes.append(dd.get("size_bytes", 0))
     sizes = []
     if os.path.exists(f_path):
         with open(f_path) as f:
