@@ -112,8 +112,8 @@ async def run_tradeoff_cell(policy: str, freq_hz: float, n_workflows: int,
     cfg = DispatcherConfig(
         instances=INSTANCES,
         instance_urls=URLS,
-        state_view="rich" if policy != "round-robin" else "coarse",
-        # state_view only matters for serialization; for dispatch we use policy directly
+        # Map policy to the right state view to serialize (independent of policy name)
+        state_view={"round-robin": "coarse", "coarse": "coarse", "rich": "rich", "sketch": "sketch"}[policy],
         update_freq_hz=freq_hz,
         duration_s=duration_s,
         out_dir=out_dir,
@@ -264,9 +264,6 @@ async def run_tradeoff_cell(policy: str, freq_hz: float, n_workflows: int,
     decision_us = []
     wcs = []
     sizes = []
-    for u in dispatcher.state_updates.values() if dispatcher.state_updates else []:
-        pass
-    # recompute sizes from collected
     # use state_updates recorded in self.f_state
     f_path = os.path.join(out_dir, "state_updates.jsonl")
     if os.path.exists(f_path):
