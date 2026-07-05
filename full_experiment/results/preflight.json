@@ -1,0 +1,73 @@
+{
+  "tier0": {
+    "instance_0": {
+      "url": "http://127.0.0.1:8000",
+      "health": true,
+      "status_code": 200,
+      "gen_status": 200,
+      "gen_ok": true,
+      "gen_sample": "Connection is successful."
+    },
+    "instance_1": {
+      "url": "http://127.0.0.1:8001",
+      "health": true,
+      "status_code": 200,
+      "gen_status": 200,
+      "gen_ok": true,
+      "gen_sample": "Connection is successful."
+    },
+    "instance_2": {
+      "url": "http://127.0.0.1:8002",
+      "health": true,
+      "status_code": 200,
+      "gen_status": 200,
+      "gen_ok": true,
+      "gen_sample": "Connection is successful."
+    },
+    "instance_3": {
+      "url": "http://127.0.0.1:8003",
+      "health": true,
+      "status_code": 200,
+      "gen_status": 200,
+      "gen_ok": true,
+      "gen_sample": "Connection is successful."
+    },
+    "instance_4": {
+      "url": "http://127.0.0.1:8004",
+      "health": true,
+      "status_code": 200,
+      "gen_status": 200,
+      "gen_ok": true,
+      "gen_sample": "Connection is successful."
+    },
+    "instance_5": {
+      "url": "http://127.0.0.1:8005",
+      "health": true,
+      "status_code": 200,
+      "gen_status": 200,
+      "gen_ok": true,
+      "gen_sample": "Connection is successful."
+    },
+    "instance_6": {
+      "url": "http://127.0.0.1:8006",
+      "health": true,
+      "status_code": 200,
+      "gen_status": 200,
+      "gen_ok": true,
+      "gen_sample": "Connection is successful."
+    },
+    "instance_7": {
+      "url": "http://127.0.0.1:8007",
+      "health": true,
+      "status_code": 200,
+      "gen_status": 200,
+      "gen_ok": true,
+      "gen_sample": "Connection is successful."
+    }
+  },
+  "start_ts": 1783244200.2408507,
+  "all_healthy": true,
+  "all_gen_ok": true,
+  "end_ts": 1783244201.5125525,
+  "duration_s": 1.2717018127441406
+}
