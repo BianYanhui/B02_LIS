@@ -16,6 +16,7 @@ Outputs:
 import json
 import math
 import os
+import re
 import sys
 from collections import defaultdict
 from statistics import mean, stdev
@@ -39,39 +40,38 @@ LOAD_LABEL = {"balanced": "balanced", "imbalanced_2": "2/8 loaded", "imbalanced_
 
 
 def load_summaries():
-    """Returns {(policy, load, rep): summary}"""
+    """Scan cells directory directly, classify each cell by inspecting name."""
     out = {}
-    for p in POLICIES:
-        for lc in LOADS:
-            for rep in [1, 2, 3]:
-                key = (p, lc, rep)
-                if lc == "balanced":
-                    pat = f"{p}_f5_balanced_r{rep}_w12_s10_c4"
-                else:
-                    n = "2" if lc == "imbalanced_2" else "6"
-                    pat = f"{p}_f5_instance_0_instance_{n}_r{rep}_w12_s10_c4"
-                # try matching pattern
-                if not os.path.isdir(os.path.join(RESULTS, pat)):
-                    # try fuzzy match
-                    found = None
-                    for d in os.listdir(RESULTS):
-                        if d.startswith(f"{p}_f5_") and d.endswith(f"_r{rep}_w12_s10_c4"):
-                            # check load
-                            if lc == "balanced" and "balanced" in d:
-                                found = d
-                                break
-                            elif lc == "imbalanced_2" and "instance_0" in d and "instance_1" in d and "instance_2" not in d:
-                                found = d
-                                break
-                            elif lc == "imbalanced_6" and "instance_5" in d:
-                                found = d
-                                break
-                    if found:
-                        pat = found
-                path = os.path.join(RESULTS, pat, "summary.json")
-                if os.path.exists(path):
-                    with open(path) as f:
-                        out[key] = json.load(f)
+    if not os.path.isdir(RESULTS):
+        return out
+    for d in os.listdir(RESULTS):
+        sp = os.path.join(RESULTS, d, "summary.json")
+        if not os.path.isdir(os.path.join(RESULTS, d)) or not os.path.exists(sp):
+            continue
+        # Match policy prefix
+        policy = None
+        for p in POLICIES:
+            if d.startswith(p + "_"):
+                policy = p
+                break
+        if policy is None:
+            continue
+        # Detect load by inspecting list repr in name
+        if "_none_" in d:
+            load = "balanced"
+        elif "_['instance_0', 'instance_1']_" in d:
+            load = "imbalanced_2"
+        elif "_['instance_0', 'instance_1', 'instance_2', 'instance_3', 'instance_4', 'instance_5']_" in d:
+            load = "imbalanced_6"
+        else:
+            continue
+        # Extract rep
+        m = re.search(r"_r(\d+)_w12_", d)
+        if not m:
+            continue
+        rep = int(m.group(1))
+        with open(sp) as f:
+            out[(policy, load, rep)] = json.load(f)
     return out
 
 
