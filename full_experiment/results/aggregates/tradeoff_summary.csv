@@ -1,10 +1,25 @@
 workload,freq_hz,policy,policy_quality_relative_to_coarse,policy_overhead_relative_to_coarse,policy_quality_relative_to_rich,policy_overhead_reduction_vs_rich,verdict
-agentic,10.0,coarse,1.000,1.000,1.017,0.000,baseline
-agentic,10.0,rich,0.983,1.000,1.000,0.000,cost~1.0x coarse
-agentic,10.0,sketch,1.103,1.000,1.122,0.001,cost~1.0x coarse
+agentic,1.0,coarse,1.000,1.000,0.655,0.630,baseline
+agentic,1.0,rich,1.527,2.702,1.000,0.000,cost~2.7x coarse
+agentic,1.0,sketch,1.999,1.063,1.309,0.607,cost~1.1x coarse
+agentic,10.0,coarse,1.000,1.000,0.656,0.623,baseline
+agentic,10.0,rich,1.524,2.652,1.000,0.000,cost~2.7x coarse
+agentic,10.0,sketch,1.803,1.059,1.183,0.601,cost~1.1x coarse
+agentic,50.0,coarse,1.000,1.000,0.639,0.628,baseline
+agentic,50.0,rich,1.565,2.687,1.000,0.000,cost~2.7x coarse
+agentic,50.0,sketch,2.007,1.062,1.283,0.605,cost~1.1x coarse
 bursty,10.0,coarse,1.000,1.000,1.008,-0.000,baseline
 bursty,10.0,rich,0.992,1.000,1.000,0.000,cost~1.0x coarse
 bursty,10.0,sketch,0.976,1.000,0.984,-0.001,cost~1.0x coarse
+chatbot,1.0,coarse,1.000,1.000,0.995,0.976,baseline
+chatbot,1.0,rich,1.005,42.244,1.000,0.000,cost~42.2x coarse
+chatbot,1.0,sketch,1.006,1.056,1.000,0.975,Pareto-optimal (≈coarse quality at ≈coarse cost)
+chatbot,10.0,coarse,1.000,1.000,0.997,0.975,baseline
+chatbot,10.0,rich,1.003,40.392,1.000,0.000,cost~40.4x coarse
+chatbot,10.0,sketch,1.003,1.024,1.000,0.975,Pareto-optimal (≈coarse quality at ≈coarse cost)
+chatbot,50.0,coarse,1.000,1.000,0.997,0.975,baseline
+chatbot,50.0,rich,1.003,40.038,1.000,0.000,cost~40.0x coarse
+chatbot,50.0,sketch,1.002,1.026,1.000,0.974,Pareto-optimal (≈coarse quality at ≈coarse cost)
 mixed,10.0,coarse,1.000,1.000,1.001,0.000,baseline
 mixed,10.0,rich,0.999,1.000,1.000,0.000,cost~1.0x coarse
 mixed,10.0,sketch,1.067,1.000,1.067,-0.000,cost~1.0x coarse

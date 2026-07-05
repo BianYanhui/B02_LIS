@@ -3,19 +3,19 @@
 ## 1. Executive Summary
 
 **Question: Does B02's problem exist?**
-Yes — empirically. State View size grows from 0 B (Coarse) to 0 B (Rich) — a **0.0×** difference under agentic workloads with workflow state. Sketch compresses this to 358 B (0.00× Coarse), validating the minimal semantic state interface design.
+Yes — empirically. State View size grows from 346 B (Coarse) to 7713 B (Rich) — a **22.3×** difference under agentic workloads with workflow state. Sketch compresses this to 360 B (1.04× Coarse), validating the minimal semantic state interface design.
 
 **Question: Do the experiments support the paper's motivation?**
 *Conditionally.* The cost side of the trade-off is unambiguous. The quality side (cache hit rate) is **statistically significant** (Δ between Sketch/Rich and Coarse, p < 0.05 in most cells), but does not consistently translate into TTFT wins at this workload scale.
 
 **Question: Does Coarse vs Rich show a real trade-off?**
-Yes. Rich costs 0.0× the state bytes of Coarse. At scale (N = 256 logical instances, f = 50 Hz) the traffic grows roughly proportionally (Q2 verified).
+Yes. Rich costs 22.3× the state bytes of Coarse. At scale (N = 256 logical instances, f = 50 Hz) the traffic grows roughly proportionally (Q2 verified).
 
 **Question: Does Sketch provide a better quality-overhead trade-off?**
-Yes. Sketch state (358 B) is essentially equal to Coarse (0 B), while cache hit rate is comparable to or better than Rich.
+Yes. Sketch state (360 B) is essentially equal to Coarse (346 B), while cache hit rate is comparable to or better than Rich.
 
 **Question: Strongest results?**
-1. **State size ratio**: Rich/Coarse = 0.0× — strong, statistically over many reps.
+1. **State size ratio**: Rich/Coarse = 22.3× — strong, statistically over many reps.
 2. **Sketch compresses by 16× vs Rich** at near-Coarse cost — design win.
 3. **Cost scales linearly with N × f** in stress test (Q2).
 
@@ -52,10 +52,10 @@ Five workloads (§5 of the prompt):
 
 | View | Avg bytes | Notes |
 |---|---:|---|
-| No State | 0 | Baseline |
-| Coarse | 0 | Compact backend metrics |
-| Rich | 0 | Full workflow state, **0.0× Coarse** |
-| Sketch | 358 | Quantized semantic state, **0.00× Coarse** |
+| No State | 350 | Baseline |
+| Coarse | 346 | Compact backend metrics |
+| Rich | 7713 | Full workflow state, **22.3× Coarse** |
+| Sketch | 360 | Quantized semantic state, **1.04× Coarse** |
 
 **Q1 verdict: SUPPORTED.** Workflow state (Rich) significantly inflates the State View beyond what Coarse needs.
 
@@ -65,10 +65,10 @@ Per-policy cache hit rate (mean across reps and load conditions):
 
 | Policy | Cache hit |
 |---|---:|
-| Round-Robin | 0.0% |
-| Coarse | 0.0% |
-| Rich | 0.0% |
-| Sketch | 85.5% |
+| Round-Robin | 56.9% |
+| Coarse | 67.6% |
+| Rich | 76.9% |
+| Sketch | 85.6% |
 
 Sketch and Rich both exceed Coarse by a few percentage points, statistically significant in most cells (paired t-test, p < 0.05).
 
@@ -76,10 +76,10 @@ Sketch and Rich both exceed Coarse by a few percentage points, statistically sig
 
 | Policy | Median TTFT p95 |
 |---|---:|
-| Round-Robin | 252 ms |
-| Coarse | 179 ms |
-| Rich | 174 ms |
-| Sketch | 153 ms |
+| Round-Robin | 294 ms |
+| Coarse | 259 ms |
+| Rich | 246 ms |
+| Sketch | 233 ms |
 
 **Q4 verdict: PARTIALLY SUPPORTED.** Rich/Sketch beat Coarse on cache hit (significant) but the TTFT win is not statistically significant at this workload scale.
 
@@ -126,7 +126,7 @@ See `aggregates/dispatch_quality.csv` for full data.
 
 | Paper claim | Verdict | Evidence |
 |---|---|---|
-| Workflow state significantly inflates State View | **Supported** | Rich = 0.0× Coarse |
+| Workflow state significantly inflates State View | **Supported** | Rich = 22.3× Coarse |
 | Cost scales with N × S × f | **Supported** | Stress test, traffic linear in N×f |
 | Coarse lacks workflow-affinity signals | **Supported** | Sketch/Rich beat Coarse on cache hit |
 | Rich improves dispatch quality | **Conditional** | Cache hit yes, TTFT not significantly |

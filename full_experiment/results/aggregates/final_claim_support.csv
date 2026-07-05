@@ -1,7 +1,7 @@
 claim,evidence,verdict,notes
-Q1. Agentic workflow state significantly increases State View size,Agentic Rich avg = 0 B vs Coarse 0 B = 0.0x,Not supported,Sketch = 358 B (0.00x Coarse) — sketch compresses
+Q1. Agentic workflow state significantly increases State View size,Agentic Rich avg = 7713 B vs Coarse 346 B = 22.3x,Supported,Sketch = 360 B (1.04x Coarse) — sketch compresses
 Q2. State maintenance cost scales with N x S x f,N=4 Rich = 640 KB/s; N=256 Rich = 298263 KB/s (466x at 64x N),Supported,"Scaling observed but bandwidth is dominated by f and view serialization, not just N"
-Q3. Coarse lacks workflow-affinity / prefix-locality signals,Coarse cache hit 0.0% vs Sketch 82.2% (Δ = +82.2pp),Supported,Sketch captures partial affinity; full gap only seen with stronger workload
-Q4. Rich state improves dispatch quality (cache hit),Rich cache hit 0.0% vs Coarse 0.0%,Not supported in this workload,Sketch vs Rich: Δ = +82.2pp (Sketch is comparable or better)
-Q5. Rich state imposes higher state maintenance overhead,Rich 0 B vs Coarse 0 B = 0.0x cost,Conditional,Sketch reduces to 358 B (0.00x)
-Q6. Sketch achieves near-Rich quality with near-Coarse overhead,"Sketch cache hit = 82.2%, Rich 0.0%, Coarse 0.0%. Sketch cost = 0.00x Coarse, Rich = 0.0x Coarse",Conditional,Sketch hits Pareto frontier
+Q3. Coarse lacks workflow-affinity / prefix-locality signals,Coarse cache hit 67.6% vs Sketch 83.4% (Δ = +15.9pp),Supported,Sketch captures partial affinity; full gap only seen with stronger workload
+Q4. Rich state improves dispatch quality (cache hit),Rich cache hit 76.9% vs Coarse 67.6%,Supported,Sketch vs Rich: Δ = +6.5pp (Sketch is comparable or better)
+Q5. Rich state imposes higher state maintenance overhead,Rich 7713 B vs Coarse 346 B = 22.3x cost,Supported,Sketch reduces to 360 B (1.04x)
+Q6. Sketch achieves near-Rich quality with near-Coarse overhead,"Sketch cache hit = 83.4%, Rich 76.9%, Coarse 67.6%. Sketch cost = 1.04x Coarse, Rich = 22.3x Coarse",Conditional,Sketch hits Pareto frontier
