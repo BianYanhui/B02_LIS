@@ -91,3 +91,6 @@
 {"ts_ns":1783235097074992204,"instance_id":"instance_0","policy":"coarse","state_view":"coarse","decision_time_us":54.677}
 {"ts_ns":1783235097943271985,"instance_id":"instance_2","policy":"coarse","state_view":"coarse","decision_time_us":64.501}
 {"ts_ns":1783235098843293784,"instance_id":"instance_0","policy":"coarse","state_view":"coarse","decision_time_us":54.924}
+{"ts_ns":1783235100589433256,"instance_id":"instance_1","policy":"coarse","state_view":"coarse","decision_time_us":56.229}
+{"ts_ns":1783235101158802970,"instance_id":"instance_2","policy":"coarse","state_view":"coarse","decision_time_us":74.488}
+{"ts_ns":1783235103488076440,"instance_id":"instance_0","policy":"coarse","state_view":"coarse","decision_time_us":62.016}
