@@ -1,0 +1,21 @@
+{
+  "cell_id": "stress_n4_f10_vrich_r3",
+  "n": 4,
+  "f_hz": 10,
+  "view": "rich",
+  "rep": 3,
+  "duration_s": 60,
+  "n_updates": 600,
+  "target_f": 10,
+  "achieved_f": 9.9999972979235,
+  "size_p95": 3111,
+  "size_avg": 3111,
+  "target_traffic_MBps": 0.12444,
+  "achieved_traffic_MBps": 0.12443996637536003,
+  "ser_us_p95": 13.141,
+  "deser_us_p95": 39.893,
+  "merge_us_p95": 0.363,
+  "total_us_p95": 57.737,
+  "missed_deadline_rate": 2.7020765003271663e-07,
+  "sustainable": true
+}

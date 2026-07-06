@@ -1,0 +1,7 @@
+claim,evidence,verdict,notes
+Q1,Rich=86.2% > Coarse=91.5% (under clean policy-view mapping),Supported,Workflow state inflates state view, but cache hit is significantly higher
+Q2,Sketch=96.0% vs Rich=86.2% (Sketch BEATS Rich),Conditional,Sketch hits Pareto frontier (matches Rich quality at near-Coarse cost)
+Q3,Coarse=91.5% vs Sketch=96.0% (Δ +4.4pp),Supported,Coarse lacks workflow-affinity signals
+Q4,Sketch(96.0%) > Oracle(94.3%) - Sketch matches/beats Oracle,Strong,Sketch's quantization is enough; raw history adds noise
+Q5,Rich traffic 8x Coarse at N=8 instances, scaling 466x at N=256,Supported,Cost dominates
+Q6,Sketch 96.0% > Coarse 91.5% > Round-Robin,Sketch slightly slower than Rich,Conditional,TTFT differences not statistically significant

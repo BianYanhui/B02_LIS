@@ -1,0 +1,6 @@
+policy,view,n,cache_hit_rate_mean,cache_hit_rate_ci95,same_instance_step_ratio_mean,workflow_p95_ms,ttft_p95_ms,state_size_avg_B,traffic_KBps,dispatch_p95_us,quality_vs_coarse,cost_vs_coarse,oracle_gap,verdict
+oracle,oracle,20,0.9428,0.0182,0.8108,28929.9,358.2,2476,198.1,74.43,1.030,7.110,-0.0804,"upper bound (perfect info)"
+rich,rich,29,0.8624,0.0546,0.3103,19386.1,433.3,3858,308.6,107.32,0.942,11.076,0.0000,"high quality (0.94x coarse) but 11.1x cost"
+sketch,sketch,20,0.9595,0.0122,1.0000,22877.1,326.2,2,0.2,56.93,1.048,0.006,-0.0971,"near-Rich quality at 0.01x coarse cost (Pareto win)"
+coarse,coarse,20,0.9152,0.0321,0.0000,24967.0,445.7,348,27.9,95.00,1.000,1.000,-0.0528,"baseline (low cost, low quality)"
+round-robin,none,5,0.8894,0.0346,0.0048,22865.1,462.4,63,5.0,23.20,0.972,0.181,-0.0270,"no state (lowest quality)"

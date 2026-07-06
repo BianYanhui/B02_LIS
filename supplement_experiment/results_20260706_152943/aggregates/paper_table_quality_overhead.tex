@@ -1,0 +1,17 @@
+% Auto-generated from Tier A supplement experiment
+\begin{table}[t]
+\centering
+\caption{Clean Quality-Overhead Comparison (5 policies, 5 reps, prefix\_locality, 1024-token context, 8 steps, 200ms tool delay, 120s measurement)}
+\label{tab:quality-overhead}
+\begin{tabular}{lrrrrrr}
+\hline
+Policy & View & Cache hit & Affinity & TTFT p95 & Wf p95 & State (B) \\
+\hline
+Round-Robin & none & 88.9\% & 0.5\% & 462 ms & 22865 ms & 63 \\
+Coarse & coarse & 91.5\% & 0.0\% & 446 ms & 24967 ms & 348 \\
+Rich & rich & 86.2\% & 31.0\% & 433 ms & 19386 ms & 3858 \\
+Sketch & sketch & 96.0\% & 100.0\% & 326 ms & 22877 ms & 2 \\
+Oracle & oracle & 94.3\% & 81.1\% & 358 ms & 28930 ms & 2476 \\
+\hline
+\end{tabular}
+\end{table}

@@ -1,0 +1,13 @@
+policy,n,cache_hit_rate_mean,same_instance_step_ratio_mean,workflow_p95_ms,state_size_avg_B,traffic_KBps,dispatch_p95_us,conclusion
+None,24,0.0000,0.0000,0.0,0,0.0,0.00,""
+None,24,0.0000,0.0000,0.0,0,0.0,0.00,""
+None,24,0.0000,0.0000,0.0,0,0.0,0.00,""
+coarse,20,0.9152,0.0000,24967.0,348,27.9,95.00,"no workflow state (baseline)"
+oracle,20,0.9428,0.8108,28929.9,2476,198.1,74.43,""
+rich,29,0.8624,0.3103,19386.1,3858,308.6,107.32,"raw workflow state (baseline)"
+round-robin,5,0.8894,0.0048,22865.1,63,5.0,23.20,""
+sketch,20,0.9595,1.0000,22877.1,2,0.2,56.93,"full sketch (current design)"
+sketch-affinityonly,3,0.9870,1.0000,21428.3,2,0.2,55.97,"affinity only - minimal sketch"
+sketch-noaffinity,3,0.9758,1.0000,21764.6,2,0.2,35.62,"no affinity counter array - shows effect of affinity"
+sketch-noprogress,3,0.9864,1.0000,21168.4,2,0.2,57.25,"no progress quant - shows effect of progress"
+sketch-notoolbits,3,0.9825,1.0000,21125.5,2,0.2,51.49,"no tool bits - shows effect of tool status/context"

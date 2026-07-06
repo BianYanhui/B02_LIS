@@ -1,0 +1,10 @@
+mode,cell_id,avg_total_bytes,avg_coarse_bytes,avg_active_workflows_bytes,avg_assigned_history_bytes,avg_tool_metadata_bytes,avg_latency_summary_bytes,avg_num_active_workflows,avg_num_history_items,diagnosis
+no_workflow_state,rich_rich_chatbot_ctx512_s1_w100_c16_td0_f10_r1_nohist_nolat,7040,300,3064,983,2561,2,6.1,0.0,"active_workflows is the dominant contributor (even with no history)"
+global_history_enabled (no latency),rich_rich_chatbot_ctx512_s1_w100_c16_td0_f10_r1_nolat,8530,304,3485,1746,2863,2,6.8,54.5,"active_workflows is the dominant contributor (even with no history)"
+empty_workflow_container (no latency),rich_rich_chatbot_ctx512_s1_w100_c16_td0_f10_r1_notool_nolat,5903,304,3619,1847,2,2,7.2,57.7,"active_workflows is the dominant contributor (even with no history)"
+no_workflow_state,rich_rich_chatbot_ctx512_s1_w100_c16_td0_f10_r2_nohist_nolat,7645,304,3335,1069,2805,2,6.7,0.0,"active_workflows is the dominant contributor (even with no history)"
+global_history_enabled (no latency),rich_rich_chatbot_ctx512_s1_w100_c16_td0_f10_r2_nolat,8675,306,3546,1776,2917,2,6.9,55.5,"active_workflows is the dominant contributor (even with no history)"
+empty_workflow_container (no latency),rich_rich_chatbot_ctx512_s1_w100_c16_td0_f10_r2_notool_nolat,5609,302,3426,1748,2,2,6.8,54.6,"active_workflows is the dominant contributor (even with no history)"
+no_workflow_state,rich_rich_chatbot_ctx512_s1_w100_c16_td0_f10_r3_nohist_nolat,7822,304,3419,1097,2872,2,6.8,0.0,"active_workflows is the dominant contributor (even with no history)"
+global_history_enabled (no latency),rich_rich_chatbot_ctx512_s1_w100_c16_td0_f10_r3_nolat,8328,305,3403,1705,2785,2,6.7,53.3,"active_workflows is the dominant contributor (even with no history)"
+empty_workflow_container (no latency),rich_rich_chatbot_ctx512_s1_w100_c16_td0_f10_r3_notool_nolat,5687,301,3478,1775,2,2,6.9,55.4,"active_workflows is the dominant contributor (even with no history)"

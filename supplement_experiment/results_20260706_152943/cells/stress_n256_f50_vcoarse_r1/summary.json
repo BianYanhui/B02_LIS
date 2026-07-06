@@ -1,0 +1,21 @@
+{
+  "cell_id": "stress_n256_f50_vcoarse_r1",
+  "n": 256,
+  "f_hz": 50,
+  "view": "coarse",
+  "rep": 1,
+  "duration_s": 60,
+  "n_updates": 3000,
+  "target_f": 50,
+  "achieved_f": 49.99998867512006,
+  "size_p95": 377,
+  "size_avg": 374.4964166666667,
+  "target_traffic_MBps": 4.793554133333334,
+  "achieved_traffic_MBps": 4.793553047604832,
+  "ser_us_p95": 2.179,
+  "deser_us_p95": 4.779,
+  "merge_us_p95": 0.307,
+  "total_us_p95": 8.091,
+  "missed_deadline_rate": 2.2649759889858956e-07,
+  "sustainable": true
+}
