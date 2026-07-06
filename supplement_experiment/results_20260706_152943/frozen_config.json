@@ -1,0 +1,73 @@
+{
+  "experiment_name": "B02 Supplement",
+  "date": "2026-07-06",
+  "backend": {
+    "vllm_version": "0.10.2",
+    "torch_version": "2.8.0+cu128",
+    "transformers_version": "4.55.2",
+    "model": "/home/byh/.cache/modelscope/qwen/Qwen2.5-1.5B-Instruct",
+    "dtype": "fp16",
+    "n_instances": 8,
+    "ports": "8000-8007 (2 per GPU on 4 T4s)",
+    "vllm_launch_params": {
+      "gpu_memory_utilization": 0.40,
+      "max_model_len": 2048,
+      "max_num_seqs": 24,
+      "enable_prefix_caching": true,
+      "swap_space": 2,
+      "block_size": 16,
+      "enforce_eager": true
+    },
+    "serialization": "orjson"
+  },
+  "policy_view_mapping": {
+    "round-robin": "none",
+    "coarse": "coarse",
+    "rich": "rich",
+    "sketch": "sketch",
+    "oracle": "oracle"
+  },
+  "policy_formulas": {
+    "round-robin": "instance = (last_assigned + 1) mod N",
+    "coarse": "score = a*running + b*waiting + c*kv_usage,  pick argmin score",
+    "rich": "score = coarse_score - gamma*affinity_score + overload_penalty,  pick argmin score",
+    "sketch": "score = coarse_score - gamma*quantized_affinity_score,  pick argmin score",
+    "oracle": "perfect knowledge of workflow history + current load,  pick min(estimated completion time)"
+  },
+  "policy_access_asserts": {
+    "coarse": ["num_requests_waiting", "num_requests_running", "kv_cache_usage_perc"],
+    "sketch": ["kv_cache_usage_q", "load_q", "affinity_hot_instance_counts", "tool_status_bitset", "active_workflow_count"],
+    "rich": "all coarse fields + full workflow list",
+    "oracle": "all coarse + all rich + exact num_requests_running for each instance"
+  },
+  "workloads": {
+    "chatbot": "100 reqs/cell, 10 RPS, ~30 token prompts, no workflows",
+    "agentic": "8 workflows × 8 steps × 200ms tool delay per cell",
+    "prefix_locality": "12 workflows × 8 steps × 200ms tool delay, 1024-token shared prefix"
+  },
+  "context_lengths": [256, 1024, 1536],
+  "workflow_steps": [4, 8, 16],
+  "tool_delays_ms": [0, 200, 1000],
+  "update_frequencies_Hz": [1, 10, 50],
+  "reps": {
+    "ExpA": 5,
+    "ExpB": 3,
+    "ExpC": 3,
+    "ExpD": 3,
+    "ExpE": 3,
+    "ExpF": 3
+  },
+  "warmup_s": 30,
+  "measurement_s": {
+    "ExpA": 120,
+    "ExpB": 120,
+    "ExpC": 120,
+    "ExpD": 60,
+    "ExpE": 120,
+    "ExpF": 60
+  },
+  "load_levels": {
+    "medium": "12 concurrent workflows, 10 RPS",
+    "high": "20 concurrent workflows, 15 RPS"
+  }
+}
