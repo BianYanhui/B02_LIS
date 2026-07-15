@@ -153,10 +153,13 @@ def hash_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def prompt_for(request: TraceRequest) -> str:
+def prompt_for(request: TraceRequest, cache_namespace: str) -> str:
     # Space-separated stable tokens yield a long reusable prefix without
     # depending on an external tokenizer at experiment construction time.
-    header = f"run={request.prompt_namespace}; prefix={request.digest}; "
+    # ``cache_namespace`` is intentionally policy-specific.  The logical trace
+    # remains byte-identical at the dispatcher layer, while cache namespaces
+    # prevent one policy cell from reusing vLLM KV left by a prior cell.
+    header = f"run={cache_namespace}; logical={request.prompt_namespace}; prefix={request.digest}; "
     prefix = "context " * request.prefix_length
     return header + prefix + "\nReturn one concise action item."
 
@@ -318,7 +321,7 @@ def run_frozen_cell(trace: list[TraceRequest], policy: str, k: int | None, cache
     }, records
 
 
-async def run_closed_loop_cell(trace: list[TraceRequest], policy: str, k: int | None, cache_capacity: int, j: int, concurrency: int, load_slack: int) -> tuple[dict, list[dict]]:
+async def run_closed_loop_cell(trace: list[TraceRequest], policy: str, k: int | None, cache_capacity: int, j: int, concurrency: int, load_slack: int, cache_namespace: str) -> tuple[dict, list[dict]]:
     dispatcher = Dispatcher(policy, k, cache_capacity, j, load_slack)
     records: list[dict] = []
     async with aiohttp.ClientSession() as session:
@@ -333,7 +336,7 @@ async def run_closed_loop_cell(trace: list[TraceRequest], policy: str, k: int | 
                 dispatcher.loads[target] += 1
                 decisions.append((request, target, raw_fanout, evaluated_fanout, candidate))
             responses = await asyncio.gather(*[
-                one_request(session, URLS[target], prompt_for(request), request.request_id)
+                one_request(session, URLS[target], prompt_for(request, cache_namespace), request.request_id)
                 for request, target, _, _, _ in decisions
             ])
             for (request, target, raw_fanout, evaluated_fanout, candidate), response in zip(decisions, responses):
@@ -390,7 +393,8 @@ async def run_all(args) -> tuple[list[dict], list[dict]]:
                         metrics, per_request = run_frozen_cell(trace, policy, k, args.cache_capacity, args.j, args.load_slack)
                         evidence_type = "trace_replay_simulation"
                     else:
-                        metrics, per_request = await run_closed_loop_cell(trace, policy, k, args.cache_capacity, args.j, args.concurrency, args.load_slack)
+                        cache_namespace = f"{trace[0].prompt_namespace}__{policy}"
+                        metrics, per_request = await run_closed_loop_cell(trace, policy, k, args.cache_capacity, args.j, args.concurrency, args.load_slack, cache_namespace)
                         evidence_type = "live_t4_vllm"
                     row = {
                         "experiment_id": f"20260715_trace_{mode}_{policy}_{locality}_rep{rep}",
@@ -402,6 +406,7 @@ async def run_all(args) -> tuple[list[dict], list[dict]]:
                         "J": args.j,
                         "policy_family": "least_load_affinity_fallback",
                         "load_slack": args.load_slack,
+                        "serving_cache_namespace": cache_namespace if mode == "closed_loop" else "fixed_snapshot_no_live_cache",
                         "locality": locality,
                         "rep": rep,
                         "seed": args.seed,

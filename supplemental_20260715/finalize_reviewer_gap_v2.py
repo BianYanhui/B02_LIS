@@ -20,7 +20,8 @@ LEGACY = [
     ("eventdriven_all_results", "Legacy_DoNotCite", "old simulator lacks token-bucket chain", "budget_freshness_quality.csv"),
     ("ksweep_all_summaries", "Legacy_TTFT_only", "same_inst_step_ratio is non-discriminative", "trace_replay_quality.csv"),
     ("n256_*", "Legacy_Mock", "mock dispatcher, not 256-GPU serving", "j_bound_sweep.csv"),
-    ("trace_replay_v2_sanity_prepolicyfix", "Sanity_only", "adapter did not hold native policy fixed", "trace_replay_v2/trace_replay_quality.csv"),
+    ("trace_replay_v2_sanity_prepolicyfix", "Sanity_only", "adapter did not hold native policy fixed", "trace_replay_v3/trace_replay_quality.csv"),
+    ("trace_replay_v2_sanity_unisolated", "Sanity_only", "closed-loop policies shared physical vLLM cache namespaces", "trace_replay_v3/trace_replay_quality.csv"),
 ]
 
 
@@ -171,7 +172,7 @@ def main() -> None:
     parser.add_argument("--trace-commit", required=True)
     args = parser.parse_args()
     root = Path(args.root)
-    cpu, trace, sota = root / "reviewer_gap_v2", root / "trace_replay_v2", root / "sota_policy_matrix"
+    cpu, trace, sota = root / "reviewer_gap_v2", root / "trace_replay_v3", root / "sota_policy_matrix"
     cpu_files = ["cost_scaling.csv", "supp_admission_v2.csv", "j_bound_sweep.csv", "staleness_validation_v2.csv", "toctou_races.csv", "budget_freshness_quality.csv"]
     all_cpu = {name: replace_commit(cpu / name, args.cpu_commit) for name in cpu_files}
     trace_cells = replace_commit(trace / "trace_replay_quality_cells.csv", args.trace_commit)
