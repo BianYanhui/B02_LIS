@@ -1,0 +1,5 @@
+check_name,status,offending_rows,suggested_fix
+heterogeneous J evaluated fanout <= J,PASS,0,truncate before validation
+heterogeneous J quality is monotone in J,PASS,0,use common candidate realization within each request
+J candidates include nonzero coverage and queue variance,PASS,0,restore heterogeneous candidate generator
+budget rows use independent repetitions,PASS,0,vary rep in event-stream seed

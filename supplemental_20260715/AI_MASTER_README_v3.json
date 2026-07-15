@@ -1,0 +1,11 @@
+{
+  "purpose": "Merged AI-facing B02 evidence after reviewer-driven v3 supplements.",
+  "required_reading": [
+    "PAPER_EXPERIMENT_RESULTS_V3.md",
+    "paper_claim_evidence_v3.csv",
+    "experiment_registry_v3.csv",
+    "sanity_checks_v3.csv"
+  ],
+  "scope_rule": "Do not pool live, trace-derived, and control-plane simulation metrics as one latency claim.",
+  "agenttrace_privacy_rule": "Only derived length/hash/turn structure appears in output; raw agent source text is excluded from the AI master table."
+}

@@ -1,0 +1,21 @@
+{
+  "started_at_unix": 1784120382.0799592,
+  "finished_at_unix": 1784133692.5279448,
+  "duration_s": 13310.447985887527,
+  "arguments": {
+    "out_dir": "/home/byh/B02/supplemental_20260715/paired_t4_latency_v3",
+    "seed": 20260715,
+    "localities": "high,medium,low",
+    "n_requests": 288,
+    "warmup": 32,
+    "repetitions": 20,
+    "cache_capacity": 128,
+    "j": 8,
+    "concurrency": 4,
+    "load_slack": 0,
+    "cooldown_s": 0.25
+  },
+  "cells": 240,
+  "pairs": 180,
+  "raw_requests": 61440
+}

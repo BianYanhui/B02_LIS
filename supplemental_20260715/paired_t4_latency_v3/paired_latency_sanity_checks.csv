@@ -1,0 +1,5 @@
+check_name,status,offending_rows,suggested_fix
+all policies share trace hash within locality/rep,PASS,0,generate one trace per paired repetition
+no live request errors,PASS,0,inspect vLLM health and retry only after root cause
+per-policy vLLM cache namespace isolation,PASS,0,retain unique namespace per policy/repetition
+policy order randomized within repetition,PASS,0,shuffle policy sequence deterministically from seed
