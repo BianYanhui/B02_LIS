@@ -162,7 +162,7 @@ def prompt_for(request: TraceRequest) -> str:
 
 
 class Dispatcher:
-    def __init__(self, policy: str, k: int | None, cache_capacity: int, j: int):
+    def __init__(self, policy: str, k: int | None, cache_capacity: int, j: int, load_slack: int = 0):
         self.policy = policy
         self.k = k
         self.cache_capacity = cache_capacity
@@ -173,16 +173,21 @@ class Dispatcher:
         self.demand: Counter[str] = Counter()
         self.loads = [0 for _ in URLS]
         self.rr = 0
+        self.load_slack = load_slack
 
     def _least_loaded(self, candidates: list[int]) -> int:
-        return min(candidates, key=lambda index: (self.loads[index], index))
+        minimum = min(self.loads[index] for index in candidates)
+        tied = [index for index in candidates if self.loads[index] == minimum]
+        target = tied[self.rr % len(tied)]
+        self.rr += 1
+        return target
 
     def choose(self, digest: str) -> tuple[int, int, int, bool]:
         self.demand[digest] += 1
+        native = list(range(len(URLS)))
+        native_target = self._least_loaded(native)
         if self.policy == "load_only":
-            target = self.rr % len(URLS)
-            self.rr += 1
-            return target, 0, 0, False
+            return native_target, 0, 0, False
         if self.policy in {"exact", "sketch_inf"}:
             candidates = [index for index in range(len(URLS)) if digest in self.resident[index]]
         else:
@@ -190,9 +195,13 @@ class Dispatcher:
         raw = len(candidates)
         evaluated = sorted(candidates, key=lambda index: (self.loads[index], index))[: self.j]
         if evaluated:
-            return self._least_loaded(evaluated), raw, len(evaluated), True
-        target = self._least_loaded(list(range(len(URLS))))
-        return target, raw, 0, False
+            affinity_target = self._least_loaded(evaluated)
+            # This is one fixed least-load policy with an affinity fallback:
+            # visible reuse may win only when it is no more loaded than the
+            # best native candidate plus the configured load slack.
+            if self.loads[affinity_target] <= self.loads[native_target] + self.load_slack:
+                return affinity_target, raw, len(evaluated), True
+        return native_target, raw, 0, False
 
     def observe(self, target: int, digest: str) -> bool:
         was_resident = digest in self.resident[target]
@@ -271,8 +280,8 @@ def frozen_snapshot(trace: list[TraceRequest], cache_capacity: int) -> list[set[
     return snapshot
 
 
-def run_frozen_cell(trace: list[TraceRequest], policy: str, k: int | None, cache_capacity: int, j: int) -> tuple[dict, list[dict]]:
-    dispatcher = Dispatcher(policy, k, cache_capacity, j)
+def run_frozen_cell(trace: list[TraceRequest], policy: str, k: int | None, cache_capacity: int, j: int, load_slack: int) -> tuple[dict, list[dict]]:
+    dispatcher = Dispatcher(policy, k, cache_capacity, j, load_slack)
     snapshot = frozen_snapshot(trace, cache_capacity)
     dispatcher.resident = [set(entries) for entries in snapshot]
     for target in range(len(URLS)):
@@ -309,8 +318,8 @@ def run_frozen_cell(trace: list[TraceRequest], policy: str, k: int | None, cache
     }, records
 
 
-async def run_closed_loop_cell(trace: list[TraceRequest], policy: str, k: int | None, cache_capacity: int, j: int, concurrency: int) -> tuple[dict, list[dict]]:
-    dispatcher = Dispatcher(policy, k, cache_capacity, j)
+async def run_closed_loop_cell(trace: list[TraceRequest], policy: str, k: int | None, cache_capacity: int, j: int, concurrency: int, load_slack: int) -> tuple[dict, list[dict]]:
+    dispatcher = Dispatcher(policy, k, cache_capacity, j, load_slack)
     records: list[dict] = []
     async with aiohttp.ClientSession() as session:
         # Each wave is a small arrival batch. Decisions are made from the same
@@ -378,10 +387,10 @@ async def run_all(args) -> tuple[list[dict], list[dict]]:
             for mode in ["frozen", "closed_loop"]:
                 for policy, k in policy_cells():
                     if mode == "frozen":
-                        metrics, per_request = run_frozen_cell(trace, policy, k, args.cache_capacity, args.j)
+                        metrics, per_request = run_frozen_cell(trace, policy, k, args.cache_capacity, args.j, args.load_slack)
                         evidence_type = "trace_replay_simulation"
                     else:
-                        metrics, per_request = await run_closed_loop_cell(trace, policy, k, args.cache_capacity, args.j, args.concurrency)
+                        metrics, per_request = await run_closed_loop_cell(trace, policy, k, args.cache_capacity, args.j, args.concurrency, args.load_slack)
                         evidence_type = "live_t4_vllm"
                     row = {
                         "experiment_id": f"20260715_trace_{mode}_{policy}_{locality}_rep{rep}",
@@ -391,6 +400,8 @@ async def run_all(args) -> tuple[list[dict], list[dict]]:
                         "policy": policy,
                         "K": "inf" if policy in {"exact", "sketch_inf", "load_only"} else k,
                         "J": args.j,
+                        "policy_family": "least_load_affinity_fallback",
+                        "load_slack": args.load_slack,
                         "locality": locality,
                         "rep": rep,
                         "seed": args.seed,
@@ -463,6 +474,7 @@ def main() -> None:
     parser.add_argument("--cache-capacity", type=int, default=128)
     parser.add_argument("--j", type=int, default=8)
     parser.add_argument("--concurrency", type=int, default=4)
+    parser.add_argument("--load-slack", type=int, default=0)
     parser.add_argument("--context-lengths", default="256,512", help="comma-separated approximate token counts for live prompts")
     args = parser.parse_args()
     args.context_lengths = tuple(int(value) for value in args.context_lengths.split(",") if value)
