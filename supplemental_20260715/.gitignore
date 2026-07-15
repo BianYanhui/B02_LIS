@@ -3,6 +3,11 @@
 */run.pid
 */server_logs/
 frozen_replay_large/trace_replay_quality.json
+paired_t4_latency_v3/paired_latency_raw.json
+
+# Public source material is used only to derive privacy-preserving structural
+# traces. The committed manifest carries its source URL, license and SHA-256.
+agenttrace_source_v3/*.jsonl
 
 # Archived smoke and Sanity-only runs remain on yhs1 and are tracked by
 # legacy_data_status.csv, but are deliberately excluded from source control.
