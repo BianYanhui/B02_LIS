@@ -574,9 +574,15 @@ def run_cost_scaling(out_dir: Path, seed: int) -> list[dict]:
                         started = time.perf_counter_ns()
                         _ = index.get(key, [])
                         lookup_times.append((time.perf_counter_ns() - started) / 1e3)
-                    # Event-driven payload includes one changed entry and a lease
-                    # renewal at the configured 0.1 event/s/instance churn.
-                    event_bps = n_instances * 0.1 * (ENTRY_BYTES if interface != "load_only" else LEASE_RENEW_BYTES)
+                    # A resource-level event stream scales with the visible
+                    # resident cardinality.  Exact therefore emits changes for
+                    # every R_i entry, while Sketch emits only changes for its
+                    # bounded advertised A_i subset.  Load-only renews its
+                    # fixed coarse lease once per instance at the same cadence.
+                    if interface == "load_only":
+                        event_bps = n_instances * 0.1 * LEASE_RENEW_BYTES
+                    else:
+                        event_bps = entries * 0.1 * ENTRY_BYTES
                     rows.append(
                         {
                             "experiment_id": row_id("cost", interface, "high", k, "high", 0),
