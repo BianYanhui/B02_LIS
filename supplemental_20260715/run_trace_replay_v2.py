@@ -387,7 +387,7 @@ async def run_all(args) -> tuple[list[dict], list[dict]]:
             trace_path = trace_dir / f"trace_{locality}_rep{rep}.csv"
             trace = make_trace(trace_path, locality, rep, args.n_requests, args.warmup, args.seed, args.context_lengths)
             trace_hash = hash_file(trace_path)
-            for mode in ["frozen", "closed_loop"]:
+            for mode in args.modes:
                 for policy, k in policy_cells():
                     if mode == "frozen":
                         metrics, per_request = run_frozen_cell(trace, policy, k, args.cache_capacity, args.j, args.load_slack)
@@ -481,14 +481,16 @@ def main() -> None:
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--load-slack", type=int, default=0)
     parser.add_argument("--context-lengths", default="256,512", help="comma-separated approximate token counts for live prompts")
+    parser.add_argument("--modes", default="frozen,closed_loop", help="comma-separated subset of frozen,closed_loop")
     args = parser.parse_args()
     args.context_lengths = tuple(int(value) for value in args.context_lengths.split(",") if value)
-    if not args.context_lengths or args.concurrency < 1:
+    args.modes = tuple(value for value in args.modes.split(",") if value)
+    if not args.context_lengths or args.concurrency < 1 or not args.modes or any(value not in {"frozen", "closed_loop"} for value in args.modes):
         raise ValueError("context lengths and concurrency must be positive")
     started = time.time()
     rows, raw = asyncio.run(run_all(args))
-    # 3 locality x repetitions x 7 policies x 2 modes.
-    expected = 3 * args.repetitions * 7 * 2
+    # 3 locality x repetitions x 7 policies x selected replay modes.
+    expected = 3 * args.repetitions * 7 * len(args.modes)
     if len(rows) != expected:
         raise RuntimeError(f"expected {expected} cells, got {len(rows)}")
     root = Path(args.out_dir)

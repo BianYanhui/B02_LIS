@@ -105,7 +105,7 @@ def data_dictionary() -> list[dict]:
     ]
 
 
-def conclusion_rows(cpu: Path, trace: Path, sota: Path) -> list[dict]:
+def conclusion_rows(cpu: Path, trace: Path, frozen_large: Path, sota: Path) -> list[dict]:
     cost = read_csv(cpu / "cost_scaling.csv")
     target_cost = [row for row in cost if row["N"] == "128" and row["R_per_inst"] == "256" and row["K"] == "8"]
     cost_by = {row["interface"]: row for row in target_cost}
@@ -117,8 +117,9 @@ def conclusion_rows(cpu: Path, trace: Path, sota: Path) -> list[dict]:
     races = read_csv(cpu / "toctou_races.csv")
     budget = read_csv(cpu / "budget_freshness_quality.csv")
     live = read_csv(trace / "trace_replay_quality.csv")
-    frozen_exact = [row for row in live if row["mode"] == "frozen" and row["policy"] == "exact" and row["locality"] == "high"][0]
-    frozen_sk8 = [row for row in live if row["mode"] == "frozen" and row["policy"] == "sketch_k8" and row["locality"] == "high"][0]
+    frozen = read_csv(frozen_large / "trace_replay_quality.csv")
+    frozen_exact = [row for row in frozen if row["mode"] == "frozen" and row["policy"] == "exact" and row["locality"] == "high"][0]
+    frozen_sk8 = [row for row in frozen if row["mode"] == "frozen" and row["policy"] == "sketch_k8" and row["locality"] == "high"][0]
     closed_exact = [row for row in live if row["mode"] == "closed_loop" and row["policy"] == "exact" and row["locality"] == "high"][0]
     closed_sk16 = [row for row in live if row["mode"] == "closed_loop" and row["policy"] == "sketch_k16" and row["locality"] == "high"][0]
     b4low = [row for row in budget if row["baseline"] == "event_driven_token_bucket" and row["churn_events_per_inst_s"] == "0.01" and row["rate_budget_Bps"] == "256"][0]
@@ -171,19 +172,20 @@ def main() -> None:
     parser.add_argument("--trace-commit", required=True)
     args = parser.parse_args()
     root = Path(args.root)
-    cpu, trace, sota = root / "reviewer_gap_v2", root / "trace_replay_v3", root / "sota_policy_matrix"
+    cpu, trace, frozen_large, sota = root / "reviewer_gap_v2", root / "trace_replay_v3", root / "frozen_replay_large", root / "sota_policy_matrix"
     cpu_files = ["cost_scaling.csv", "supp_admission_v2.csv", "j_bound_sweep.csv", "staleness_validation_v2.csv", "toctou_races.csv", "budget_freshness_quality.csv"]
     all_cpu = {name: replace_commit(cpu / name, args.cpu_commit) for name in cpu_files}
     trace_cells = replace_commit(trace / "trace_replay_quality_cells.csv", args.trace_commit)
-    trace_summary = read_csv(trace / "trace_replay_quality.csv")
+    frozen_cells = replace_commit(frozen_large / "trace_replay_quality_cells.csv", args.trace_commit)
     registry = []
     for name, rows in all_cpu.items():
         registry.extend(record_registry(rows, name.removesuffix(".csv"), "legacy control-plane tables"))
     registry.extend(record_registry(trace_cells, "trace_replay_quality", "live_vllm_affinity_workload"))
+    registry.extend(record_registry(frozen_cells, "frozen_replay_large", "short frozen trace replay"))
     write_csv(root / "experiment_registry_v2.csv", registry)
     write_csv(root / "legacy_data_status.csv", [{"source_sheet": s, "status": st, "reason": r, "superseded_by": by} for s, st, r, by in LEGACY])
     write_csv(root / "data_dictionary_v2.csv", data_dictionary())
-    claims = conclusion_rows(cpu, trace, sota)
+    claims = conclusion_rows(cpu, trace, frozen_large, sota)
     write_csv(root / "paper_claim_evidence.csv", claims)
     write_paper_notes(root / "PAPER_EXPERIMENT_RESULTS_V2.md", claims)
     cpu_checks = read_csv(cpu / "sanity_checks.csv")
@@ -193,6 +195,7 @@ def main() -> None:
             row["status"] = "PASS" if all(check["status"] == "PASS" for check in trace_checks if "frozen Exact upper bound" in check["check_name"]) else "FAIL"
             row["suggested_fix"] = "fixed-snapshot live replay verifies Exact information upper bound"
     cpu_checks.extend(trace_checks)
+    cpu_checks.extend(read_csv(frozen_large / "trace_replay_sanity_checks.csv"))
     write_csv(root / "sanity_checks_v2.csv", cpu_checks)
     readme = {
         "purpose": "Current, AI-facing experimental evidence for Cost-Aware State Interfaces for LLM Request Dispatch.",
