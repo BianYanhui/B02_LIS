@@ -165,6 +165,21 @@ def write_paper_notes(path: Path, claims: list[dict]) -> None:
     path.write_text("\n".join(lines) + "\n")
 
 
+def write_ai_master_table(path: Path, datasets: list[tuple[str, list[dict]]]) -> None:
+    """Write one flat, AI-oriented table while preserving every raw column."""
+    rows: list[dict] = []
+    for source, source_rows in datasets:
+        for row in source_rows:
+            rows.append({"source_dataset": source, "evidence_type": row.get("evidence_type", "simulation"), "status": row.get("status", "Current"), **row})
+    write_csv(path, rows)
+    readme = path.with_name("AI_MASTER_TABLE_V2_README.md")
+    readme.write_text(
+        "# AI Master Table v2\n\n"
+        "Each row is a raw experiment cell or summary cell. `source_dataset` identifies its native metric schema; do not compare metrics with different source datasets unless their definitions match in `data_dictionary_v2.csv`.\n\n"
+        "Use only rows where `status=Current` as primary paper evidence. Evidence types distinguish live T4/vLLM data, fixed-snapshot trace replay, microbenchmarks, and control-plane simulations. `legacy_data_status.csv` records older sheets that must not be cited.\n"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default="/home/byh/B02/supplemental_20260715")
@@ -186,6 +201,16 @@ def main() -> None:
     write_csv(root / "experiment_registry_v2.csv", registry)
     write_csv(root / "legacy_data_status.csv", [{"source_sheet": s, "status": st, "reason": r, "superseded_by": by} for s, st, r, by in LEGACY])
     write_csv(root / "data_dictionary_v2.csv", data_dictionary())
+    sota_rows = read_csv(sota / "sota_policy_matrix.csv")
+    for row in sota_rows:
+        row.setdefault("evidence_type", "simulation")
+        row.setdefault("status", "Current")
+        row.setdefault("code_commit", "81f53e3")
+    write_ai_master_table(
+        root / "AI_MASTER_TABLE_V2.csv",
+        [(name.removesuffix(".csv"), rows) for name, rows in all_cpu.items()]
+        + [("trace_replay_v3_cells", trace_cells), ("frozen_replay_large_cells", frozen_cells), ("sota_policy_matrix", sota_rows)],
+    )
     claims = conclusion_rows(cpu, trace, frozen_large, sota)
     write_csv(root / "paper_claim_evidence.csv", claims)
     write_paper_notes(root / "PAPER_EXPERIMENT_RESULTS_V2.md", claims)
