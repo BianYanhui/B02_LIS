@@ -56,8 +56,7 @@ def as_float(value: object, default: float = 0.0) -> float:
 def replace_commit(path: Path, commit: str) -> list[dict]:
     rows = read_csv(path)
     for row in rows:
-        if "code_commit" in row:
-            row["code_commit"] = commit
+        row["code_commit"] = commit
     write_csv(path, rows)
     return rows
 
