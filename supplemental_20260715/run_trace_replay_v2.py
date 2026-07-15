@@ -286,6 +286,10 @@ def frozen_snapshot(trace: list[TraceRequest], cache_capacity: int) -> list[set[
 def run_frozen_cell(trace: list[TraceRequest], policy: str, k: int | None, cache_capacity: int, j: int, load_slack: int) -> tuple[dict, list[dict]]:
     dispatcher = Dispatcher(policy, k, cache_capacity, j, load_slack)
     snapshot = frozen_snapshot(trace, cache_capacity)
+    # The Dispatcher obtains demand before placement. Seed the fixed-snapshot
+    # admission view from the common discard/warm-up prefix of this trace
+    # before selecting its bounded advertisements.
+    dispatcher.demand.update(request.digest for request in trace if request.discard)
     dispatcher.resident = [set(entries) for entries in snapshot]
     for target in range(len(URLS)):
         dispatcher._refresh(target)
