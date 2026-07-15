@@ -1,0 +1,19 @@
+{
+  "started_at_unix": 1784100794.054154,
+  "finished_at_unix": 1784101175.7106888,
+  "duration_s": 381.65653562545776,
+  "seed": 20260715,
+  "n_requests": 3000,
+  "quick": false,
+  "code_commit": "81f53e33bc6326674a42e79cb3976efd7f53aa1f",
+  "row_counts": {
+    "cost_scaling": 240,
+    "supp_admission_v2": 540,
+    "j_bound_sweep": 75,
+    "staleness_validation_v2": 50,
+    "toctou_races": 21,
+    "budget_freshness_quality": 64,
+    "experiment_registry": 990,
+    "sanity_checks": 10
+  }
+}

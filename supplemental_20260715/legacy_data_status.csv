@@ -1,0 +1,13 @@
+source_sheet,status,reason,superseded_by
+supp_Table_A_clean,Legacy_DoNotCite,Sketch=2B is an old semantic-sketch schema,cost_scaling.csv
+supp_Table_E_ablation,Legacy_DoNotCite,schema drift from current affinity entry,cost_scaling.csv
+supp_Table_G_claims,Legacy_DoNotCite,contains an invalid Sketch-beats-Oracle claim,paper_claim_evidence.csv
+full_final_claims,Legacy_DoNotCite,old claim set,paper_claim_evidence.csv
+full_tradeoff,Legacy_DoNotCite,old state-interface schema,cost_scaling.csv
+full_dispatch_quality,Legacy_DoNotCite,policy and state-view labels are mixed,trace_replay_quality.csv
+exp_part_a_real_serving,Legacy_DoNotCite,r1/r2 are not independent repetitions,trace_replay_quality.csv
+eventdriven_all_results,Legacy_DoNotCite,old simulator lacks token-bucket chain,budget_freshness_quality.csv
+ksweep_all_summaries,Legacy_TTFT_only,same_inst_step_ratio is non-discriminative,trace_replay_quality.csv
+n256_*,Legacy_Mock,"mock dispatcher, not 256-GPU serving",j_bound_sweep.csv
+trace_replay_v2_sanity_prepolicyfix,Sanity_only,adapter did not hold native policy fixed,trace_replay_v3/trace_replay_quality.csv
+trace_replay_v2_sanity_unisolated,Sanity_only,closed-loop policies shared physical vLLM cache namespaces,trace_replay_v3/trace_replay_quality.csv

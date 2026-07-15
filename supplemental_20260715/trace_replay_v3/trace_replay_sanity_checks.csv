@@ -1,0 +1,9 @@
+check_name,status,offending_rows,suggested_fix
+frozen Exact upper bound high,PASS,0,inspect snapshot/interface construction
+frozen Sketch_inf equals Exact high,PASS,0,make sketch infinity expose full exact resident set
+frozen Exact upper bound medium,PASS,0,inspect snapshot/interface construction
+frozen Sketch_inf equals Exact medium,PASS,0,make sketch infinity expose full exact resident set
+frozen Exact upper bound low,PASS,0,inspect snapshot/interface construction
+frozen Sketch_inf equals Exact low,PASS,0,make sketch infinity expose full exact resident set
+all policies share same trace hash within locality/rep,PASS,0,generate one trace before scheduling policy cells
+evaluated fanout <= J,PASS,0,truncate candidates before selection

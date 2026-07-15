@@ -1,0 +1,12 @@
+field,meaning,unit,notes
+candidate_hit_rate,Requests whose raw affinity candidate set contains at least one candidate.,fraction,Does not count candidate<=1 as a special case; it is a raw opportunity metric.
+observed_reuse_hit_rate,Dispatcher-observed reuse: selected instance had previously received the same prefix in the cell.,fraction,Not a private vLLM cache counter.
+metadata_snapshot_bytes,Serialized interface-size model including coarse base N*96B and affinity entries.,bytes,"Sketch entries are per instance, bounded by K."
+K,Per-instance advertised top-K affinity entries.,entries/instance,Never global K.
+raw_candidate_fanout_p95,P95 candidate count before J truncation.,instances,May exceed J.
+evaluated_candidate_fanout_p95,P95 candidate count actually evaluated after J truncation.,instances,Must be <= J.
+saved_vs_exact_ratio,Bounded-admission saved Prefill work divided by full Exact Affinity saved work.,ratio,Defined only when exact_saved_ms_total>0.
+stale_lookup_miss_rate,"Candidate set nonempty but no candidate remains valid at lookup time, divided by all requests.",fraction,Separate from normal_cache_miss.
+unsafe_reuse_rate,Fraction of requests that reuse incompatible or absent state.,fraction,Must be zero with validation enabled.
+state_size vs snapshot_B,state_size is in-memory object size; snapshot_B is serialized control-plane bytes.,bytes,Do not interchange the two.
+locality,"Synthetic Zipf prefix popularity. CPU: alpha in {1.25,0.85,0.15}; live: alpha in {1.35,0.75,0.05}.",category,The two alpha sets must not be pooled.

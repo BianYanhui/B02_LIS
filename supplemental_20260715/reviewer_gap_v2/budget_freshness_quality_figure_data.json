@@ -1,0 +1,17 @@
+[
+  {
+    "x": "rate_budget_Bps",
+    "y": "update_delay_p95_ms",
+    "source": "budget_freshness_quality.csv"
+  },
+  {
+    "x": "update_delay_p95_ms",
+    "y": "stale_lookup_rate",
+    "source": "budget_freshness_quality.csv"
+  },
+  {
+    "x": "stale_lookup_rate",
+    "y": "saved_prefill_ms_total",
+    "source": "budget_freshness_quality.csv"
+  }
+]

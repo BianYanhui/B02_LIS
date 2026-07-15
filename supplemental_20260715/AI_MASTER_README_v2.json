@@ -1,0 +1,11 @@
+{
+  "purpose": "Current, AI-facing experimental evidence for Cost-Aware State Interfaces for LLM Request Dispatch.",
+  "primary_current_sources": [
+    "reviewer_gap_v2/*.csv",
+    "trace_replay_v2/trace_replay_quality.csv",
+    "sota_policy_matrix/*.csv"
+  ],
+  "legacy_sources": "legacy_data_status.csv; do not cite Legacy_DoNotCite or Sanity_only rows.",
+  "key_negative_result": "Current decentralized demand-aware admission does not meet its preregistered quality/convergence thresholds; use Route B wording.",
+  "live_limit": "4-T4 replay uses 64 requests/cell, 5 repetitions, 256/512 approximate-token prompts, and four-request arrival waves. It is sampled live validation, not a million-request throughput benchmark."
+}

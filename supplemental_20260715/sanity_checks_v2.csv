@@ -1,0 +1,27 @@
+check_name,status,offending_rows,suggested_fix
+Sketch index entries <= N*K,PASS,0,cap per-instance advertisements at K
+evaluated candidate fanout <= J,PASS,0,truncate ordered candidates before dispatch
+same trace hash across policies,PASS,0,reuse generated trace path for all policies in a cell
+independent repetition trace bytes,PASS,0,use a distinct deterministic seed for each repetition
+numeric columns are numeric in CSV writer,PASS,0,do not serialize numeric values as decorated strings
+legacy sheets excluded from primary references,PASS,0,only cite v2 Current datasets
+validation-on unsafe reuse is zero,PASS,0,perform owner validation before every reuse
+token bucket window bound,PASS,0,retain per-window sent byte logs in a live transport
+frozen Exact contains advertised Sketch,PASS,0,fixed-snapshot live replay verifies Exact information upper bound
+all staleness injections validate safely,PASS,0,keep validation_on mandatory in serving path
+frozen Exact upper bound high,PASS,0,inspect snapshot/interface construction
+frozen Sketch_inf equals Exact high,PASS,0,make sketch infinity expose full exact resident set
+frozen Exact upper bound medium,PASS,0,inspect snapshot/interface construction
+frozen Sketch_inf equals Exact medium,PASS,0,make sketch infinity expose full exact resident set
+frozen Exact upper bound low,PASS,0,inspect snapshot/interface construction
+frozen Sketch_inf equals Exact low,PASS,0,make sketch infinity expose full exact resident set
+all policies share same trace hash within locality/rep,PASS,0,generate one trace before scheduling policy cells
+evaluated fanout <= J,PASS,0,truncate candidates before selection
+frozen Exact upper bound high,PASS,0,inspect snapshot/interface construction
+frozen Sketch_inf equals Exact high,PASS,0,make sketch infinity expose full exact resident set
+frozen Exact upper bound medium,PASS,0,inspect snapshot/interface construction
+frozen Sketch_inf equals Exact medium,PASS,0,make sketch infinity expose full exact resident set
+frozen Exact upper bound low,PASS,0,inspect snapshot/interface construction
+frozen Sketch_inf equals Exact low,PASS,0,make sketch infinity expose full exact resident set
+all policies share same trace hash within locality/rep,PASS,0,generate one trace before scheduling policy cells
+evaluated fanout <= J,PASS,0,truncate candidates before selection

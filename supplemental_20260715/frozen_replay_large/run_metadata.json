@@ -1,0 +1,25 @@
+{
+  "started_at_unix": 1784107781.2790005,
+  "finished_at_unix": 1784107791.6137865,
+  "duration_s": 10.334786415100098,
+  "arguments": {
+    "out_dir": "supplemental_20260715/frozen_replay_large",
+    "seed": 20260715,
+    "n_requests": 5000,
+    "warmup": 500,
+    "repetitions": 10,
+    "cache_capacity": 128,
+    "j": 8,
+    "concurrency": 4,
+    "load_slack": 0,
+    "context_lengths": [
+      256,
+      512
+    ],
+    "modes": [
+      "frozen"
+    ]
+  },
+  "cells": 210,
+  "raw_requests": 945000
+}

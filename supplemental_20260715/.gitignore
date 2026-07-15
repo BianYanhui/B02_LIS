@@ -1,0 +1,10 @@
+# Regenerable runtime files and the large per-request frozen replay payload.
+*/run.log
+*/run.pid
+*/server_logs/
+frozen_replay_large/trace_replay_quality.json
+
+# Archived smoke and Sanity-only runs remain on yhs1 and are tracked by
+# legacy_data_status.csv, but are deliberately excluded from source control.
+reviewer_gap_v2_smoke*/
+trace_replay_v2_sanity_*/
