@@ -170,13 +170,14 @@ def main() -> None:
     parser.add_argument("--root", default="/home/byh/B02/supplemental_20260715")
     parser.add_argument("--cpu-commit", required=True)
     parser.add_argument("--trace-commit", required=True)
+    parser.add_argument("--frozen-commit", required=True)
     args = parser.parse_args()
     root = Path(args.root)
     cpu, trace, frozen_large, sota = root / "reviewer_gap_v2", root / "trace_replay_v3", root / "frozen_replay_large", root / "sota_policy_matrix"
     cpu_files = ["cost_scaling.csv", "supp_admission_v2.csv", "j_bound_sweep.csv", "staleness_validation_v2.csv", "toctou_races.csv", "budget_freshness_quality.csv"]
     all_cpu = {name: replace_commit(cpu / name, args.cpu_commit) for name in cpu_files}
     trace_cells = replace_commit(trace / "trace_replay_quality_cells.csv", args.trace_commit)
-    frozen_cells = replace_commit(frozen_large / "trace_replay_quality_cells.csv", args.trace_commit)
+    frozen_cells = replace_commit(frozen_large / "trace_replay_quality_cells.csv", args.frozen_commit)
     registry = []
     for name, rows in all_cpu.items():
         registry.extend(record_registry(rows, name.removesuffix(".csv"), "legacy control-plane tables"))
