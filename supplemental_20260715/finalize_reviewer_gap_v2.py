@@ -134,6 +134,36 @@ def conclusion_rows(cpu: Path, trace: Path, sota: Path) -> list[dict]:
     ]
 
 
+def write_paper_notes(path: Path, claims: list[dict]) -> None:
+    lines = [
+        "# B02 Paper Experiment Writing Notes (v2)",
+        "",
+        "Use only `Current` rows in `experiment_registry_v2.csv` as primary evidence. Do not cite sources listed as `Legacy_DoNotCite` or `Sanity_only` in `legacy_data_status.csv`.",
+        "",
+        "## Recommended Evaluation Structure",
+        "",
+        "1. **Current-schema interface cost.** Report `cost_scaling.csv` at N=128, R=256, K=8. It isolates Load-only, Exact Affinity, and Sketch under the current 64-byte affinity-entry schema.",
+        "2. **Same-trace state-interface quality.** Use frozen rows for the information-bound result and closed-loop rows for sampled live T4 TTFT/reuse validation. State exactly that observed reuse is dispatcher-observed, because vLLM does not export cache-hit counters.",
+        "3. **Cross-policy generality.** Use the existing `sota_policy_matrix` CPU traces for DualMap-style, Power-of-Two, and SLO-aware families. Keep their modeled TTFT separate from live TTFT.",
+        "4. **Bounds and correctness.** Use `j_bound_sweep.csv`, `budget_freshness_quality.csv`, `staleness_validation_v2.csv`, and `toctou_races.csv` as explicit control-plane simulation evidence.",
+        "",
+        "## Claim Decisions",
+        "",
+    ]
+    for claim in claims:
+        lines.extend([f"### {claim['claim_id']}: {claim['status']}", "", claim["paper_claim"], "", f"Evidence: {claim['evidence']}", "", f"Writing rule: {claim['safe_writing']}", ""])
+    lines.extend([
+        "## T4 Scope",
+        "",
+        "Four Tesla T4 GPUs run one Qwen2.5-1.5B vLLM instance per GPU. The measured trace replay uses 64 requests per cell, 5 independent repetitions, approximate 256/512-token prompts, and four-request arrival waves. This is a sampled end-to-end validation, not a 1,050,000-request throughput study. A larger GPU (for example A800/80G) is needed for long-context or high-concurrency throughput claims.",
+        "",
+        "## Admission Negative Result",
+        "",
+        "The current decentralized demand-aware utility did not meet its preregistered saved-vs-Exact or shift-convergence targets. Revise the paper so Sketch is a bounded state interface with pluggable admission; use LRU/coverage admission as the default bounded baseline and report demand-aware as an ablation/limitation rather than a superior optimizer.",
+    ])
+    path.write_text("\n".join(lines) + "\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", default="/home/byh/B02/supplemental_20260715")
@@ -155,6 +185,7 @@ def main() -> None:
     write_csv(root / "data_dictionary_v2.csv", data_dictionary())
     claims = conclusion_rows(cpu, trace, sota)
     write_csv(root / "paper_claim_evidence.csv", claims)
+    write_paper_notes(root / "PAPER_EXPERIMENT_RESULTS_V2.md", claims)
     cpu_checks = read_csv(cpu / "sanity_checks.csv")
     trace_checks = read_csv(trace / "trace_replay_sanity_checks.csv")
     for row in cpu_checks:
