@@ -258,9 +258,13 @@ async def run(args: argparse.Namespace) -> tuple[list[dict], list[dict], list[di
             }
             cells.append(row)
             raw.extend({
-                "experiment_id": row["experiment_id"], "rep": rep, "policy": policy,
+                "experiment_id": row["experiment_id"], "locality": "difficult", "rep": rep, "policy": policy,
                 "J": args.j, **record,
             } for record in records)
+            # These checkpoints are diagnostics only.  The final tables are
+            # written only after every cell and cross-policy sanity check pass.
+            write_csv(root / "_checkpoint_cells.csv", cells)
+            (root / "_checkpoint_raw.json").write_text(json.dumps(raw))
             print(json.dumps({
                 "completed": row["experiment_id"], "p50_ttft_ms": row["ttft_p50_ms"],
                 "saved_prefill": row["estimated_saved_prefill_tokens_total"],
