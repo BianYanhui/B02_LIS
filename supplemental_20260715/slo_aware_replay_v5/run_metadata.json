@@ -1,0 +1,17 @@
+{
+  "started_at_unix": 1784182795.0593264,
+  "finished_at_unix": 1784182808.6346726,
+  "duration_s": 13.57534670829773,
+  "arguments": {
+    "source": "/home/byh/B02/supplemental_20260715/agenttrace_source_v3/agenttrace_nl2bash_1_7B.jsonl",
+    "out_dir": "/home/byh/B02/supplemental_20260715/slo_aware_replay_v5",
+    "repetitions": 20,
+    "warmup": 100,
+    "max_requests": 1000,
+    "capacity": 128,
+    "j": 4,
+    "guard_ms": 2.0,
+    "seed": 20260716
+  },
+  "cells": 200
+}

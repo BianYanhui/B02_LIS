@@ -1,0 +1,3 @@
+check_name,status,offending_rows,suggested_fix
+validation rejects incompatible and evicted metadata without unsafe reuse,PASS,0,inspect model/tenant/epoch/resident guards
+token-bucket send bytes obey per-window budget plus one-frame burst,PASS,0,inspect token accounting and burst cap

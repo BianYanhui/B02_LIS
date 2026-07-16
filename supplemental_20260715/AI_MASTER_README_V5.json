@@ -1,0 +1,13 @@
+{
+  "required_reading": [
+    "PAPER_EXPERIMENT_RESULTS_V5.md",
+    "paper_claim_evidence_v5.csv",
+    "paper_primary_sources_v5.csv",
+    "experiment_registry_v5.csv",
+    "sanity_checks_v5.csv",
+    "legacy_exclusions_v5.csv"
+  ],
+  "scope_rule": "Never pool live, trace-derived, dispatcher simulation, single-host microbenchmark, and cost microbenchmark values into one performance statement.",
+  "live_k_primary_available": true,
+  "invalid_slo_rerun_included": false
+}

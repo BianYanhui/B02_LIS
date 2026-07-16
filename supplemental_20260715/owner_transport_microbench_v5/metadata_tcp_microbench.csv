@@ -1,0 +1,9 @@
+experiment,evidence_type,rate_budget_Bps,duration_s,coalescing_enabled,offered_updates,sent_updates,coalesced_updates,sent_bytes,allowed_bytes_with_one_frame_burst,budget_assertion_pass,end_to_end_p50_us,end_to_end_p95_us,status
+metadata_tcp_token_bucket_v5,single_host_tcp_microbenchmark,64,2.0,False,1024,2,0,128,192.0,True,82.211,257.104,Current
+metadata_tcp_token_bucket_v5,single_host_tcp_microbenchmark,64,2.0,True,1024,2,512,128,192.0,True,244.2,263.689,Current
+metadata_tcp_token_bucket_v5,single_host_tcp_microbenchmark,256,2.0,False,1024,8,0,512,576.0,True,258.5,364.843,Current
+metadata_tcp_token_bucket_v5,single_host_tcp_microbenchmark,256,2.0,True,1024,8,512,512,576.0,True,261.94,272.745,Current
+metadata_tcp_token_bucket_v5,single_host_tcp_microbenchmark,1024,2.0,False,1024,32,0,2048,2112.0,True,220.974,238.719,Current
+metadata_tcp_token_bucket_v5,single_host_tcp_microbenchmark,1024,2.0,True,1024,32,512,2048,2112.0,True,223.804,258.26,Current
+metadata_tcp_token_bucket_v5,single_host_tcp_microbenchmark,4096,2.0,False,1024,128,0,8192,8256.0,True,157.523,191.681,Current
+metadata_tcp_token_bucket_v5,single_host_tcp_microbenchmark,4096,2.0,True,1024,128,512,8192,8256.0,True,165.228,196.294,Current

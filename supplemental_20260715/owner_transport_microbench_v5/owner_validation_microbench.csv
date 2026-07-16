@@ -1,0 +1,6 @@
+experiment,evidence_type,scenario,clients,requests,pin_count,fallback_count,unsafe_reuse_count,end_to_end_p50_us,end_to_end_p95_us,end_to_end_p99_us,owner_critical_section_p95_us,throughput_ops_s,status
+owner_validate_and_pin_v5,single_host_tcp_microbenchmark,valid,32,20000,20000,0,0,1697.503,2121.441,2330.381,2.223,18120.034478937578,Current
+owner_validate_and_pin_v5,single_host_tcp_microbenchmark,old_epoch,32,20000,0,20000,0,921.847,963.403,981.077,1.773,33920.30858551377,Current
+owner_validate_and_pin_v5,single_host_tcp_microbenchmark,tenant_mismatch,32,20000,0,20000,0,934.947,975.877,1021.021,1.739,33074.8699515474,Current
+owner_validate_and_pin_v5,single_host_tcp_microbenchmark,evicted,32,20000,0,20000,0,919.574,942.478,997.303,1.818,17016.563025592444,Current
+owner_validate_and_pin_v5,single_host_tcp_microbenchmark,model_mismatch,32,20000,0,20000,0,926.856,979.924,1024.316,1.755,33637.23246538964,Current

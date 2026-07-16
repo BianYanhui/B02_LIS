@@ -127,7 +127,6 @@ def main() -> None:
     datasets = {
         "slo_aware_v5_cells": root / "slo_aware_replay_v5" / "slo_aware_cells.csv",
         "slo_aware_v5_summary": root / "slo_aware_replay_v5" / "slo_aware_summary.csv",
-        "slo_aware_v5_trace_manifest": root / "slo_aware_replay_v5" / "slo_aware_trace_manifest.csv",
         "owner_validation_v5": root / "owner_transport_microbench_v5" / "owner_validation_microbench.csv",
         "metadata_transport_v5": root / "owner_transport_microbench_v5" / "metadata_tcp_microbench.csv",
     }

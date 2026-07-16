@@ -1,0 +1,11 @@
+{
+  "started_at_unix": 1784182701.6072516,
+  "finished_at_unix": 1784182721.7907343,
+  "duration_s": 20.183483362197876,
+  "arguments": {
+    "out_dir": "/home/byh/B02/supplemental_20260715/owner_transport_microbench_v5",
+    "clients": 32,
+    "validation_requests": 20000,
+    "transport_duration_s": 2.0
+  }
+}

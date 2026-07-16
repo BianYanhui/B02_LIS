@@ -1,0 +1,4 @@
+check_name,status,offending_rows,suggested_fix
+same AgentTrace-derived trace within each SLO paired cell,PASS,0,replay one trace for all interfaces
+SLO replay evaluated fanout obeys J,PASS,0,truncate candidate list before prediction
+saved-prefill accounting is nonnegative,PASS,0,inspect coverage accounting
