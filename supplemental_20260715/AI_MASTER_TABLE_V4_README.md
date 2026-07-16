@@ -1,0 +1,1 @@
+# AI Master Table V4\n\nThis flat, AI-facing table preserves V2/V3 lineage and appends V4 paired replay, guard, and fixed-prompt live evidence. Filter by `status`, `source_dataset`, and `evidence_type` before comparing values. Do not cite `Superseded_InputConfounded`, `Legacy_DiagnosticNegative`, or `SanityOnly` rows as primary paper evidence.\n

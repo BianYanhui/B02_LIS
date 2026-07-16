@@ -1,0 +1,12 @@
+{
+  "started_at_unix": 1784171331.59443,
+  "finished_at_unix": 1784171351.7392964,
+  "duration_s": 20.144866943359375,
+  "arguments": {
+    "out_dir": "/home/byh/B02/supplemental_20260715/net_benefit_conflict_v4",
+    "seed": 20260716,
+    "repetitions": 20,
+    "requests": 5000
+  },
+  "cells": 960
+}

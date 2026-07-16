@@ -1,0 +1,1 @@
+# Fixed-prompt paired T4 replay v4\n\nEvery logical request has the same prompt SHA-256, input token count, and fixed output token count across policies. Policy-specific cache isolation uses vLLM cache_salt, which is not part of prompt text. Use per-request cached-token telemetry and paired TTFT/latency distributions.\n

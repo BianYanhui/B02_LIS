@@ -1,0 +1,4 @@
+source_dataset,status,reason
+paired_t4_latency_v3,Superseded_InputConfounded,Policy-specific namespace changed semantic prompt and output behavior; V4 fixed_prompt_t4 uses cache_salt outside prompt and fixed generation length.
+agenttrace_structural_v3,Legacy_DiagnosticNegative,Legacy admission was empirically inadequate in closed loop; V4 uses coverage-first and reports Oracle-K headroom.
+*_smoke*,SanityOnly,Smoke artifacts validate implementation only and are not paper evidence.

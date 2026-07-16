@@ -1,0 +1,4 @@
+check_name,status,offending_rows,suggested_fix
+each family/rep shares one trace hash across interfaces,PASS,0,generate trace once per replica
+evaluated fanout obeys J,PASS,0,truncate candidate list before selection
+no raw AgentTrace text is emitted,PASS,0,write only structural fields and hashes

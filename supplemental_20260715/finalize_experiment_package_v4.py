@@ -77,7 +77,10 @@ def mark_lineage(rows: list[dict]) -> list[dict]:
     for row in rows:
         current = dict(row)
         source = str(current.get("source_dataset", ""))
-        if source.startswith("paired_t4_latency_v3"):
+        # V3 master-table source names predate the V3 suffix.  Match the
+        # entire legacy paired-T4 family so no prompt-confounded row remains
+        # eligible as primary evidence.
+        if source.startswith("paired_t4_latency"):
             current["status"] = "Superseded_InputConfounded"
             current["superseded_by"] = "fixed_prompt_t4_v4_primary"
             current["supersession_reason"] = "V3 embedded policy namespace in semantic prompt, changing model input/output; V4 uses cache_salt outside prompt and fixed output length."

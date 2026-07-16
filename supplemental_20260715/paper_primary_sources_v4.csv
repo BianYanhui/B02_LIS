@@ -1,0 +1,8 @@
+paper_section,source_dataset,evidence_type,status
+Interface cost,reviewer_gap_v2/cost_scaling.csv,microbenchmark,Current
+Admission and K trade-off,agenttrace_admission_oracle_v4,trace_derived_simulation,Current
+Policy generality,cross_policy_v4,trace_derived_simulation,Current
+Fanout bound,control_plane_v3/j_bound_heterogeneous_summary.csv,dispatcher_level_simulation,Current
+Net-benefit guard,net_benefit_conflict_v4,dispatcher_level_simulation,Current
+Staleness safety,"reviewer_gap_v2/staleness_validation_v2.csv,reviewer_gap_v2/toctou_races.csv",protocol simulation,Current
+Sampled live validation,fixed_prompt_t4_v4_primary,live_t4_vllm,Current

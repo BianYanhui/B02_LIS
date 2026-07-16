@@ -1,0 +1,1 @@
+# Net-benefit affinity/load conflict sensitivity v4\n\nThis dispatcher-level simulation evaluates the abstention condition under controlled prefix coverage and affinity queue delay. It is evidence for the guard's cost-quality behavior, not a substitute for live vLLM performance measurement.\n

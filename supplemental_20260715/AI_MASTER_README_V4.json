@@ -1,0 +1,13 @@
+{
+  "required_reading": [
+    "PAPER_EXPERIMENT_RESULTS_V4.md",
+    "paper_claim_evidence_v4.csv",
+    "paper_primary_sources_v4.csv",
+    "experiment_registry_v4.csv",
+    "sanity_checks_v4.csv",
+    "legacy_exclusions_v4.csv"
+  ],
+  "scope_rule": "Never pool live, trace-derived, dispatcher simulation, and microbenchmark metrics into one performance statement.",
+  "primary_run_available": true,
+  "raw_agenttrace_text_included": false
+}

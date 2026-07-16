@@ -1,0 +1,4 @@
+check_name,status,offending_rows,suggested_fix
+guarded policies never select an unobservable sketch candidate,PASS,0,apply visibility check before guard
+all stochastic cells use independent deterministic seeds,PASS,0,include policy/scenario/rep in seed
+simulation evidence type is explicit,PASS,0,do not merge with live TTFT claims
