@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Rebuild the T4 serving cluster for B02 same-trace replay.
+# V4 additionally exposes per-response cached-token telemetry.
 set -euo pipefail
 
 ROOT=/home/byh/B02
@@ -30,7 +31,8 @@ for GPU in 0 1 2 3; do
     --host 127.0.0.1 --port "$PORT" \
     --gpu-memory-utilization 0.85 \
     --max-model-len 4096 --max-num-seqs 8 \
-    --enable-prefix-caching --swap-space 4 --block-size 16 --enforce-eager \
+    --enable-prefix-caching --enable-prompt-tokens-details \
+    --swap-space 4 --block-size 16 --enforce-eager \
     >"$LOG_DIR/vllm_${GPU}.log" 2>&1 &
   echo $! >"$LOG_DIR/vllm_${GPU}.pid"
 done
