@@ -243,7 +243,7 @@ async def metric_snapshot(session: aiohttp.ClientSession) -> dict[str, float]:
     return totals
 
 
-async def one_request(session: aiohttp.ClientSession, url: str, prompt: str, cache_salt: str, output_tokens: int) -> dict:
+async def one_request(session: aiohttp.ClientSession, url: str, prompt: str, cache_salt: str, output_tokens: int, max_attempts: int) -> dict:
     payload = {
         "model": MODEL_ID,
         "messages": [{"role": "user", "content": prompt}],
@@ -258,41 +258,58 @@ async def one_request(session: aiohttp.ClientSession, url: str, prompt: str, cac
         "stream": True,
         "stream_options": {"include_usage": True},
     }
-    started, first, chunks = time.perf_counter_ns(), 0, 0
-    usage: dict = {}
-    ok, error = True, ""
-    try:
-        async with session.post(f"{url}/v1/chat/completions", json=payload, timeout=aiohttp.ClientTimeout(total=180)) as response:
-            if response.status != 200:
-                ok, error = False, f"http_{response.status}: {(await response.text())[:120]}"
-            else:
-                buffer = ""
-                async for part in response.content.iter_any():
-                    buffer += part.decode(errors="ignore")
-                    while "\n\n" in buffer:
-                        event, buffer = buffer.split("\n\n", 1)
-                        data = next((line[6:] for line in event.splitlines() if line.startswith("data: ")), "")
-                        if not data or data == "[DONE]":
-                            continue
-                        parsed = json.loads(data)
-                        chunks += 1
-                        if not first and parsed.get("choices"):
-                            first = time.perf_counter_ns()
-                        if parsed.get("usage"):
-                            usage = parsed["usage"]
-    except Exception as exc:
-        ok, error = False, repr(exc)[:180]
-    ended = time.perf_counter_ns()
-    details = usage.get("prompt_tokens_details") or {}
+    errors: list[str] = []
+    for attempt in range(1, max_attempts + 1):
+        started, first, chunks, parse_errors = time.perf_counter_ns(), 0, 0, 0
+        usage: dict = {}
+        ok, error = True, ""
+        try:
+            async with session.post(f"{url}/v1/chat/completions", json=payload, timeout=aiohttp.ClientTimeout(total=180)) as response:
+                if response.status != 200:
+                    ok, error = False, f"http_{response.status}: {(await response.text())[:120]}"
+                else:
+                    buffer = ""
+                    async for part in response.content.iter_any():
+                        buffer += part.decode(errors="ignore")
+                        while "\n\n" in buffer:
+                            event, buffer = buffer.split("\n\n", 1)
+                            data = next((line[6:] for line in event.splitlines() if line.startswith("data: ")), "")
+                            if not data or data == "[DONE]":
+                                continue
+                            try:
+                                parsed = json.loads(data)
+                            except json.JSONDecodeError:
+                                # A malformed transient SSE fragment must not
+                                # discard an otherwise valid streamed response.
+                                parse_errors += 1
+                                continue
+                            chunks += 1
+                            if not first and parsed.get("choices"):
+                                first = time.perf_counter_ns()
+                            if parsed.get("usage"):
+                                usage = parsed["usage"]
+        except Exception as exc:
+            ok, error = False, repr(exc)[:180]
+        ended = time.perf_counter_ns()
+        if ok and usage.get("prompt_tokens") is None:
+            ok, error = False, "missing_final_usage"
+        if ok:
+            details = usage.get("prompt_tokens_details") or {}
+            return {
+                "ok": True, "error": "", "prior_attempt_errors": "|".join(errors),
+                "attempt_count": attempt, "sse_parse_errors": parse_errors,
+                "ttft_ms": ((first or ended) - started) / 1e6,
+                "latency_ms": (ended - started) / 1e6, "chunks": chunks,
+                "input_tokens": usage.get("prompt_tokens"), "output_tokens": usage.get("completion_tokens"),
+                "vllm_cached_tokens": details.get("cached_tokens", 0),
+            }
+        errors.append(error)
+        if attempt < max_attempts:
+            await asyncio.sleep(0.05 * attempt)
     return {
-        "ok": ok,
-        "error": error,
-        "ttft_ms": ((first or ended) - started) / 1e6,
-        "latency_ms": (ended - started) / 1e6,
-        "chunks": chunks,
-        "input_tokens": usage.get("prompt_tokens"),
-        "output_tokens": usage.get("completion_tokens"),
-        "vllm_cached_tokens": details.get("cached_tokens", 0),
+        "ok": False, "error": errors[-1] if errors else "unknown_request_failure", "prior_attempt_errors": "|".join(errors),
+        "attempt_count": max_attempts, "sse_parse_errors": 0, "ttft_ms": 0.0, "latency_ms": 0.0,
+        "chunks": 0, "input_tokens": None, "output_tokens": None, "vllm_cached_tokens": 0,
     }
 
 
@@ -309,7 +326,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, k: int | None, cache_
                 dispatcher.loads[target] += 1
                 decisions.append((request, target, raw, evaluated, selected_affinity, coverage, expected_net))
             responses = await asyncio.gather(*[
-                one_request(session, URLS[target], prompt_for(request), cache_salt, args.output_tokens)
+                one_request(session, URLS[target], prompt_for(request), cache_salt, args.output_tokens, args.max_request_attempts)
                 for request, target, _, _, _, _, _ in decisions
             ])
             for (request, target, raw, evaluated, selected_affinity, coverage, expected_net), response in zip(decisions, responses):
@@ -343,6 +360,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, k: int | None, cache_
         "mean_selected_coverage_tokens": statistics.mean(float(row["selected_coverage_tokens"]) for row in records) if records else 0.0,
         "vllm_cached_token_rate": sum(float(row["vllm_cached_tokens"] or 0) > 0 for row in records) / n if n else 0.0,
         "vllm_cached_tokens_total": sum(float(row["vllm_cached_tokens"] or 0) for row in records),
+        "retried_request_count": sum(int(row["attempt_count"]) > 1 for row in records),
         "metric_prefix_cache_hits_delta": metric_delta["vllm:prefix_cache_hits_total"],
         "metric_prefix_cache_queries_delta": metric_delta["vllm:prefix_cache_queries_total"],
         "metric_prompt_tokens_delta": metric_delta["vllm:prompt_tokens_total"],
@@ -398,11 +416,13 @@ def validate_records(raw: list[dict], output_tokens: int) -> list[dict]:
     mismatched_inputs = sum(len({(item["prompt_sha256"], item["input_tokens"]) for item in rows}) != 1 for rows in groups.values())
     mismatched_outputs = sum(len({item["output_tokens"] for item in rows}) != 1 or next(iter({item["output_tokens"] for item in rows})) != output_tokens for rows in groups.values())
     missing_usage = sum(item["input_tokens"] is None or item["output_tokens"] is None for item in raw)
+    retries = sum(int(item["attempt_count"]) > 1 for item in raw)
     return [
         {"check_name": "same logical request has byte-identical prompt and input token count across policies", "status": "PASS" if mismatched_inputs == 0 else "FAIL", "offending_rows": mismatched_inputs, "suggested_fix": "remove all policy data from semantic prompt"},
         {"check_name": "same logical request has fixed output token count across policies", "status": "PASS" if mismatched_outputs == 0 else "FAIL", "offending_rows": mismatched_outputs, "suggested_fix": "keep min_tokens=max_tokens and ignore_eos"},
         {"check_name": "vLLM usage telemetry present for every request", "status": "PASS" if missing_usage == 0 else "FAIL", "offending_rows": missing_usage, "suggested_fix": "restart vLLM with --enable-prompt-tokens-details"},
         {"check_name": "all output token counts equal requested fixed length", "status": "PASS" if mismatched_outputs == 0 else "FAIL", "offending_rows": mismatched_outputs, "suggested_fix": "inspect server generation settings"},
+        {"check_name": "transient live retries recorded in raw data", "status": "PASS", "offending_rows": retries, "suggested_fix": "inspect prior_attempt_errors if retries are nonzero"},
     ]
 
 
@@ -445,6 +465,7 @@ async def run(args: argparse.Namespace) -> tuple[list[dict], list[dict], list[di
                     "rep": rep, "repetitions": args.repetitions, "seed": args.seed, "workload_trace_hash": trace_hash,
                     "request_count_total": args.n_requests, "warmup_request_count": args.warmup, "cache_capacity": args.cache_capacity,
                     "concurrency": args.concurrency, "prefix_token_target": args.prefix_tokens, "fixed_output_tokens": args.output_tokens,
+                    "generation_mode": "greedy_temperature0_min_tokens_eq_max_tokens_ignore_eos", "max_request_attempts": args.max_request_attempts,
                     "policy_order": order_index, "policy_order_sequence": ",".join(item[0] for item in order),
                     "vllm_cache_salt": cache_salt, "semantic_prompt_contains_policy": False,
                     "metric_scope": "TTFT and cached-token telemetry are live vLLM measurements; total latency is comparable because generation length is fixed.",
@@ -473,9 +494,10 @@ def main() -> None:
     parser.add_argument("--prefill-tokens-per-ms", type=float, default=50.0)
     parser.add_argument("--queue-penalty-ms", type=float, default=2.0)
     parser.add_argument("--guard-ms", type=float, default=0.5)
+    parser.add_argument("--max-request-attempts", type=int, default=3)
     parser.add_argument("--cooldown-s", type=float, default=0.2)
     args = parser.parse_args()
-    if args.n_requests <= args.warmup or args.repetitions < 2 or args.output_tokens < 1:
+    if args.n_requests <= args.warmup or args.repetitions < 2 or args.output_tokens < 1 or args.max_request_attempts < 1:
         raise ValueError("need measured requests, at least two repetitions, and positive output tokens")
     started = time.time()
     cells, pairs, raw = asyncio.run(run(args))
