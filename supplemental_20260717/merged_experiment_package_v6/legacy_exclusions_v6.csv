@@ -1,0 +1,8 @@
+source_dataset,status,reason
+paired_t4_latency_v3,Superseded_InputConfounded,Policy-specific namespace changed semantic prompt and output behavior; V4 fixed_prompt_t4 uses cache_salt outside prompt and fixed generation length.
+agenttrace_structural_v3,Legacy_DiagnosticNegative,Legacy admission was empirically inadequate in closed loop; V4 uses coverage-first and reports Oracle-K headroom.
+*_smoke*,SanityOnly,Smoke artifacts validate implementation only and are not paper evidence.
+slo_aware_replay_v5_invalid_native_visibility,Invalid_NativeVisibilityLeak,Native SLO baseline erroneously inspected private KV coverage. Preserved for audit only; corrected rerun is slo_aware_replay_v5.
+live_k_tradeoff_v5_primary_2k,Aborted_UncommittedRunner,Initial T4 K log used an uncommitted runner. No final tables were produced; formal rerun is live_k_tradeoff_v5_primary_2k_committed.
+live_k_tradeoff_v5_primary_2k_output16_endpoint_crash,Invalid_EndpointCrash,Fixed 16-token T4 run terminated after a vLLM CUDA illegal-memory-access. It produced no final tables and is excluded; formal rerun uses fixed 4-token output.
+owner_transport_microbench_v5,Current_TransportOnly,V5 remains the fixed-frame loopback metadata transport evidence. V6 supersedes it only for the runtime-native owner ValidateAndPin claim.

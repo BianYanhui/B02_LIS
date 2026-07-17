@@ -1,0 +1,15 @@
+{
+  "required_reading": [
+    "V6_PAPER_INSERTS.md",
+    "paper_claim_evidence_v6.csv",
+    "sanity_checks_v6.csv",
+    "experiment_registry_v6.csv",
+    "related_system_interface_matrix_v6.csv",
+    "real_baseline_feasibility_v6.csv"
+  ],
+  "evidence_separation_rule": "Never combine live runtime-owner latency, live T4 serving latency, trace-derived replay, dispatcher simulation, or control-plane microbenchmark metrics into one performance statistic.",
+  "native_runtime_scope": "single-host B02 vLLM 0.10.2 developer API; BlockPool touch/free lifecycle verified; not a production multi-node API.",
+  "master_rows": 7193,
+  "registry_rows": 6524,
+  "sanity_rows": 68
+}
