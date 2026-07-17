@@ -1,0 +1,286 @@
+--- a/vllm/v1/engine/core.py
++++ b/vllm/v1/engine/core.py
+@@ -1,6 +1,8 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ import gc
++import hashlib
++import json
+ import os
+ import queue
+ import signal
+@@ -13,6 +15,7 @@
+ from inspect import isclass, signature
+ from logging import DEBUG
+ from typing import Any, Callable, Optional, TypeVar, Union
++from types import SimpleNamespace
+ 
+ import msgspec
+ import zmq
+@@ -158,7 +161,158 @@
+ 
+             self.request_block_hasher = get_request_block_hasher(
+                 block_size, caching_hash_fn)
++
++        # B02 experimental owner-side state. These records deliberately live
++        # in EngineCore: utility calls and scheduler/eviction steps share the
++        # same serialized event loop, so validation and BlockPool.touch() have
++        # no interleaving eviction window.
++        self._b02_epoch = 1
++        self._b02_sequence = 0
++        self._b02_advertisements: dict[str, dict[str, Any]] = {}
++        self._b02_pins: dict[str, tuple[tuple[list[Any], ...], str]] = {}
++        self._b02_next_pin_id = 0
++
++    @staticmethod
++    def _b02_digest(token_ids: list[int], tenant: str,
++                    model_revision: str) -> str:
++        payload = json.dumps({
++            "token_ids": token_ids,
++            "tenant": tenant,
++            "model_revision": model_revision,
++        }, separators=(",", ":"), sort_keys=True).encode("utf-8")
++        return hashlib.sha256(payload).hexdigest()
++
++    def _b02_cached_blocks(
++            self, token_ids: list[int]) -> tuple[tuple[list[Any], ...], int]:
++        """Return the live vLLM cache blocks matching a tokenized prefix."""
++        if self.request_block_hasher is None:
++            raise RuntimeError("prefix caching is disabled")
++        request = SimpleNamespace(
++            block_hashes=[],
++            num_tokens=len(token_ids),
++            all_token_ids=token_ids,
++            mm_positions=[],
++            mm_hashes=[],
++            lora_request=None,
++            cache_salt=None,
++            sampling_params=None,
++        )
++        request.block_hashes = self.request_block_hasher(request)
++        cache_blocks, matched_tokens = (
++            self.scheduler.kv_cache_manager.get_computed_blocks(request))
++        return cache_blocks.blocks, matched_tokens
++
++    @staticmethod
++    def _b02_flatten(blocks: tuple[list[Any], ...]) -> list[Any]:
++        return [block for group in blocks for block in group]
++
++    def b02_advertise_prefix(self, token_ids: list[int], tenant: str,
++                             model_revision: str,
++                             lease_ms: int = 1000) -> dict[str, Any]:
++        """Create a lease-bearing advertisement for live cached KV blocks."""
++        blocks, coverage_tokens = self._b02_cached_blocks(token_ids)
++        if coverage_tokens <= 0:
++            return {"ok": False, "reason": "not_resident", "coverage_tokens": 0}
++        self._b02_sequence += 1
++        digest = self._b02_digest(token_ids, tenant, model_revision)
++        advertisement = {
++            "digest": digest,
++            "token_ids": token_ids,
++            "tenant": tenant,
++            "model_revision": model_revision,
++            "epoch": self._b02_epoch,
++            "sequence": self._b02_sequence,
++            "coverage_tokens": coverage_tokens,
++            "lease_deadline": time.monotonic() + lease_ms / 1000.0,
++        }
++        self._b02_advertisements[digest] = advertisement
++        return {"ok": True, **{
++            key: value for key, value in advertisement.items()
++            if key not in ("token_ids", "lease_deadline")
++        }}
++
++    def b02_validate_and_pin(self, digest: str, expected_epoch: int,
++                             expected_sequence: int, tenant: str,
++                             model_revision: str,
++                             min_coverage_tokens: int = 1) -> dict[str, Any]:
++        """Atomically validate an advertisement and pin actual vLLM blocks."""
++        advertisement = self._b02_advertisements.get(digest)
++        if advertisement is None:
++            return {"ok": False, "reason": "unknown_digest"}
++        if (expected_epoch != self._b02_epoch
++                or expected_epoch != advertisement["epoch"]):
++            return {"ok": False, "reason": "epoch_mismatch"}
++        if expected_sequence != advertisement["sequence"]:
++            return {"ok": False, "reason": "sequence_mismatch"}
++        if tenant != advertisement["tenant"]:
++            return {"ok": False, "reason": "tenant_mismatch"}
++        if model_revision != advertisement["model_revision"]:
++            return {"ok": False, "reason": "model_revision_mismatch"}
++        if time.monotonic() > advertisement["lease_deadline"]:
++            return {"ok": False, "reason": "lease_expired"}
++
++        blocks, coverage_tokens = self._b02_cached_blocks(
++            advertisement["token_ids"])
++        if coverage_tokens < min_coverage_tokens:
++            return {"ok": False, "reason": "not_resident",
++                    "coverage_tokens": coverage_tokens}
++
++        # BlockPool.touch removes a cached block from the eviction queue and
++        # raises its reference count. This occurs in the same EngineCore
++        # operation as all validation checks above.
++        self.scheduler.kv_cache_manager.block_pool.touch(blocks)
++        self._b02_next_pin_id += 1
++        pin_handle = f"b02-{self._b02_epoch}-{self._b02_next_pin_id}"
++        self._b02_pins[pin_handle] = (blocks, digest)
++        return {"ok": True, "pin_handle": pin_handle,
++                "coverage_tokens": coverage_tokens,
++                "epoch": advertisement["epoch"],
++                "sequence": advertisement["sequence"]}
++
++    def b02_release_pin(self, pin_handle: str,
++                        reason: str = "release") -> dict[str, Any]:
++        """Release a pin after normal completion, abort, or cancellation."""
++        pin = self._b02_pins.pop(pin_handle, None)
++        if pin is None:
++            return {"ok": False, "reason": "unknown_pin"}
++        blocks, _ = pin
++        self.scheduler.kv_cache_manager.block_pool.free_blocks(
++            self._b02_flatten(blocks))
++        return {"ok": True, "release_reason": reason}
+ 
++    def b02_evict_prefix(self, digest: str) -> dict[str, Any]:
++        """Test-only eviction injection through the actual vLLM BlockPool."""
++        advertisement = self._b02_advertisements.get(digest)
++        if advertisement is None:
++            return {"ok": False, "reason": "unknown_digest"}
++        if any(pin_digest == digest for _, pin_digest in self._b02_pins.values()):
++            return {"ok": False, "reason": "pinned"}
++        blocks, coverage_tokens = self._b02_cached_blocks(
++            advertisement["token_ids"])
++        if coverage_tokens <= 0:
++            return {"ok": False, "reason": "not_resident"}
++        evicted = 0
++        block_pool = self.scheduler.kv_cache_manager.block_pool
++        for block in self._b02_flatten(blocks):
++            if block.ref_cnt == 0 and block_pool._maybe_evict_cached_block(block):
++                evicted += 1
++        self._b02_sequence += 1
++        self._b02_advertisements.pop(digest, None)
++        return {"ok": evicted > 0, "evicted_blocks": evicted,
++                "coverage_tokens": coverage_tokens}
++
++    def b02_advance_epoch(self) -> dict[str, Any]:
++        """Inject a restart epoch without relying on stale client metadata."""
++        self._b02_epoch += 1
++        self._b02_sequence += 1
++        return {"ok": True, "epoch": self._b02_epoch}
++
++    def b02_native_pin_status(self) -> dict[str, Any]:
++        return {"ok": True, "epoch": self._b02_epoch,
++                "advertisements": len(self._b02_advertisements),
++                "active_pins": len(self._b02_pins),
++                "kv_usage": self.scheduler.kv_cache_manager.usage}
++
+     def _initialize_kv_caches(
+             self, vllm_config: VllmConfig) -> tuple[int, int, KVCacheConfig]:
+         start = time.time()
+--- a/vllm/v1/engine/async_llm.py
++++ b/vllm/v1/engine/async_llm.py
+@@ -647,6 +647,41 @@
+             raise ValueError("Not supported on CPU.")
+         await self.engine_core.reset_prefix_cache_async()
+ 
++    # B02 experimental runtime-owner API. The methods intentionally use the
++    # EngineCore utility channel so validation, pinning, and eviction all run
++    # on the scheduler's serialized event loop.
++    async def b02_advertise_prefix(self, token_ids: list[int], tenant: str,
++                                   model_revision: str,
++                                   lease_ms: int = 1000) -> dict[str, Any]:
++        return await self.engine_core.call_utility_async(
++            "b02_advertise_prefix", token_ids, tenant, model_revision,
++            lease_ms)
++
++    async def b02_validate_and_pin(self, digest: str, expected_epoch: int,
++                                   expected_sequence: int, tenant: str,
++                                   model_revision: str,
++                                   min_coverage_tokens: int = 1
++                                   ) -> dict[str, Any]:
++        return await self.engine_core.call_utility_async(
++            "b02_validate_and_pin", digest, expected_epoch,
++            expected_sequence, tenant, model_revision, min_coverage_tokens)
++
++    async def b02_release_pin(self, pin_handle: str,
++                              reason: str = "release") -> dict[str, Any]:
++        return await self.engine_core.call_utility_async(
++            "b02_release_pin", pin_handle, reason)
++
++    async def b02_evict_prefix(self, digest: str) -> dict[str, Any]:
++        return await self.engine_core.call_utility_async("b02_evict_prefix",
++                                                         digest)
++
++    async def b02_advance_epoch(self) -> dict[str, Any]:
++        return await self.engine_core.call_utility_async("b02_advance_epoch")
++
++    async def b02_native_pin_status(self) -> dict[str, Any]:
++        return await self.engine_core.call_utility_async(
++            "b02_native_pin_status")
++
+     async def sleep(self, level: int = 1) -> None:
+         await self.reset_prefix_cache()
+         await self.engine_core.sleep_async(level)
+--- a/vllm/entrypoints/openai/api_server.py
++++ b/vllm/entrypoints/openai/api_server.py
+@@ -1069,7 +1069,61 @@
+         logger.info("Resetting prefix cache with specific %s...", str(device))
+         await engine_client(raw_request).reset_prefix_cache(device)
+         return Response(status_code=200)
++
++    async def _b02_payload(raw_request: Request) -> dict[str, Any]:
++        try:
++            payload = await raw_request.json()
++        except Exception as exc:
++            raise HTTPException(status_code=HTTPStatus.BAD_REQUEST.value,
++                                detail="expected a JSON request body") from exc
++        if not isinstance(payload, dict):
++            raise HTTPException(status_code=HTTPStatus.BAD_REQUEST.value,
++                                detail="expected a JSON object")
++        return payload
++
++    @router.get("/b02/native_pin/status")
++    async def b02_native_pin_status(raw_request: Request):
++        return JSONResponse(content=await engine_client(raw_request).
++                            b02_native_pin_status())
++
++    @router.post("/b02/native_pin/advertise")
++    async def b02_advertise_prefix(raw_request: Request):
++        payload = await _b02_payload(raw_request)
++        result = await engine_client(raw_request).b02_advertise_prefix(
++            [int(token) for token in payload["token_ids"]],
++            str(payload["tenant"]), str(payload["model_revision"]),
++            int(payload.get("lease_ms", 1000)))
++        return JSONResponse(content=result)
++
++    @router.post("/b02/native_pin/validate")
++    async def b02_validate_and_pin(raw_request: Request):
++        payload = await _b02_payload(raw_request)
++        result = await engine_client(raw_request).b02_validate_and_pin(
++            str(payload["digest"]), int(payload["epoch"]),
++            int(payload["sequence"]), str(payload["tenant"]),
++            str(payload["model_revision"]),
++            int(payload.get("min_coverage_tokens", 1)))
++        return JSONResponse(content=result)
++
++    @router.post("/b02/native_pin/release")
++    async def b02_release_pin(raw_request: Request):
++        payload = await _b02_payload(raw_request)
++        result = await engine_client(raw_request).b02_release_pin(
++            str(payload["pin_handle"]), str(payload.get("reason", "release")))
++        return JSONResponse(content=result)
++
++    @router.post("/b02/native_pin/evict")
++    async def b02_evict_prefix(raw_request: Request):
++        payload = await _b02_payload(raw_request)
++        result = await engine_client(raw_request).b02_evict_prefix(
++            str(payload["digest"]))
++        return JSONResponse(content=result)
+ 
++    @router.post("/b02/native_pin/advance_epoch")
++    async def b02_advance_epoch(raw_request: Request):
++        return JSONResponse(content=await engine_client(raw_request).
++                            b02_advance_epoch())
++
+     @router.post("/sleep")
+     async def sleep(raw_request: Request):
+         # get POST params
