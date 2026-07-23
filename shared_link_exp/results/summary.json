@@ -1,0 +1,268 @@
+{
+  "e1_scaling": {
+    "table": [
+      {
+        "N": 16,
+        "offered_Bps": 848.2,
+        "utilization": 0.0129,
+        "q_max": 67.9,
+        "q_p95": 0.5,
+        "qdelay_p95_s": 0.0126
+      },
+      {
+        "N": 32,
+        "offered_Bps": 1700.0,
+        "utilization": 0.0259,
+        "q_max": 140.2,
+        "q_p95": 5.4,
+        "qdelay_p95_s": 0.0333
+      },
+      {
+        "N": 64,
+        "offered_Bps": 3403.8,
+        "utilization": 0.0519,
+        "q_max": 275.6,
+        "q_p95": 42.6,
+        "qdelay_p95_s": 0.0904
+      },
+      {
+        "N": 128,
+        "offered_Bps": 6811.6,
+        "utilization": 0.1039,
+        "q_max": 552.0,
+        "q_p95": 210.8,
+        "qdelay_p95_s": 0.2722
+      },
+      {
+        "N": 256,
+        "offered_Bps": 13610.9,
+        "utilization": 0.2077,
+        "q_max": 1118.7,
+        "q_p95": 1047.7,
+        "qdelay_p95_s": 1.033
+      }
+    ],
+    "note": "offered load grows ~linearly in N; q_max/q_p95/qdelay_p95 mark where burst-phase instantaneous offered load crosses link capacity (64 KiB/s)."
+  },
+  "e2_freshness": {
+    "table": [
+      {
+        "B_kib": 8,
+        "utilization": 0.7938,
+        "age_delivery_p50_s": 6.2457,
+        "age_delivery_p95_s": 16.5406,
+        "age_use_p95_s": 84.7161,
+        "tombstone_delay_p95_s": 16.1075,
+        "stale_fallback_rate": 0.1192
+      },
+      {
+        "B_kib": 16,
+        "utilization": 0.4157,
+        "age_delivery_p50_s": 0.8319,
+        "age_delivery_p95_s": 6.0641,
+        "age_use_p95_s": 79.7971,
+        "tombstone_delay_p95_s": 5.8837,
+        "stale_fallback_rate": 0.0359
+      },
+      {
+        "B_kib": 32,
+        "utilization": 0.2079,
+        "age_delivery_p50_s": 0.0031,
+        "age_delivery_p95_s": 1.0478,
+        "age_use_p95_s": 78.442,
+        "tombstone_delay_p95_s": 1.0388,
+        "stale_fallback_rate": 0.0072
+      },
+      {
+        "B_kib": 64,
+        "utilization": 0.1039,
+        "age_delivery_p50_s": 0.001,
+        "age_delivery_p95_s": 0.2732,
+        "age_use_p95_s": 78.1624,
+        "tombstone_delay_p95_s": 0.398,
+        "stale_fallback_rate": 0.0011
+      },
+      {
+        "B_kib": 128,
+        "utilization": 0.052,
+        "age_delivery_p50_s": 0.0005,
+        "age_delivery_p95_s": 0.091,
+        "age_use_p95_s": 78.1303,
+        "tombstone_delay_p95_s": 0.1933,
+        "stale_fallback_rate": 0.0004
+      },
+      {
+        "B_kib": 256,
+        "utilization": 0.026,
+        "age_delivery_p50_s": 0.0002,
+        "age_delivery_p95_s": 0.0358,
+        "age_use_p95_s": 78.1255,
+        "tombstone_delay_p95_s": 0.0956,
+        "stale_fallback_rate": 0.0002
+      }
+    ],
+    "note": "state-age-at-delivery and stale-fallback rate blow up non-linearly as link utilization approaches 1."
+  },
+  "e3_dispatch": {
+    "by_B": {
+      "16KiB": {
+        "exact_fifo": {
+          "valid_hit_rate": 0.4326,
+          "stale_fallback_rate": 0.0359,
+          "cold_miss_rate": 0.5513,
+          "saved_prefill_total": 17079585.7,
+          "saved_prefill_retention_vs_ideal": 0.9562,
+          "saved_prefill_mean_per_req": 2842.0,
+          "qdelay_p95_s": 6.0602,
+          "age_use_p95_s": 79.7971,
+          "tx_bytes": 2043481
+        },
+        "local_topk": {
+          "valid_hit_rate": 0.3373,
+          "stale_fallback_rate": 0.0178,
+          "cold_miss_rate": 0.6566,
+          "saved_prefill_total": 14935844.6,
+          "saved_prefill_retention_vs_ideal": 0.8362,
+          "saved_prefill_mean_per_req": 2485.2,
+          "qdelay_p95_s": 2.8152,
+          "age_use_p95_s": 81.9544,
+          "tx_bytes": 1384110
+        },
+        "agg_static": {
+          "valid_hit_rate": 0.433,
+          "stale_fallback_rate": 0.0071,
+          "cold_miss_rate": 0.5639,
+          "saved_prefill_total": 17121008.2,
+          "saved_prefill_retention_vs_ideal": 0.9585,
+          "saved_prefill_mean_per_req": 2848.9,
+          "qdelay_p95_s": 3.7633,
+          "age_use_p95_s": 75.5573,
+          "tx_bytes": 1734805
+        },
+        "agg_adaptive": {
+          "valid_hit_rate": 0.3842,
+          "stale_fallback_rate": 0.007,
+          "cold_miss_rate": 0.6131,
+          "saved_prefill_total": 15317599.8,
+          "saved_prefill_retention_vs_ideal": 0.8576,
+          "saved_prefill_mean_per_req": 2548.8,
+          "qdelay_p95_s": 1.2932,
+          "age_use_p95_s": 81.3182,
+          "tx_bytes": 1491805
+        }
+      },
+      "32KiB": {
+        "exact_fifo": {
+          "valid_hit_rate": 0.448,
+          "stale_fallback_rate": 0.0072,
+          "cold_miss_rate": 0.5487,
+          "saved_prefill_total": 17711510.0,
+          "saved_prefill_retention_vs_ideal": 0.9916,
+          "saved_prefill_mean_per_req": 2947.1,
+          "qdelay_p95_s": 1.0458,
+          "age_use_p95_s": 78.442,
+          "tx_bytes": 2043483
+        },
+        "local_topk": {
+          "valid_hit_rate": 0.344,
+          "stale_fallback_rate": 0.0017,
+          "cold_miss_rate": 0.6554,
+          "saved_prefill_total": 15234302.8,
+          "saved_prefill_retention_vs_ideal": 0.8529,
+          "saved_prefill_mean_per_req": 2534.9,
+          "qdelay_p95_s": 0.3399,
+          "age_use_p95_s": 81.3728,
+          "tx_bytes": 1384110
+        },
+        "agg_static": {
+          "valid_hit_rate": 0.4428,
+          "stale_fallback_rate": 0.0023,
+          "cold_miss_rate": 0.5562,
+          "saved_prefill_total": 17545536.6,
+          "saved_prefill_retention_vs_ideal": 0.9823,
+          "saved_prefill_mean_per_req": 2919.5,
+          "qdelay_p95_s": 0.9017,
+          "age_use_p95_s": 73.8231,
+          "tx_bytes": 1898615
+        },
+        "agg_adaptive": {
+          "valid_hit_rate": 0.4338,
+          "stale_fallback_rate": 0.0023,
+          "cold_miss_rate": 0.5653,
+          "saved_prefill_total": 17212753.8,
+          "saved_prefill_retention_vs_ideal": 0.9637,
+          "saved_prefill_mean_per_req": 2864.2,
+          "qdelay_p95_s": 0.4491,
+          "age_use_p95_s": 75.9229,
+          "tx_bytes": 1844392
+        }
+      },
+      "64KiB": {
+        "exact_fifo": {
+          "valid_hit_rate": 0.4515,
+          "stale_fallback_rate": 0.0011,
+          "cold_miss_rate": 0.548,
+          "saved_prefill_total": 17850374.0,
+          "saved_prefill_retention_vs_ideal": 0.9994,
+          "saved_prefill_mean_per_req": 2970.2,
+          "qdelay_p95_s": 0.2722,
+          "age_use_p95_s": 78.1624,
+          "tx_bytes": 2043483
+        },
+        "local_topk": {
+          "valid_hit_rate": 0.3444,
+          "stale_fallback_rate": 0.0005,
+          "cold_miss_rate": 0.6554,
+          "saved_prefill_total": 15252968.9,
+          "saved_prefill_retention_vs_ideal": 0.854,
+          "saved_prefill_mean_per_req": 2538.0,
+          "qdelay_p95_s": 0.0996,
+          "age_use_p95_s": 81.34,
+          "tx_bytes": 1384110
+        },
+        "agg_static": {
+          "valid_hit_rate": 0.4445,
+          "stale_fallback_rate": 0.001,
+          "cold_miss_rate": 0.5551,
+          "saved_prefill_total": 17613923.7,
+          "saved_prefill_retention_vs_ideal": 0.9861,
+          "saved_prefill_mean_per_req": 2930.9,
+          "qdelay_p95_s": 0.2602,
+          "age_use_p95_s": 73.5834,
+          "tx_bytes": 1972652
+        },
+        "agg_adaptive": {
+          "valid_hit_rate": 0.4412,
+          "stale_fallback_rate": 0.001,
+          "cold_miss_rate": 0.5584,
+          "saved_prefill_total": 17485914.8,
+          "saved_prefill_retention_vs_ideal": 0.979,
+          "saved_prefill_mean_per_req": 2909.6,
+          "qdelay_p95_s": 0.182,
+          "age_use_p95_s": 74.3904,
+          "tx_bytes": 1930803
+        }
+      },
+      "ideal": {
+        "ideal_exact": {
+          "valid_hit_rate": 0.4518,
+          "stale_fallback_rate": 0.0,
+          "cold_miss_rate": 0.5482,
+          "saved_prefill_total": 17861621.8,
+          "saved_prefill_retention_vs_ideal": 1.0,
+          "saved_prefill_mean_per_req": 2972.1,
+          "qdelay_p95_s": 0.0,
+          "age_use_p95_s": 78.1349,
+          "tx_bytes": 2043483
+        }
+      }
+    },
+    "ideal_exact_saved_prefill_total": 17861621.8,
+    "headline": {
+      "16KiB": "at B=16KiB/s: p95 age-at-use exact_fifo 79797 ms vs agg_adaptive 81318 ms; saved-prefill retention vs ideal_exact: exact_fifo 95.6%, agg_adaptive 85.8%; stale-fallback rate exact_fifo 3.6% vs agg_adaptive 0.7%",
+      "32KiB": "at B=32KiB/s: p95 age-at-use exact_fifo 78442 ms vs agg_adaptive 75923 ms; saved-prefill retention vs ideal_exact: exact_fifo 99.2%, agg_adaptive 96.4%; stale-fallback rate exact_fifo 0.7% vs agg_adaptive 0.2%",
+      "64KiB": "at B=64KiB/s: p95 age-at-use exact_fifo 78162 ms vs agg_adaptive 74390 ms; saved-prefill retention vs ideal_exact: exact_fifo 99.9%, agg_adaptive 97.9%; stale-fallback rate exact_fifo 0.1% vs agg_adaptive 0.1%"
+    }
+  },
+  "wall_s_total": 202.5
+}
