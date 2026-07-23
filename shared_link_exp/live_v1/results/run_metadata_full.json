@@ -1,0 +1,30 @@
+{
+  "started_at_unix": 1784815276.913283,
+  "finished_at_unix": 1784817801.2489262,
+  "duration_s": 2524.3356437683105,
+  "arguments": {
+    "out_dir": "/home/byh/B02/shared_link_exp/live_v1",
+    "tag": "full",
+    "seed": 20260723,
+    "repetitions": 4,
+    "n_requests": 128,
+    "warmup": 32,
+    "pool_size": 64,
+    "alpha": 0.55,
+    "concurrency": 4,
+    "prefix_tokens": 2048,
+    "output_tokens": 4,
+    "kv_cache_tokens": 104544,
+    "bps": "low=960,med=410,high=300",
+    "j": 4,
+    "topk": 8,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "max_request_attempts": 3,
+    "cooldown_s": 1.0,
+    "ideal_only": false
+  },
+  "cells": 52,
+  "raw_requests": 4992
+}
