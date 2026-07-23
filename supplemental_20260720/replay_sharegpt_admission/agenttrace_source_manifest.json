@@ -1,0 +1,8 @@
+{
+  "source_dataset": "anon8231489123/ShareGPT_Vicuna_unfiltered: V3 unfiltered cleaned split (8k multi-turn subset)",
+  "source_url": "https://huggingface.co/datasets/pagarsky/agent-trace",
+  "source_license": "Apache-2.0",
+  "source_file_sha256": "51943822e63b4a003d17ea84a08463775a71eba9d7e828d28b20cdf1cba245f2",
+  "raw_source_retained_in_output": false,
+  "derivation": "Only lengths, counts, hashes and structural lineage metadata are output."
+}

@@ -1,0 +1,18 @@
+{
+  "started_at_unix": 1784536118.8726892,
+  "finished_at_unix": 1784536121.2924197,
+  "duration_s": 2.4197309017181396,
+  "arguments": {
+    "source_jsonl": "/home/byh/B02/supplemental_20260720/sources/agenttrace_mbpp_s200.jsonl",
+    "out_dir": "/home/byh/B02/supplemental_20260720/replay_mbpp_s200_structural",
+    "seed": 20260715,
+    "repetitions": 10,
+    "max_requests": 512,
+    "warmup": 128,
+    "cache_capacity": 128,
+    "j": 8
+  },
+  "cells": 80,
+  "structural_requests": 5120,
+  "source_sha256": "84df2532cab6e68c7f8fa38f2ad9603aba663a9e493fb7151df2992011845b60"
+}

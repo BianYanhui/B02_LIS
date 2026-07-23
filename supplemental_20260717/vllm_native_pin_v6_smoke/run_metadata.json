@@ -1,0 +1,29 @@
+{
+  "arguments": {
+    "base_url": "http://127.0.0.1:8000",
+    "model": "/home/byh/.cache/modelscope/qwen/Qwen2.5-1.5B-Instruct",
+    "out_dir": "supplemental_20260717/vllm_native_pin_v6_smoke",
+    "workers": 2,
+    "ops_per_worker": 2,
+    "invalid_operations": 2,
+    "eviction_attempts": 4,
+    "timeout_s": 30.0
+  },
+  "initial_status": {
+    "ok": true,
+    "epoch": 1,
+    "advertisements": 0,
+    "active_pins": 0,
+    "kv_usage": 0.0
+  },
+  "initial_advertisement": {
+    "ok": true,
+    "digest": "bc5ecf14a269683075f9592c83a4cb119027243b3b80cdae65225b8e37c92555",
+    "tenant": "tenant-b02",
+    "model_revision": "qwen2.5-1.5b-instruct-r0",
+    "epoch": 1,
+    "sequence": 18,
+    "coverage_tokens": 2336
+  },
+  "prefix_sha256": "92ddc423b5b4c54981c84fdfdbf32964b94717d52b819771867cad9ccfc1f98d"
+}

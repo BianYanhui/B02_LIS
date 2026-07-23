@@ -1,0 +1,19 @@
+{
+  "policy": "sketch_K",
+  "K": 32,
+  "concurrent": 4,
+  "rep": 1,
+  "n_dispatch": 75,
+  "n_success": 75,
+  "success_rate": 1.0,
+  "ttft_p50_ms": 48.030149,
+  "ttft_p95_ms": 50.557061,
+  "ttft_p99_ms": 51.754497,
+  "same_inst_step_ratio": 1.0,
+  "decision_p50_us": 81.186,
+  "decision_p95_us": 110.477,
+  "state_collect_p50_us": 24255.197,
+  "state_collect_p95_us": 24469.507,
+  "cell_id": "sketch_K_K32_r1",
+  "K_for_run": 32
+}

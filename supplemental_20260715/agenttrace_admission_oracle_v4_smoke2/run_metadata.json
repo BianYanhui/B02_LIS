@@ -1,0 +1,18 @@
+{
+  "started_at_unix": 1784170585.479795,
+  "finished_at_unix": 1784170592.5145748,
+  "duration_s": 7.034780263900757,
+  "arguments": {
+    "source_jsonl": "supplemental_20260715/agenttrace_source_v3/agenttrace_nl2bash_1_7B.jsonl",
+    "out_dir": "supplemental_20260715/agenttrace_admission_oracle_v4_smoke2",
+    "seed": 20260716,
+    "repetitions": 2,
+    "max_requests": 128,
+    "warmup": 32,
+    "cache_capacity": 128,
+    "j": 4,
+    "guard_tokens": 512
+  },
+  "cells": 176,
+  "source_sha256": "250313ae096b0bb8c1986b6f571b68f4ff7617a12026db20214ad84188d12ae5"
+}

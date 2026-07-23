@@ -1,0 +1,26 @@
+{
+  "seed": 20260715,
+  "n_instances": 16,
+  "n_requests": 200,
+  "n_prefixes": 80,
+  "rows": 54,
+  "summary_rows": 36,
+  "policy_families": [
+    "dualmap",
+    "power2",
+    "slo_affinity"
+  ],
+  "state_interfaces": [
+    "load_only",
+    "exact_affinity",
+    "sketch_K2",
+    "sketch_K4",
+    "sketch_K8",
+    "sketch_K16"
+  ],
+  "scenarios": [
+    "stable",
+    "eviction",
+    "remap_restart"
+  ]
+}

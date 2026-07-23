@@ -1,0 +1,16 @@
+[
+  {
+    "trace": "mbpp_s200",
+    "family": "agentic_tooluse",
+    "structural": "ok",
+    "admission": "ok",
+    "duration_s": 45.214539766311646
+  },
+  {
+    "trace": "sharegpt_s200",
+    "family": "real_chat_multiturn",
+    "structural": "ok",
+    "admission": "ok",
+    "duration_s": 43.568082332611084
+  }
+]

@@ -1,0 +1,30 @@
+{
+  "started_at_unix": 1784536846.453591,
+  "finished_at_unix": 1784540158.479654,
+  "duration_s": 3312.02606344223,
+  "arguments": {
+    "out_dir": "/home/byh/B02/supplemental_20260720/crosssystem_normal",
+    "variant": "normal",
+    "seed": 20260720,
+    "repetitions": 12,
+    "n_requests": 192,
+    "warmup": 64,
+    "active_prefixes": 96,
+    "zipf_alpha": 0.55,
+    "cache_capacity": 128,
+    "sglang_assumed_capacity": 512,
+    "j": 4,
+    "concurrency": 4,
+    "prefix_tokens": 2048,
+    "output_tokens": 4,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "max_request_attempts": 3,
+    "cooldown_s": 0.05,
+    "smoke": false
+  },
+  "cells": 60,
+  "pairs": 48,
+  "raw_requests": 7680
+}

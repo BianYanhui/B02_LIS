@@ -1,0 +1,5 @@
+policy,n_cells,n_dispatch_total,success_rate,decision_avg_us_mean,decision_p95_us_mean,state_collect_avg_us_mean,state_collect_p95_us_mean,ttft_avg_us_mean,load_stdev_mean
+coarse,12,2366,1.0,156.286,213.266,105531.234,121725.73,81485.815,83.873
+rich,12,2374,1.0,177.128,269.821,105069.201,120881.355,80678.968,83.873
+round-robin,12,2362,1.0,92.882,138.238,105173.47,120378.027,81298.636,83.873
+sketch,12,2371,1.0,172.811,233.534,105795.047,120928.713,80724.214,83.873

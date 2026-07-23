@@ -1,0 +1,19 @@
+{
+  "policy": "rich",
+  "K": null,
+  "concurrent": 4,
+  "rep": 1,
+  "n_dispatch": 79,
+  "n_success": 79,
+  "success_rate": 1.0,
+  "ttft_p50_ms": 47.591341,
+  "ttft_p95_ms": 103.536812,
+  "ttft_p99_ms": 106.620062,
+  "same_inst_step_ratio": 1.0,
+  "decision_p50_us": 22.012,
+  "decision_p95_us": 23.639,
+  "state_collect_p50_us": 23232.452,
+  "state_collect_p95_us": 24710.146,
+  "cell_id": "rich_KNone_r1",
+  "K_for_run": null
+}

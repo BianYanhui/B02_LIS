@@ -1,0 +1,8 @@
+{
+  "started_at_unix": 1784087684.9983783,
+  "seed": 20260715,
+  "script": "/home/byh/B02/supplemental_20260715_run_control_plane_supplements.py",
+  "purpose": "Supplement paper evidence for Cost-Aware State Interfaces / Minimal State Sketch.",
+  "finished_at_unix": 1784087692.0840147,
+  "duration_s": 7.086
+}

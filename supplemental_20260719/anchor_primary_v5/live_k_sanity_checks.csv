@@ -1,0 +1,8 @@
+check_name,status,offending_rows,suggested_fix
+same logical request has byte-identical prompt and input token count across policies,PASS,0,remove all policy data from semantic prompt
+same logical request has fixed output token count across policies,PASS,0,keep min_tokens=max_tokens and ignore_eos
+vLLM usage telemetry present for every request,PASS,0,restart vLLM with --enable-prompt-tokens-details
+all output token counts equal requested fixed length,PASS,0,inspect server generation settings
+transient live retries recorded in raw data,PASS,1,inspect prior_attempt_errors if retries are nonzero
+same difficult trace hash and policy set within every paired repetition,PASS,0,regenerate one shared trace per repetition before policy replay
+evaluated candidate fanout obeys J for every live request,PASS,0,truncate ranked candidates before owner request

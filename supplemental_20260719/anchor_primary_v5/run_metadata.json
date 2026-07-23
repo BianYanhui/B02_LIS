@@ -1,0 +1,28 @@
+{
+  "started_at_unix": 1784188611.7257917,
+  "finished_at_unix": 1784194743.118783,
+  "duration_s": 6131.392992019653,
+  "arguments": {
+    "out_dir": "/home/byh/B02/supplemental_20260715/live_k_tradeoff_v5_primary_2k_committed",
+    "seed": 20260716,
+    "k_values": "4,8,16,32",
+    "repetitions": 12,
+    "n_requests": 192,
+    "warmup": 64,
+    "active_prefixes": 96,
+    "zipf_alpha": 0.55,
+    "cache_capacity": 128,
+    "j": 4,
+    "concurrency": 4,
+    "prefix_tokens": 2048,
+    "output_tokens": 4,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "max_request_attempts": 3,
+    "cooldown_s": 0.05
+  },
+  "cells": 72,
+  "pairs": 60,
+  "raw_requests": 9216
+}

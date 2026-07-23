@@ -1,0 +1,7 @@
+experiment_id,locality,rep,baseline_policy,treatment_policy,workload_trace_hash,status,delta_ttft_p50_ms,delta_ttft_p95_ms,delta_vllm_cached_tokens_total,delta_vllm_cached_token_rate,delta_metric_prefix_cache_hits_delta,delta_mean_selected_coverage_tokens
+20260716_fixed_t4_high_sketch_coverage_k8_rep0,high,0,load_only,sketch_coverage_k8,acbc7af9885887b52f4bad250aa7a5483c24541e48b1fc36d638dd70b60c6315,Current,-0.15240599999998494,1291.90087,1088.0,0.0,1584.0,192.0
+20260716_fixed_t4_high_sketch_coverage_k16_rep0,high,0,load_only,sketch_coverage_k16,acbc7af9885887b52f4bad250aa7a5483c24541e48b1fc36d638dd70b60c6315,Current,-81.332309,54.14883400000002,1088.0,0.0,1584.0,192.0
+20260716_fixed_t4_high_exact_rep0,high,0,load_only,exact,acbc7af9885887b52f4bad250aa7a5483c24541e48b1fc36d638dd70b60c6315,Current,-107.57660999999999,-9.871037000000001,1088.0,0.0,1584.0,192.0
+20260716_fixed_t4_high_sketch_coverage_k8_rep1,high,1,load_only,sketch_coverage_k8,148d43598dd2530b4a2a460b34dcde19dfc8f8ebc274c66b20d92880ffad01bb,Current,-0.27885200000000054,-75.459631,1072.0,0.0,1056.0,256.0
+20260716_fixed_t4_high_sketch_coverage_k16_rep1,high,1,load_only,sketch_coverage_k16,148d43598dd2530b4a2a460b34dcde19dfc8f8ebc274c66b20d92880ffad01bb,Current,-2.7474109999999996,-78.505888,1072.0,0.0,1056.0,256.0
+20260716_fixed_t4_high_exact_rep1,high,1,load_only,exact,148d43598dd2530b4a2a460b34dcde19dfc8f8ebc274c66b20d92880ffad01bb,Current,-2.297162,1177.119436,1072.0,0.0,1056.0,256.0

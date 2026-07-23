@@ -1,0 +1,17 @@
+request_id,arrival_time,tenant,digest,prefix_token_target,discard
+0,0.0,tenant-0,p0000,512,True
+1,0.03,tenant-0,p0008,512,True
+2,0.06,tenant-4,p0020,512,True
+3,0.09,tenant-0,p0024,512,True
+4,0.12,tenant-0,p0000,512,True
+5,0.15,tenant-0,p0000,512,True
+6,0.18,tenant-6,p0006,512,True
+7,0.21,tenant-0,p0000,512,True
+8,0.24,tenant-0,p0000,512,False
+9,0.27,tenant-1,p0001,512,False
+10,0.3,tenant-6,p0006,512,False
+11,0.32999999999999996,tenant-2,p0002,512,False
+12,0.36,tenant-7,p0007,512,False
+13,0.39,tenant-1,p0001,512,False
+14,0.42,tenant-0,p0008,512,False
+15,0.44999999999999996,tenant-0,p0000,512,False

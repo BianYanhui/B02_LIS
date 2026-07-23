@@ -1,0 +1,29 @@
+{
+  "started_at_unix": 1784404903.9869115,
+  "finished_at_unix": 1784409329.17572,
+  "duration_s": 4425.188808917999,
+  "arguments": {
+    "out_dir": "/home/byh/B02/supplemental_20260719/live_guard_ablation",
+    "seed": 20260719,
+    "repetitions": 12,
+    "n_requests": 192,
+    "warmup": 64,
+    "active_prefixes": 96,
+    "zipf_alpha": 0.55,
+    "cache_capacity": 128,
+    "j": 4,
+    "concurrency": 4,
+    "prefix_tokens": 2048,
+    "output_tokens": 4,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "abstain_min_increment_tokens": 1024,
+    "max_request_attempts": 3,
+    "cooldown_s": 0.05,
+    "smoke": false
+  },
+  "cells": 72,
+  "pairs": 60,
+  "raw_requests": 9216
+}

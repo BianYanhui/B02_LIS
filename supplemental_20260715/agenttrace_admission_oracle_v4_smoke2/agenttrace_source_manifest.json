@@ -1,0 +1,8 @@
+{
+  "source_dataset": "pagarsky/agent-trace: nl2bash_1_7B_20260403T211347Z",
+  "source_url": "https://huggingface.co/datasets/pagarsky/agent-trace",
+  "source_license": "Apache-2.0",
+  "source_file_sha256": "250313ae096b0bb8c1986b6f571b68f4ff7617a12026db20214ad84188d12ae5",
+  "raw_source_retained_in_output": false,
+  "derivation": "Only lengths, counts, hashes and structural lineage metadata are output."
+}

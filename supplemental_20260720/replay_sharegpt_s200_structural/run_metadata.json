@@ -1,0 +1,18 @@
+{
+  "started_at_unix": 1784536164.081765,
+  "finished_at_unix": 1784536165.8883445,
+  "duration_s": 1.8065800666809082,
+  "arguments": {
+    "source_jsonl": "/home/byh/B02/supplemental_20260720/sources/sharegpt_chat_s200.jsonl",
+    "out_dir": "/home/byh/B02/supplemental_20260720/replay_sharegpt_s200_structural",
+    "seed": 20260715,
+    "repetitions": 10,
+    "max_requests": 512,
+    "warmup": 128,
+    "cache_capacity": 128,
+    "j": 8
+  },
+  "cells": 80,
+  "structural_requests": 5120,
+  "source_sha256": "c6a1c39d759f2931c895ad421ebbb66cfa85a04a6d10e1c2b16f204502b58e5f"
+}

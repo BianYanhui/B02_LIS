@@ -1,0 +1,4 @@
+finding,dualmap_load_reuse,exact_reuse,sketchK8_reuse,sketchK8_vs_exact_reuse_ratio,sketchK8_metadata_bytes,exact_metadata_bytes,interpretation
+cpu_high,0.9429,0.9437,0.9456,1.002,31808,49408,"If Sketch remains near Exact with much less metadata, the paper conclusion survives replacing toy weighted routing with DualMap."
+cpu_medium,0.9011,0.9015,0.9013,0.9998,34944,81792,"If Sketch remains near Exact with much less metadata, the paper conclusion survives replacing toy weighted routing with DualMap."
+cpu_low,0.9,0.9,0.9,1.0,34944,82944,"If Sketch remains near Exact with much less metadata, the paper conclusion survives replacing toy weighted routing with DualMap."

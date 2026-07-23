@@ -1,0 +1,5 @@
+check_name,status,offending_rows,suggested_fix
+frozen Exact is incremental-prefill upper bound,PASS,0,inspect visibility or snapshot construction
+all evaluated candidate fanouts obey J,PASS,0,truncate candidates before selection
+no derived output contains raw source text,PASS,0,write structural fields and hashes only
+oracle variants marked UpperBoundOnly,PASS,0,never report oracle as deployable

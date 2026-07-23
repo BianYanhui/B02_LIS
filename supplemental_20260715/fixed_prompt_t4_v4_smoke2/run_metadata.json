@@ -1,0 +1,25 @@
+{
+  "started_at_unix": 1784170587.5259976,
+  "finished_at_unix": 1784170606.7025356,
+  "duration_s": 19.176538467407227,
+  "arguments": {
+    "out_dir": "supplemental_20260715/fixed_prompt_t4_v4_smoke2",
+    "seed": 20260716,
+    "localities": "high",
+    "n_requests": 16,
+    "warmup": 8,
+    "repetitions": 2,
+    "cache_capacity": 128,
+    "j": 4,
+    "concurrency": 4,
+    "prefix_tokens": 512,
+    "output_tokens": 8,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "cooldown_s": 0.05
+  },
+  "cells": 8,
+  "pairs": 6,
+  "raw_requests": 64
+}

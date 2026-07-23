@@ -1,0 +1,3 @@
+workload_trace_hash,rep,request_count_total,measured_request_count,active_lineages,unique_selective_prefixes,top_2_demand_concentration,top_8_demand_concentration,top_16_demand_concentration,reuse_distance_p50_requests,reuse_distance_p95_requests,prefix_tokens_p50,prefix_tokens_p95
+38b4a3a6454bb1f788ad1914150602685aa52997482de2e71e88c406aee8c9b1,0,128,96,95,128,0.03348893850213112,0.11020905216155875,0.20905216155875786,42.0,79.0,303.0,2456.0
+d9a602508ad9540bc06c0fac792582559ad8879c8f313c89d0d6369d88073cfa,1,128,96,99,128,0.043533798957496345,0.12100047386529864,0.22104786039516244,35.0,93.0,302.0,1801.0

@@ -1,0 +1,19 @@
+{
+  "policy": "coarse",
+  "K": null,
+  "concurrent": 4,
+  "rep": 1,
+  "n_dispatch": 59,
+  "n_success": 59,
+  "success_rate": 1.0,
+  "ttft_p50_ms": 58.752984,
+  "ttft_p95_ms": 122.288947,
+  "ttft_p99_ms": 1669.906399,
+  "same_inst_step_ratio": 1.0,
+  "decision_p50_us": 14.49,
+  "decision_p95_us": 16.183,
+  "state_collect_p50_us": 25030.823,
+  "state_collect_p95_us": 26986.912,
+  "cell_id": "coarse_KNone_r1",
+  "K_for_run": null
+}

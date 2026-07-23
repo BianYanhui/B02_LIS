@@ -1,0 +1,18 @@
+{
+  "started_at_unix": 1784535671.7093396,
+  "finished_at_unix": 1784535673.8349926,
+  "duration_s": 2.1256535053253174,
+  "arguments": {
+    "source_jsonl": "/home/byh/B02/supplemental_20260715/agenttrace_source_v3/agenttrace_nl2bash_1_7B.jsonl",
+    "out_dir": "/home/byh/B02/supplemental_20260720/replay_nl2bash_structural",
+    "seed": 20260715,
+    "repetitions": 10,
+    "max_requests": 512,
+    "warmup": 128,
+    "cache_capacity": 128,
+    "j": 8
+  },
+  "cells": 80,
+  "structural_requests": 5120,
+  "source_sha256": "250313ae096b0bb8c1986b6f571b68f4ff7617a12026db20214ad84188d12ae5"
+}

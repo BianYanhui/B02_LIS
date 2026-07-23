@@ -1,0 +1,1 @@
+# AgentTrace admission and Oracle-K diagnosis v4\n\nThis is a trace-derived structural simulation. Oracle-K uses future trace demand only to establish an attainable upper bound at each K; it is non-deployable and is marked UpperBoundOnly. All other admission policies are online. The net-benefit guard abstains on prefixes shorter than the configured threshold.\n

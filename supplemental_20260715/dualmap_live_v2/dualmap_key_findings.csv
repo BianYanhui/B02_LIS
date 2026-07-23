@@ -1,0 +1,7 @@
+finding,dualmap_load_reuse,exact_reuse,sketchK8_reuse,sketchK8_vs_exact_reuse_ratio,sketchK8_metadata_bytes,exact_metadata_bytes,interpretation,dualmap_load_ttft_p95,exact_ttft_p95,sketchK8_ttft_p95,least_load_ttft_p95
+cpu_high,0.9458,0.9435,0.947,1.0037,31488,49536,"If Sketch remains near Exact with much less metadata, the paper conclusion survives replacing toy weighted routing with DualMap.",,,,
+cpu_medium,0.9018,0.9015,0.9012,0.9997,34880,81792,"If Sketch remains near Exact with much less metadata, the paper conclusion survives replacing toy weighted routing with DualMap.",,,,
+cpu_low,0.9,0.9,0.9,1.0,34944,82944,"If Sketch remains near Exact with much less metadata, the paper conclusion survives replacing toy weighted routing with DualMap.",,,,
+live_high,,,,,,,Live numbers are a small sanity check; CPU trace is better for isolating policy behavior.,161.876,106.092,90.766,191.78
+live_medium,,,,,,,Live numbers are a small sanity check; CPU trace is better for isolating policy behavior.,102.34,101.713,84.592,137.811
+live_low,,,,,,,Live numbers are a small sanity check; CPU trace is better for isolating policy behavior.,99.114,91.578,42.586,109.265

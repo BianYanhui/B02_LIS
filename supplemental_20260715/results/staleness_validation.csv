@@ -1,0 +1,26 @@
+experiment,stale_type,injected_stale_rate,n_entries,n_requests,accepted_reuse,fallback_normal_exec,correction_updates,unsafe_reuse,unsafe_reuse_rate,fallback_rate,claim_relevance
+staleness_validation,expired_lease,0.0,20000,8000,6575,1425,0,0,0.0,0.1781,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,wrong_epoch,0.0,20000,8000,6584,1416,0,0,0.0,0.177,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,evicted_resource,0.0,20000,8000,6515,1485,0,0,0.0,0.1856,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,model_mismatch,0.0,20000,8000,6553,1447,0,0,0.0,0.1809,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,mixed,0.0,20000,8000,6569,1431,0,0,0.0,0.1789,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,expired_lease,0.01,20000,8000,6414,1586,67,0,0.0,0.1983,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,wrong_epoch,0.01,20000,8000,6498,1502,75,0,0.0,0.1878,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,evicted_resource,0.01,20000,8000,6477,1523,52,0,0.0,0.1904,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,model_mismatch,0.01,20000,8000,6587,1413,56,0,0.0,0.1766,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,mixed,0.01,20000,8000,6504,1496,55,0,0.0,0.187,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,expired_lease,0.05,20000,8000,6217,1783,350,0,0.0,0.2229,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,wrong_epoch,0.05,20000,8000,6176,1824,361,0,0.0,0.228,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,evicted_resource,0.05,20000,8000,6277,1723,314,0,0.0,0.2154,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,model_mismatch,0.05,20000,8000,6309,1691,319,0,0.0,0.2114,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,mixed,0.05,20000,8000,6231,1769,350,0,0.0,0.2211,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,expired_lease,0.1,20000,8000,5926,2074,665,0,0.0,0.2592,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,wrong_epoch,0.1,20000,8000,5909,2091,655,0,0.0,0.2614,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,evicted_resource,0.1,20000,8000,5919,2081,650,0,0.0,0.2601,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,model_mismatch,0.1,20000,8000,5961,2039,649,0,0.0,0.2549,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,mixed,0.1,20000,8000,5943,2057,660,0,0.0,0.2571,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,expired_lease,0.2,20000,8000,5209,2791,1269,0,0.0,0.3489,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,wrong_epoch,0.2,20000,8000,5293,2707,1291,0,0.0,0.3384,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,evicted_resource,0.2,20000,8000,5326,2674,1311,0,0.0,0.3342,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,model_mismatch,0.2,20000,8000,5274,2726,1333,0,0.0,0.3407,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.
+staleness_validation,mixed,0.2,20000,8000,5151,2849,1385,0,0.0,0.3561,Stale metadata affects placement quality but not execution correctness because the owner validates KV before reuse.

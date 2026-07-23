@@ -1,0 +1,8 @@
+{
+  "source_dataset": "pagarsky/agent-trace: mbpp_1_7B_20260403T211347Z",
+  "source_url": "https://huggingface.co/datasets/pagarsky/agent-trace",
+  "source_license": "Apache-2.0",
+  "source_file_sha256": "43f3b82675c0d680cc4d2d1e9689da421a70597eb45ade928eb0f77c800652fc",
+  "raw_source_retained_in_output": false,
+  "derivation": "Only lengths, counts, hashes and structural lineage metadata are output."
+}

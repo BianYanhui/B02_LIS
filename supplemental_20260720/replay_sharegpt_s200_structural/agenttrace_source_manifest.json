@@ -1,0 +1,8 @@
+{
+  "source_dataset": "anon8231489123/ShareGPT_Vicuna_unfiltered: V3 cleaned split (200-session dense subsample, min 3 turns, seed 20260721)",
+  "source_url": "https://huggingface.co/datasets/pagarsky/agent-trace",
+  "source_license": "Apache-2.0",
+  "source_file_sha256": "c6a1c39d759f2931c895ad421ebbb66cfa85a04a6d10e1c2b16f204502b58e5f",
+  "raw_source_retained_in_output": false,
+  "derivation": "Only text lengths, step counts, tool-span latency, common chat-template hash, and SHA-256 lineage identifiers are used. No prompt, reasoning, tool input, or tool output is written to output files."
+}

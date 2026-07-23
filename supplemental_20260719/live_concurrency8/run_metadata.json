@@ -1,0 +1,28 @@
+{
+  "started_at_unix": 1784411493.238703,
+  "finished_at_unix": 1784414112.1674922,
+  "duration_s": 2618.928789615631,
+  "arguments": {
+    "out_dir": "/home/byh/B02/supplemental_20260719/live_concurrency8",
+    "seed": 20260716,
+    "k_values": "4,16",
+    "repetitions": 12,
+    "n_requests": 192,
+    "warmup": 64,
+    "active_prefixes": 96,
+    "zipf_alpha": 0.55,
+    "cache_capacity": 128,
+    "j": 4,
+    "concurrency": 8,
+    "prefix_tokens": 2048,
+    "output_tokens": 4,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "max_request_attempts": 3,
+    "cooldown_s": 0.05
+  },
+  "cells": 48,
+  "pairs": 36,
+  "raw_requests": 6144
+}

@@ -1,0 +1,4 @@
+check_name,status,offending_rows,suggested_fix
+all invalid advertisements fall back without unsafe reuse,PASS,0,"inspect owner scope, sequence, lease, epoch, and residency guards"
+pinned runtime blocks reject concurrent eviction and become evictable after cancelled release,PASS,0,inspect BlockPool.touch/free_blocks lifecycle and release-on-cancellation path
+valid validations pin then release successfully,PASS,0,inspect EngineCore utility dispatch and live prefix-cache residency

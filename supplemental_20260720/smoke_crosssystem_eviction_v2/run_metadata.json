@@ -1,0 +1,30 @@
+{
+  "started_at_unix": 1784540672.3068364,
+  "finished_at_unix": 1784541481.1450038,
+  "duration_s": 808.8381676673889,
+  "arguments": {
+    "out_dir": "/home/byh/B02/supplemental_20260720/smoke_crosssystem_eviction_v2",
+    "variant": "eviction",
+    "seed": 20260720,
+    "repetitions": 2,
+    "n_requests": 192,
+    "warmup": 64,
+    "active_prefixes": 384,
+    "zipf_alpha": 0.55,
+    "cache_capacity": 24,
+    "sglang_assumed_capacity": 96,
+    "j": 4,
+    "concurrency": 4,
+    "prefix_tokens": 2048,
+    "output_tokens": 4,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "max_request_attempts": 3,
+    "cooldown_s": 0.05,
+    "smoke": true
+  },
+  "cells": 10,
+  "pairs": 8,
+  "raw_requests": 1280
+}

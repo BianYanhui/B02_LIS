@@ -19,3 +19,7 @@ poc/**/cache/
 experiments/results/**/*.pid
 experiments/results/**/*.log
 experiments/results/**/*.jsonl.tmp
+
+# Oversized raw data exceeding GitHub 100MB per-file limit
+supplemental_20260715/frozen_replay_large/trace_replay_quality.json
+supplemental_20260720/sources/sharegpt_v3.json

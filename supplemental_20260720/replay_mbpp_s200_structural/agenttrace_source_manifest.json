@@ -1,0 +1,8 @@
+{
+  "source_dataset": "pagarsky/agent-trace: mbpp_1_7B_20260403T211347Z (200-session dense subsample, seed 20260720)",
+  "source_url": "https://huggingface.co/datasets/pagarsky/agent-trace",
+  "source_license": "Apache-2.0",
+  "source_file_sha256": "84df2532cab6e68c7f8fa38f2ad9603aba663a9e493fb7151df2992011845b60",
+  "raw_source_retained_in_output": false,
+  "derivation": "Only text lengths, step counts, tool-span latency, common chat-template hash, and SHA-256 lineage identifiers are used. No prompt, reasoning, tool input, or tool output is written to output files."
+}
