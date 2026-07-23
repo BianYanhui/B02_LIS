@@ -81,3 +81,31 @@ p50/p95, tombstone delivery delay p95, bytes/messages sent, aggregator drop
 counters (superseded / replica cap / low utility), plus V4-style integrity
 checks (byte-identical prompts and input token counts per logical request
 across cells, fixed output length, usage telemetry present).
+
+## v2 (run_live_shared_link_v2.py)
+
+v1 findings drove three changes:
+
+1. **Order de-confounding**: v1 ran cells in fixed order within each rep while
+   a global TTFT drift aliased policy order with time.  v2 shuffles the
+   per-rep cell order with a per-rep seed (`cell_order_index`,
+   `cell_order_sequence`, and `cell_order_by_rep` in run metadata).
+2. **Coverage-growth workload (agentic lineage)**: v1's fixed 2048-token
+   coverage meant merge-superseded never fired.  v2 lineages are 3-step
+   chains; step k's prompt is step k-1's prompt plus a ~512-token extension
+   (measured input tokens 2094 / 2617 / 3140; advertised coverage target
+   2048 / 2560 / 3072).  Step prompts are literal string prefixes, so
+   physical prefix caching chains along the lineage.
+3. **Deeper congestion**: v1's tightest tier (util ~0.95) only reached ad
+   queue p95 ~0.9 s.  v2 tiers target util ~0.5 / 1.0 / 1.75 of the raw ad
+   rate remeasured under the lineage workload (~96 B/s upserts, ~110 B/s
+   with tombstones; tiers 220 / 110 / 63 B/s).  exact_fifo (only) drops the
+   oldest queued message beyond a backlog of 200 (metric
+   `backlog_drop_count`); cell-end drain is capped at 60 s with the
+   undeliverable remainder counted as drain overflow.
+
+Pool sizing: 64 lineages per phase, 128 distinct total; per-instance working
+set plus cross-cell cache_salt residue exceeds the real 104,544-token KV
+pool, so physical evictions continue.  Added metrics: `backlog_drop_count`,
+`link_max_backlog_depth`, `ad_queue_delay_mean_s`,
+`mean_coverage_shortfall_tokens`, per-rep cell order.

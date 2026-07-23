@@ -1,0 +1,47 @@
+{
+  "started_at_unix": 1784818731.6144555,
+  "finished_at_unix": 1784819140.2931232,
+  "duration_s": 408.6786689758301,
+  "arguments": {
+    "out_dir": "/home/byh/B02/shared_link_exp/live_v2",
+    "tag": "v2smoke",
+    "seed": 20260723,
+    "repetitions": 1,
+    "n_requests": 48,
+    "warmup": 16,
+    "pool_size": 96,
+    "alpha": 0.55,
+    "steps": 3,
+    "concurrency": 4,
+    "output_tokens": 4,
+    "kv_cache_tokens": 104544,
+    "bps": "low=520,med=260,high=150",
+    "j": 4,
+    "topk": 8,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "max_request_attempts": 3,
+    "cooldown_s": 1.0,
+    "ideal_only": false
+  },
+  "cell_order_by_rep": {
+    "0": [
+      "agg_adaptive@med",
+      "exact_fifo@high",
+      "exact_fifo@low",
+      "agg_static@high",
+      "local_topk@med",
+      "local_topk@low",
+      "agg_adaptive@low",
+      "agg_static@low",
+      "agg_adaptive@high",
+      "ideal",
+      "exact_fifo@med",
+      "local_topk@high",
+      "agg_static@med"
+    ]
+  },
+  "cells": 13,
+  "raw_requests": 416
+}

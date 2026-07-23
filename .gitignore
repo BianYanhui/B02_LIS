@@ -27,3 +27,4 @@ supplemental_20260720/sources/sharegpt_v3.json
 # shared-link live run artifacts
 shared_link_exp/server_logs/
 shared_link_exp/live_v1/run.log
+shared_link_exp/live_v2/run.log
