@@ -33,7 +33,7 @@ run_live_shared_link_v3.py docstring).
 kinds: 1 upsert, 2 tombstone   (agent -> relay -> dispatcher)
        3 reset, 4 stats_request, 5 config   (agent -> relay)
        6 ack                                 (dispatcher -> relay)
-       7 stats, 8 reset_done                (relay -> dispatcher)
+       7 stats, 8 reset_done                (relay -> agent control channel)
 
 Mechanisms (set per cell via a config frame; passthrough = all off):
   --merge:    a newer upsert cancels a queued unsent older upsert for the
@@ -90,7 +90,6 @@ class Relay:
         self.maxq = 0
         self.current_cell = -1
         self.down_writer: asyncio.StreamWriter | None = None
-        self.pending_reset_done: int | None = None
         self.queue_event = asyncio.Event()
         self.stats_requested = asyncio.Event()
 
@@ -106,6 +105,13 @@ class Relay:
                 kind, instance, cell, seq, coverage, digest, t_send = HDR.unpack(data[:32])
                 if kind == K_RESET:
                     self.do_reset(cell)
+                    # Cell-boundary acknowledgement deliberately returns on
+                    # the unshaped agent control direction. Under severe
+                    # congestion the shaped downstream link may need tens of
+                    # seconds to drain; waiting on it would make the next
+                    # cell's reset depend on the previous cell's backlog.
+                    writer.write(frame(K_RESET_DONE, 0, cell, 0, 0, 0, time.time()))
+                    await writer.drain()
                     continue
                 if kind == K_CONFIG:
                     merge, priority, adaptive, global_topk, dedup, maxq = CFG.unpack(data[32:42])
@@ -205,9 +211,7 @@ class Relay:
         self.current_cell = cell
         # Fresh kernel state per cell: closing the downstream connection
         # discards every in-flight byte (socket buffers, qdisc backlog) from
-        # the previous cell, so cells are independent.  reset_done is sent
-        # over the NEW connection by downstream_manager.
-        self.pending_reset_done = cell
+        # the previous cell, so cells are independent.
         if self.down_writer is not None:
             self.down_writer.close()
             self.down_writer = None
@@ -224,9 +228,6 @@ class Relay:
                 writer.transport.set_write_buffer_limits(high=2048)
                 self.down_writer = writer
                 print(json.dumps({"event": "downstream_connected", "to": self.args.downstream}), flush=True)
-                if self.pending_reset_done is not None:
-                    writer.write(frame(K_RESET_DONE, 0, self.pending_reset_done, 0, 0, 0, time.time()))
-                    self.pending_reset_done = None
                 await self.ack_reader(reader)
                 print(json.dumps({"event": "downstream_eof"}), flush=True)
             except (ConnectionRefusedError, OSError, asyncio.IncompleteReadError) as exc:

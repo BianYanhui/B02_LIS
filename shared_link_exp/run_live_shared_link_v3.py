@@ -340,6 +340,9 @@ class LinkRuntime:
             while True:
                 data = await reader.readexactly(FRAME)
                 kind, _instance, cell, _seq, _coverage, _digest, _sent = HDR.unpack(data[:32])
+                if kind == K_RESET_DONE and cell == self.cell_id:
+                    self.reset_done.set()
+                    continue
                 if kind == K_STATS and cell == self.cell_id and self.stats_future is not None and not self.stats_future.done():
                     self.stats_future.set_result(STATS.unpack(data[32:64]))
         except (asyncio.IncompleteReadError, ConnectionResetError):
