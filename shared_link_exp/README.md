@@ -109,3 +109,52 @@ set plus cross-cell cache_salt residue exceeds the real 104,544-token KV
 pool, so physical evictions continue.  Added metrics: `backlog_drop_count`,
 `link_max_backlog_depth`, `ad_queue_delay_mean_s`,
 `mean_coverage_shortfall_tokens`, per-rep cell order.
+
+## v3 (net/ + run_live_shared_link_v3.py): real kernel networking state channel
+
+v1/v2 simulated the shared link as an in-process asyncio queue.  v3 moves the
+state channel onto REAL kernel networking.  **Deviation from the letter of
+the reviewer plan: vLLM stays on the host** (GPU simplicity); ALL signaling
+and background traffic still traverses real kernel networking:
+
+```
+harness instance-agents (host) --TCP--> gateway container (b02-net, NET_ADMIN)
+                                            |  tc HTB on eth0 egress
+                                            |  class 1:10 signaling (dst port 9701)
+                                            |  class 1:20 background (iperf3, dst port 5201)
+                                            +--TCP--> dispatcher endpoint (host, bridge IP:9701)
+```
+
+- `net/gateway_relay.py` — TCP relay + semantic aggregator (alpine stdlib
+  python3).  Fixed 64-byte binary frames (format documented in the file
+  header).  Per-cell config frame selects mechanisms: merge-superseded,
+  tombstone priority lane, cross-instance replica cap (--dedup 2), adaptive
+  utility gate (EWMA delivery delay from real ack feedback).  Passthrough =
+  exact_fifo.  The downstream socket has SO_SNDBUF pinned and a low asyncio
+  high-water mark, so release blocks on real kernel backpressure; the
+  relay's internal FIFO is the pre-kernel queue a real aggregator controls.
+  Passthrough mode drops oldest beyond a 200-message queue (metric
+  relay_drop_backlog_cap).
+- `net/setup_net.sh` — idempotent: docker network `b02-net`
+  (172.30.0.0/24), image `b02-gw` (alpine + iproute2 + iperf3 + python3),
+  containers `gateway` (NET_ADMIN, 127.0.0.1:9700 published) and `bgserver`
+  (iperf3 server :5201), tc HTB on gateway eth0 (parent = shared link;
+  children guaranteed half, ceil = full link).  `net/teardown_net.sh`
+  removes ONLY those.  Existing containers/networks are never touched.
+- `net/cell_rate.sh --sig-bit N` — per-cell link rate; cells specify
+  `--rho`, and the harness computes rate = offered/rho where offered is
+  MEASURED during an ideal cell (msgs/s x 104 on-wire bytes).
+- `net/tc_stats.sh` — `tc -s qdisc/class` snapshot; the harness stores
+  before/mid/after snapshots per cell under live_v3/tc/.
+- `net/restart_t4_v3.sh [LOW|MED|HIGH]` — vLLM cluster with parameterized
+  gpu-memory-utilization (0.60/0.40/0.30); KV token capacity is read from
+  the server logs, never assumed.
+- `net/smoke_v3.sh` — end-to-end smoke with assertions: (a) real tc backlog
+  at rho=1.3, (b) delivery p95 materially larger at rho=1.3 than 0.5,
+  (c) ideal bypasses the network, (d) integrity checks, (e) iperf3
+  background sharing raises signaling delay with both classes active.
+
+Delivery delay is measured cross-process with wall-clock timestamps embedded
+in each frame (same host => shared clock): delay = dispatcher receive time -
+agent send time.  Ground truth for reuse remains the physical
+`vllm_cached_tokens` per response; the shadow model only emits tombstones.
