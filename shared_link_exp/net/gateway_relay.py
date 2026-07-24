@@ -329,8 +329,8 @@ def main() -> None:
                         help="downstream SO_SNDBUF; kept near the kernel minimum so queueing happens at the tc qdisc, not in socket buffers")
     parser.add_argument("--max-queue", type=int, default=200)
     parser.add_argument("--tau", type=float, default=30.0)
-    parser.add_argument("--util-lambda", type=float, default=28.0)
-    parser.add_argument("--gate", type=float, default=0.050)
+    parser.add_argument("--util-lambda", type=float, default=16.0)
+    parser.add_argument("--gate", type=float, default=2.0)
     args = parser.parse_args()
     asyncio.run(amain(args))
 
