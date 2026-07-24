@@ -77,6 +77,12 @@ async def configure(link: live.LinkRuntime, policy: str, cell_id: int, names: li
     dispatcher = live.Dispatcher(j=4, prefill_tokens_per_ms=50.0, queue_penalty_ms=2.0, guard_ms=0.5)
     digest_map = {live.digest64(name): name for name in names}
     await link.configure_cell(dispatcher, cell_id, digest_map, policy, global_topk=16, relay_max_inflight=max_inflight)
+    # `K_RESET` deliberately closes the old downstream TCP socket to make
+    # cells independent.  Wait for the relay to establish the replacement
+    # socket before injecting this cell's first frame; otherwise a short
+    # microbench can finish its drain timeout before any frame has a route.
+    if not await wait_for(link, lambda: link.down_writer is not None, timeout_s=10.0):
+        raise RuntimeError(f"downstream relay connection did not recover for cell {cell_id}")
     return dispatcher
 
 
@@ -205,6 +211,16 @@ async def run(args: argparse.Namespace) -> list[dict]:
 
 
 def write_outputs(tag: str, rows: list[dict], args: argparse.Namespace) -> None:
+    invalid = []
+    for row in rows:
+        if row["mechanism"] == "merge" and not row["final_coverage_correct"]:
+            invalid.append(f"merge rep={row['rep']} policy={row['policy']}")
+        if row["mechanism"] == "priority" and not row["invalidation_delivered"]:
+            invalid.append(f"priority rep={row['rep']} policy={row['policy']}")
+        if row["mechanism"] == "dedup" and row["unique_prefixes_visible"] != row["distinct_prefixes_generated"]:
+            invalid.append(f"dedup rep={row['rep']} policy={row['policy']} overlap={row['overlap_percent']}")
+    if invalid:
+        raise RuntimeError("semantic microbench validity failure: " + "; ".join(invalid))
     RESULTS.mkdir(parents=True, exist_ok=True)
     raw = {
         "tag": tag,
