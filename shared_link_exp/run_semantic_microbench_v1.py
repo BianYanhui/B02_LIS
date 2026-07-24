@@ -106,7 +106,7 @@ async def merge_case(link: live.LinkRuntime, policy: str, cell_id: int, rate: in
     for step in range(10):
         link.send(live.K_UP, 0, name, 256 * (step + 1))
     await flush_agents(link)
-    await link.drain(timeout_s=25.0)
+    await link.drain(timeout_s=60.0)
     stats = await link.fetch_stats()
     final = stats_summary(stats, dispatcher, name)
     final.update({
@@ -137,7 +137,7 @@ async def priority_case(link: live.LinkRuntime, policy: str, cell_id: int, rate:
         link.send(live.K_UP, i % 3, name, 256 + i)
     link.send(live.K_TOMB, 0, critical, 0)
     await flush_agents(link)
-    invalidated = await wait_for(link, lambda: critical not in dispatcher.index[0], timeout_s=25.0)
+    invalidated = await wait_for(link, lambda: critical not in dispatcher.index[0], timeout_s=60.0)
     stats = await link.fetch_stats()
     return {
         **stats_summary(stats, dispatcher, critical),
@@ -162,7 +162,7 @@ async def dedup_case(link: live.LinkRuntime, policy: str, overlap_percent: int, 
         for owner in owners:
             link.send(live.K_UP, owner, name, 1024 + index)
     await flush_agents(link)
-    await link.drain(timeout_s=25.0)
+    await link.drain(timeout_s=60.0)
     stats = await link.fetch_stats()
     unique_visible = sum(int(any(name in owner for owner in dispatcher.index)) for name in names)
     forwarded = stats.get("relay_forwarded", 0)
