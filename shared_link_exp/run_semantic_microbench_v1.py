@@ -76,16 +76,16 @@ async def close_link(link: live.LinkRuntime) -> None:
 async def configure(link: live.LinkRuntime, policy: str, cell_id: int, names: list[str], max_inflight: int) -> live.Dispatcher:
     dispatcher = live.Dispatcher(j=4, prefill_tokens_per_ms=50.0, queue_penalty_ms=2.0, guard_ms=0.5)
     digest_map = {live.digest64(name): name for name in names}
+    prior_downstream = link.down_writer
     await link.configure_cell(dispatcher, cell_id, digest_map, policy, global_topk=16, relay_max_inflight=max_inflight)
     # `K_RESET` deliberately closes the old downstream TCP socket to make
     # cells independent.  Wait for the relay to establish the replacement
     # socket before injecting this cell's first frame; otherwise a short
     # microbench can finish its drain timeout before any frame has a route.
-    # Give the previous connection's EOF handler a chance to clear the old
-    # writer.  Without this grace period, `down_writer is not None` can still
-    # refer to the socket that the reset has just closed.
-    await asyncio.sleep(0.5)
-    if not await wait_for(link, lambda: link.down_writer is not None, timeout_s=10.0):
+    # A reset deliberately retires the current socket.  Require a different
+    # writer object, not merely a non-null stale reference, before injecting
+    # frames for the new cell.
+    if not await wait_for(link, lambda: link.down_writer is not None and link.down_writer is not prior_downstream, timeout_s=15.0):
         raise RuntimeError(f"downstream relay connection did not recover for cell {cell_id}")
     return dispatcher
 
