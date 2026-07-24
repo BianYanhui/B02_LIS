@@ -27,9 +27,12 @@ if [[ -e "$LOG" || -e "$EVENTS" ]]; then
   exit 3
 fi
 
+# Keep enough measured requests in every rate interval.  The previous
+# 24-request warm-up plus a 30 s first dwell could consume the entire
+# initial low-rate period, yielding no dispatch-time low-phase samples.
 "$PY" "$HARNESS" \
   --tag "$TAG" --seed "$SEED" --instances 3 --repetitions 1 \
-  --n-requests 96 --warmup 24 --pool-size 32 --alpha 1.2 --steps 3 \
+  --n-requests 96 --warmup 12 --pool-size 32 --alpha 1.2 --steps 3 \
   --concurrency 3 --output-tokens 4 --kv-cache-tokens 50000 \
   --rhos 0.5 --policies "$POLICY" --global-topk 16 \
   --relay-max-inflight 2 --cooldown-s 0.5 >"$LOG" 2>&1 &
@@ -63,10 +66,10 @@ stamp() {
 }
 
 stamp low_initial "$LOW_RATE"
-sleep 30
+sleep 45
 bash "$RATE" --sig-bit "$HIGH_RATE" >>"$LOG" 2>&1
 stamp high "$HIGH_RATE"
-sleep 40
+sleep 45
 bash "$RATE" --sig-bit "$LOW_RATE" >>"$LOG" 2>&1
 stamp low_recovery "$LOW_RATE"
 
