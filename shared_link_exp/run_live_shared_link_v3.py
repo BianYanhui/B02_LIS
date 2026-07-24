@@ -963,8 +963,13 @@ def smoke_report(cells: list[dict], checks: list[dict]) -> list[dict]:
     p95_on = float(bg_on.get("ad_delivery_delay_p95_s", 0))
     p95_off = float(bg_off.get("ad_delivery_delay_p95_s", 0))
     bg_bytes_delta = int(bg_on.get("tc_class120_sent_bytes_after", 0)) - int(bg_on.get("tc_class120_sent_bytes_before", 0))
-    add("e: iperf3 background sharing raises signaling delay", p95_on > p95_off and bg_bytes_delta > 0,
-        f"p95 bg_on={p95_on:.3f}s bg_off={p95_off:.3f}s class1:20_bytes_during_bg_cell={bg_bytes_delta}")
+    sig_bytes = int(bg_on.get("tc_class110_sent_bytes_after", 0))
+    # A single short live cell is intentionally not a directional A/B test:
+    # queue phase and cache warmness can move a delivered-only percentile in
+    # either direction.  The smoke test verifies the physical shared-parent
+    # condition; the formal --paired-background repetitions test the effect.
+    add("e: iperf3 and signaling both use the shared HTB parent", bg_bytes_delta > 0 and sig_bytes > 0,
+        f"p95 bg_on={p95_on:.3f}s bg_off={p95_off:.3f}s class1:10_bytes={sig_bytes} class1:20_bytes_during_bg_cell={bg_bytes_delta}")
     return report
 
 
