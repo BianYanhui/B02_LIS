@@ -69,6 +69,11 @@ async def close_link(link: live.LinkRuntime) -> None:
         task.cancel()
     for writer in link.agent_writers:
         writer.close()
+    if link.down_writer is not None:
+        # `server.close()` stops accepts but leaves this accepted downstream
+        # connection alive.  Explicitly close it so the relay reconnects to
+        # the fresh endpoint of the next isolated semantic case.
+        link.down_writer.close()
     link._server.close()
     await asyncio.sleep(0)
 
