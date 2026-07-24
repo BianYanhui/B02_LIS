@@ -23,8 +23,8 @@ run_live_shared_link_v3.py docstring).
     kind u8 | instance u8 | cell u16 | seq u32 | coverage i64 |
     digest64 u64 | t_send f64 (wall clock; same host => shared clock)
   payload (32B): kind-specific
-    config (kind 5): ">BBBBHI" = merge, priority, adaptive, global_topk,
-                              dedup, max_queue
+    config (kind 5): ">BBBBHII" = merge, priority, adaptive, global_topk,
+                               dedup, max_queue, max_inflight
     stats  (kind 7): ">IIIIIIII" = forwarded, drop_superseded, drop_replica_cap,
                      drop_low_utility, drop_backlog_cap, drop_global_topk,
                      max_queue_depth, ewma_dq_ms
@@ -44,8 +44,13 @@ Mechanisms (set per cell via a config frame; passthrough = all off):
   --global-topk K: retain only the K highest-coverage distinct prefixes in
               the unsent cross-instance queue.
   --adaptive: utility gate: drop an upsert when the ack-measured EWMA
-              delivery delay Dq exceeds --gate and
+              delivery delay Dq or the gateway's pre-link queue exceeds its
+              congestion threshold, and
               U = exp(-(age+Dq)/tau)*coverage - lambda*FRAME <= 0.
+  --max-inflight: optional shared application-layer frame window.  It is
+              applied to every policy equally, preserving an unsent gateway
+              queue where semantic selection can still replace stale updates
+              before they enter the real TCP/tc path.
   Backpressure cap: in passthrough mode only, drop-oldest once the internal
   queue exceeds --max-queue (counted as drop_backlog_cap).
 """
@@ -61,7 +66,7 @@ from collections import Counter, defaultdict, deque
 
 FRAME = 64
 HDR = struct.Struct(">BBHIqQd")
-CFG = struct.Struct(">BBBBHI")
+CFG = struct.Struct(">BBBBHII")
 STATS = struct.Struct(">IIIIIIII")
 K_UP, K_TOMB, K_RESET, K_STATS_REQ, K_CONFIG, K_ACK, K_STATS, K_RESET_DONE = 1, 2, 3, 4, 5, 6, 7, 8
 RECENT_KEEP = 4096
@@ -80,6 +85,7 @@ class Relay:
         self.global_topk = 0
         self.dedup = 0
         self.max_queue = args.max_queue
+        self.max_inflight = 0
         self.queue: deque[bytes] = deque()
         self.pqueue: deque[bytes] = deque()
         self.replicas: dict[int, set[int]] = defaultdict(set)
@@ -91,6 +97,8 @@ class Relay:
         self.current_cell = -1
         self.down_writer: asyncio.StreamWriter | None = None
         self.queue_event = asyncio.Event()
+        self.inflight_event = asyncio.Event()
+        self.inflight_event.set()
         self.stats_requested = asyncio.Event()
 
     @property
@@ -114,10 +122,11 @@ class Relay:
                     await writer.drain()
                     continue
                 if kind == K_CONFIG:
-                    merge, priority, adaptive, global_topk, dedup, maxq = CFG.unpack(data[32:42])
+                    merge, priority, adaptive, global_topk, dedup, maxq, max_inflight = CFG.unpack(data[32:46])
                     self.merge, self.priority, self.adaptive = bool(merge), bool(priority), bool(adaptive)
                     self.global_topk = global_topk
                     self.dedup, self.max_queue = dedup, maxq
+                    self.max_inflight = max_inflight
                     continue
                 if kind == K_STATS_REQ:
                     # Return control-plane stats on the reverse direction of
@@ -137,8 +146,14 @@ class Relay:
         finally:
             writer.close()
 
+    def congested(self) -> bool:
+        return self.adaptive and (
+            self.ewma_dq > self.args.gate
+            or len(self.queue) >= self.args.adaptive_queue_gate
+        )
+
     def low_utility(self, coverage: int, t_send: float) -> bool:
-        if not self.adaptive or self.ewma_dq <= self.args.gate:
+        if not self.congested():
             return False
         age = time.time() - t_send
         utility = (2.718281828459045 ** (-(age + self.ewma_dq) / self.args.tau)) * coverage - self.args.util_lambda * FRAME
@@ -192,15 +207,16 @@ class Relay:
             if qkind == K_UP:
                 best[qdigest] = max(best.get(qdigest, 0), qcoverage)
         # Adaptive mode changes state admission, not the physical link rate.
-        limit = max(1, self.global_topk // 4) if self.adaptive and self.ewma_dq > self.args.gate else self.global_topk
+        limit = max(1, self.global_topk // 4) if self.congested() else self.global_topk
         keep = {digest for digest, _coverage in sorted(best.items(), key=lambda item: (-item[1], item[0]))[:limit]}
         if len(keep) == len(best):
             return
         retained: deque[bytes] = deque()
         for queued in self.queue:
-            qkind, _inst, _cell, _seq, _coverage, qdigest, _sent = HDR.unpack(queued[:32])
+            qkind, qinst, _cell, _seq, _coverage, qdigest, _sent = HDR.unpack(queued[:32])
             if qkind == K_UP and qdigest not in keep:
                 self.drops["global_topk"] += 1
+                self.replicas[qdigest].discard(qinst)
             else:
                 retained.append(queued)
         self.queue = retained
@@ -210,6 +226,7 @@ class Relay:
         self.pqueue.clear()
         self.replicas.clear()
         self.recent.clear()
+        self.inflight_event.set()
         self.ewma_dq = 0.0
         self.drops.clear()
         self.forwarded = 0
@@ -252,18 +269,28 @@ class Relay:
             if t_send is not None:
                 delay = max(0.0, t_recv - t_send)
                 self.ewma_dq = 0.8 * self.ewma_dq + 0.2 * delay
+                self.inflight_event.set()
 
     async def release_loop(self) -> None:
         while True:
-            if self.pqueue:
-                data = self.pqueue.popleft()
-            elif self.queue:
-                data = self.queue.popleft()
-            else:
+            if not self.pqueue and not self.queue:
                 self.queue_event.clear()
                 if not self.pqueue and not self.queue:
                     await self.queue_event.wait()
                 continue
+            # Keep a small, real ACK-delimited application window when
+            # configured.  Exact FIFO, static, and adaptive all share this
+            # transport discipline; only their treatment of unsent updates
+            # differs.  With max_inflight=0, preserve the legacy behavior.
+            if self.max_inflight and len(self.recent) >= self.max_inflight:
+                self.inflight_event.clear()
+                if len(self.recent) >= self.max_inflight:
+                    await self.inflight_event.wait()
+                continue
+            if self.pqueue:
+                data = self.pqueue.popleft()
+            else:
+                data = self.queue.popleft()
             if self.down_writer is None:
                 # Dispatcher endpoint not connected yet: requeue and wait.
                 (self.pqueue if HDR.unpack(data[:32])[0] == K_TOMB and self.priority else self.queue).appendleft(data)
@@ -341,6 +368,8 @@ def main() -> None:
     parser.add_argument("--tau", type=float, default=30.0)
     parser.add_argument("--util-lambda", type=float, default=16.0)
     parser.add_argument("--gate", type=float, default=2.0)
+    parser.add_argument("--adaptive-queue-gate", type=int, default=8,
+                        help="queued upserts that trigger proactive adaptive admission")
     args = parser.parse_args()
     asyncio.run(amain(args))
 

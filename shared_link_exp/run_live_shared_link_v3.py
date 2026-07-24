@@ -69,7 +69,7 @@ RELAY_PORT = 9700          # gateway relay, published on 127.0.0.1
 DISPATCH_PORT = 9701       # harness dispatcher endpoint, bound on the bridge IP
 FRAME = 64
 HDR = struct.Struct(">BBHIqQd")
-CFG = struct.Struct(">BBBBHI")
+CFG = struct.Struct(">BBBBHII")
 STATS = struct.Struct(">IIIIIIII")
 K_UP, K_TOMB, K_RESET, K_STATS_REQ, K_CONFIG, K_ACK, K_STATS, K_RESET_DONE = 1, 2, 3, 4, 5, 6, 7, 8
 WIRE_BYTES_PER_MSG = 104   # 64 payload + ~40 IP/TCP header; on-wire offered-load convention
@@ -399,7 +399,8 @@ class LinkRuntime:
             self.down_writer = None
             writer.close()
 
-    async def configure_cell(self, dispatcher: Dispatcher, cell_id: int, digest_map: dict[int, str], policy: str, global_topk: int) -> None:
+    async def configure_cell(self, dispatcher: Dispatcher, cell_id: int, digest_map: dict[int, str], policy: str,
+                             global_topk: int, relay_max_inflight: int) -> None:
         self.dispatcher = dispatcher
         self.cell_id = cell_id
         self.digest_map = digest_map
@@ -414,7 +415,7 @@ class LinkRuntime:
         cfg_payload = CFG.pack(
             flags["merge"], flags["priority"], flags["adaptive"],
             global_topk if flags["global_topk"] else 0,
-            flags["dedup"], MAX_QUEUE,
+            flags["dedup"], MAX_QUEUE, relay_max_inflight,
         )
         self.agent_writers[0].write(HDR.pack(K_CONFIG, 0, cell_id, 0, 0, 0, time.time()) + cfg_payload.ljust(32, b"\x00"))
         await self.agent_writers[0].drain()
@@ -574,7 +575,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
             subprocess.call(["docker", "exec", "-d", "gateway", "iperf3", "-c", "bgserver", "-t", "7200"])
             await asyncio.sleep(1.0)
         tc_before = tc_snapshot(f"{cell_tag}_before", Path(args.out_dir))
-        await link.configure_cell(dispatcher, cell_uid % 60000, digest_map, policy, args.global_topk)
+        await link.configure_cell(dispatcher, cell_uid % 60000, digest_map, policy, args.global_topk, args.relay_max_inflight)
     def publish_state(target: int, digest: str, coverage_tokens: int) -> None:
         """Publish one actual cache-state update via the active policy."""
         nonlocal local_clock, source_tombstones_sent, source_upserts_sent, upserts_generated
@@ -705,6 +706,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
         tomb = link.delays["tombstone"]
         net_metrics = {
             "rho": rho, "sig_bit_per_s": sig_bit, "background_traffic": bg,
+            "relay_max_inflight": args.relay_max_inflight,
             "source_local_topk": policy in LOCAL_TOPK_POLICIES,
             "gateway_global_topk": args.global_topk if POLICY_FLAGS[policy]["global_topk"] else 0,
             "source_upserts_sent": source_upserts_sent,
@@ -996,6 +998,8 @@ def main() -> None:
                         help="comma-separated link policies; includes gateway ablations")
     parser.add_argument("--global-topk", type=int, default=16,
                         help="distinct queued prefixes retained by gateway static/full policies")
+    parser.add_argument("--relay-max-inflight", type=int, default=0,
+                        help="shared ACK-delimited gateway frame window (0 preserves legacy immediate release)")
     parser.add_argument("--background", action="store_true",
                         help="run every non-ideal cell with saturating iperf3 traffic")
     parser.add_argument("--paired-background", action="store_true",
@@ -1023,6 +1027,8 @@ def main() -> None:
         raise ValueError("need measured requests and positive output tokens")
     if not 0.0 <= args.overlap <= 1.0:
         raise ValueError("overlap must be in [0, 1]")
+    if args.relay_max_inflight < 0:
+        raise ValueError("relay_max_inflight must be nonnegative")
     started = time.time()
     result = asyncio.run(run(args))
     cells, raw = result["cells"], result["raw"]
