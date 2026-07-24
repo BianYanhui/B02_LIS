@@ -58,14 +58,22 @@ docker exec gateway sh -c "
   tc class add dev eth0 parent 1: classid 1:1 htb rate ${SIG_BIT}bit
   tc class add dev eth0 parent 1:1 classid 1:10 htb rate ${HALF}bit ceil ${SIG_BIT}bit
   tc class add dev eth0 parent 1:1 classid 1:20 htb rate ${HALF}bit ceil ${SIG_BIT}bit
+  # Reverse control on the persistent agent TCP connection has source port
+  # 9700.  Keep reset/stats acknowledgements out of the saturating iperf3
+  # class so a new experimental cell cannot inherit a control-plane timeout.
+  # State frames still use class 1:10 and contend with class 1:20 under the
+  # same HTB parent; this class is only for cell-boundary control.
+  tc class add dev eth0 parent 1:1 classid 1:30 htb rate ${SIG_BIT}bit ceil ${SIG_BIT}bit
   if [ \"$NETEM_DELAY\" != \"0\" ]; then
     tc qdisc add dev eth0 parent 1:10 handle 10: netem delay ${NETEM_DELAY}ms limit 1000
   else
     tc qdisc add dev eth0 parent 1:10 handle 10: bfifo limit 65536
   fi
   tc qdisc add dev eth0 parent 1:20 handle 20: bfifo limit 65536
+  tc qdisc add dev eth0 parent 1:30 handle 30: bfifo limit 8192
   tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip dport 9701 0xffff flowid 1:10
   tc filter add dev eth0 protocol ip parent 1:0 prio 2 u32 match ip dport 5201 0xffff flowid 1:20
+  tc filter add dev eth0 protocol ip parent 1:0 prio 3 u32 match ip sport 9700 0xffff flowid 1:30
 "
 
 echo "b02-net ready: bridge=${BRIDGE_IP} gateway+bgserver running, sig=${SIG_BIT}bit/s netem=${NETEM_DELAY}ms mtu=${MTU}"
