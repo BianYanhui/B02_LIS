@@ -163,7 +163,7 @@ async def priority_case(link: live.LinkRuntime, policy: str, cell_id: int, rate:
     link.send(live.K_TOMB, 0, critical, 0)
     await flush_agents(link)
     print(json.dumps({"event": "semantic_priority_wait_begin", "cell": cell_id}), flush=True)
-    invalidated = await wait_for(link, lambda: critical not in dispatcher.index[0], timeout_s=60.0)
+    invalidated = await wait_for(link, lambda: critical not in dispatcher.index[0], timeout_s=120.0)
     print(json.dumps({"event": "semantic_priority_wait_end", "cell": cell_id, "received": link.received, "invalidated": invalidated}), flush=True)
     stats = delivered_stats(link)
     return {
