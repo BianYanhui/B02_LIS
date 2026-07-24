@@ -160,6 +160,14 @@ harness instance-agents (host) --TCP--> gateway container (b02-net, NET_ADMIN)
   (c) ideal bypasses the network, (d) integrity checks, (e) iperf3
   background sharing raises signaling delay with both classes active.
 
+`run_live_shared_link_v3.py --overlap r` adds a physical replica-overlap
+setup for E2: it requests `r × pool_size` phase-0 prefixes on every vLLM
+instance before the measured trace. These base-prefix advertisements use the
+same selected source/gateway policy and real state path as measured traffic;
+the run records the seeded prefix and request counts. This makes duplicate
+owner advertisements observable without treating a simulated replica as
+physical cache state.
+
 Delivery delay is measured cross-process with wall-clock timestamps embedded
 in each frame (same host => shared clock): delay = dispatcher receive time -
 agent send time.  Ground truth for reuse remains the physical

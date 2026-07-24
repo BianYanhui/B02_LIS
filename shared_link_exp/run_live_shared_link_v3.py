@@ -536,7 +536,13 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
     source_upserts_sent = 0
     source_tombstones_sent = 0
     is_ideal = policy == "ideal"
-    digest_map = {digest64(request.digest): request.digest for request in trace}
+    overlap_seed_count = int(round(args.pool_size * args.overlap))
+    overlap_seeds = [TraceRequest(
+        request_id=-(index + 1), phase=0, lineage_id=index, step=0,
+        tenant=f"tenant-{index % 8}", digest=f"L{index:04d}",
+        coverage_tokens=BASE_WORDS, discard=True,
+    ) for index in range(overlap_seed_count)]
+    digest_map = {digest64(request.digest): request.digest for request in [*trace, *overlap_seeds]}
     sig_bit = 0
     tc_before: dict = {}
     tc_mid: dict = {}
@@ -549,10 +555,62 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
             await asyncio.sleep(1.0)
         tc_before = tc_snapshot(f"{cell_tag}_before", Path(args.out_dir))
         await link.configure_cell(dispatcher, cell_uid % 60000, digest_map, policy, args.global_topk)
+    def publish_state(target: int, digest: str, coverage_tokens: int) -> None:
+        """Publish one actual cache-state update via the active policy."""
+        nonlocal local_clock, source_tombstones_sent, source_upserts_sent, upserts_generated
+        evicted = shadows[target].insert(digest, coverage_tokens)
+        upserts_generated += 1
+        if is_ideal:
+            dispatcher.index[target][digest] = coverage_tokens
+            for victim in evicted:
+                dispatcher.index[target].pop(victim, None)
+            return
+        if policy in LOCAL_TOPK_POLICIES:
+            local_clock += 1
+            local_entries[target][digest] = coverage_tokens
+            local_recency[target][digest] = local_clock
+            for victim in evicted:
+                local_entries[target].pop(victim, None)
+                local_recency[target].pop(victim, None)
+            selected = dict(sorted(
+                local_entries[target].items(),
+                key=lambda item: (-item[1], -local_recency[target][item[0]], item[0]),
+            )[:args.topk])
+            for candidate in set(advertised[target]) - set(selected):
+                link.send(K_TOMB, target, candidate, 0)
+                source_tombstones_sent += 1
+            for candidate, selected_coverage in selected.items():
+                if advertised[target].get(candidate) != selected_coverage:
+                    link.send(K_UP, target, candidate, selected_coverage)
+                    source_upserts_sent += 1
+            advertised[target] = selected
+            return
+        link.send(K_UP, target, digest, coverage_tokens)
+        source_upserts_sent += 1
+        advertised[target][digest] = coverage_tokens
+        for victim in evicted:
+            if victim in advertised[target]:
+                link.send(K_TOMB, target, victim, 0)
+                source_tombstones_sent += 1
+                advertised[target].pop(victim, None)
+
     records: list[dict] = []
     started = time.perf_counter()
     mid_at = int(len(trace) * 0.75)
     async with aiohttp.ClientSession() as session:
+        # E2 uses a real warm overlap: the designated base prefixes are
+        # requested from every vLLM instance before the measured lineage
+        # trace. Their state updates still traverse the selected signaling
+        # policy, so local redundancy and gateway-level dedup are observable.
+        for seed_request in overlap_seeds:
+            seed_responses = await asyncio.gather(*[
+                one_request(session, url, prompt_for(seed_request), cache_salt, args.output_tokens, args.max_request_attempts)
+                for url in URLS
+            ])
+            if not all(response["ok"] for response in seed_responses):
+                raise RuntimeError("overlap preseed vLLM request failed")
+            for target in range(len(URLS)):
+                publish_state(target, seed_request.digest, seed_request.coverage_tokens)
         for offset in range(0, len(trace), args.concurrency):
             if not tc_mid_done and offset >= mid_at:
                 tc_mid = tc_snapshot(f"{cell_tag}_mid", Path(args.out_dir))
@@ -569,42 +627,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
             ])
             for (request, target, raw_fanout, evaluated, affinity, coverage, expected_net), response in zip(decisions, responses):
                 dispatcher.loads[target] -= 1
-                evicted = shadows[target].insert(request.digest, request.coverage_tokens)
-                if is_ideal:
-                    dispatcher.index[target][request.digest] = request.coverage_tokens
-                    for victim in evicted:
-                        dispatcher.index[target].pop(victim, None)
-                    upserts_generated += 1
-                else:
-                    upserts_generated += 1
-                    if policy in LOCAL_TOPK_POLICIES:
-                        local_clock += 1
-                        local_entries[target][request.digest] = request.coverage_tokens
-                        local_recency[target][request.digest] = local_clock
-                        for victim in evicted:
-                            local_entries[target].pop(victim, None)
-                            local_recency[target].pop(victim, None)
-                        selected = dict(sorted(
-                            local_entries[target].items(),
-                            key=lambda item: (-item[1], -local_recency[target][item[0]], item[0]),
-                        )[:args.topk])
-                        for digest in set(advertised[target]) - set(selected):
-                            link.send(K_TOMB, target, digest, 0)
-                            source_tombstones_sent += 1
-                        for digest, selected_coverage in selected.items():
-                            if advertised[target].get(digest) != selected_coverage:
-                                link.send(K_UP, target, digest, selected_coverage)
-                                source_upserts_sent += 1
-                        advertised[target] = selected
-                    else:
-                        link.send(K_UP, target, request.digest, request.coverage_tokens)
-                        source_upserts_sent += 1
-                        advertised[target][request.digest] = request.coverage_tokens
-                        for victim in evicted:
-                            if victim in advertised[target]:
-                                link.send(K_TOMB, target, victim, 0)
-                                source_tombstones_sent += 1
-                                advertised[target].pop(victim, None)
+                publish_state(target, request.digest, request.coverage_tokens)
                 if request.discard:
                     continue
                 physical_cached = float(response["vllm_cached_tokens"] or 0)
@@ -666,6 +689,9 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
     n = len(records)
     metrics = {
         "request_count": n,
+        "overlap_fraction": args.overlap,
+        "overlap_seed_prefixes": overlap_seed_count,
+        "overlap_seed_requests": overlap_seed_count * len(URLS),
         "cell_active_s": active_s,
         "upserts_generated": upserts_generated,
         "upserts_per_s": upserts_generated / active_s if active_s > 0 else 0.0,
@@ -878,6 +904,8 @@ def main() -> None:
     parser.add_argument("--n-requests", type=int, default=128)
     parser.add_argument("--warmup", type=int, default=32)
     parser.add_argument("--pool-size", type=int, default=64)
+    parser.add_argument("--overlap", type=float, default=0.0,
+                        help="fraction of phase-0 lineages physically seeded on all instances")
     parser.add_argument("--alpha", type=float, default=0.55)
     parser.add_argument("--steps", type=int, default=3)
     parser.add_argument("--concurrency", type=int, default=4)
@@ -908,6 +936,8 @@ def main() -> None:
         args.tag = args.tag if args.tag != "v3" else "v3smoke"
     if args.n_requests <= args.warmup or args.output_tokens < 1:
         raise ValueError("need measured requests and positive output tokens")
+    if not 0.0 <= args.overlap <= 1.0:
+        raise ValueError("overlap must be in [0, 1]")
     started = time.time()
     result = asyncio.run(run(args))
     cells, raw = result["cells"], result["raw"]
