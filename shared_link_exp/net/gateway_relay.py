@@ -23,9 +23,11 @@ run_live_shared_link_v3.py docstring).
     kind u8 | instance u8 | cell u16 | seq u32 | coverage i64 |
     digest64 u64 | t_send f64 (wall clock; same host => shared clock)
   payload (32B): kind-specific
-    config (kind 5): ">BBBBHI" = merge, priority, adaptive, pad, dedup, max_queue
-    stats  (kind 7): ">IIIIIII" = forwarded, drop_superseded, drop_replica_cap,
-                     drop_low_utility, drop_backlog_cap, max_queue_depth, ewma_dq_ms
+    config (kind 5): ">BBBBHI" = merge, priority, adaptive, global_topk,
+                              dedup, max_queue
+    stats  (kind 7): ">IIIIIIII" = forwarded, drop_superseded, drop_replica_cap,
+                     drop_low_utility, drop_backlog_cap, drop_global_topk,
+                     max_queue_depth, ewma_dq_ms
     ack    (kind 6): header.seq = acked seq, header.t_send = receiver wall time
 
 kinds: 1 upsert, 2 tombstone   (agent -> relay -> dispatcher)
@@ -39,6 +41,8 @@ Mechanisms (set per cell via a config frame; passthrough = all off):
   --priority: tombstones go to a priority lane released first (non-preemptive).
   --dedup N:  replica cap: at most N instances may hold queued-or-forwarded
               upserts per digest (drop excess).
+  --global-topk K: retain only the K highest-coverage distinct prefixes in
+              the unsent cross-instance queue.
   --adaptive: utility gate: drop an upsert when the ack-measured EWMA
               delivery delay Dq exceeds --gate and
               U = exp(-(age+Dq)/tau)*coverage - lambda*FRAME <= 0.
@@ -58,7 +62,7 @@ from collections import Counter, defaultdict, deque
 FRAME = 64
 HDR = struct.Struct(">BBHIqQd")
 CFG = struct.Struct(">BBBBHI")
-STATS = struct.Struct(">IIIIIII")
+STATS = struct.Struct(">IIIIIIII")
 K_UP, K_TOMB, K_RESET, K_STATS_REQ, K_CONFIG, K_ACK, K_STATS, K_RESET_DONE = 1, 2, 3, 4, 5, 6, 7, 8
 RECENT_KEEP = 4096
 
@@ -73,6 +77,7 @@ class Relay:
         self.merge = False
         self.priority = False
         self.adaptive = False
+        self.global_topk = 0
         self.dedup = 0
         self.max_queue = args.max_queue
         self.queue: deque[bytes] = deque()
@@ -91,7 +96,7 @@ class Relay:
 
     @property
     def passthrough(self) -> bool:
-        return not (self.merge or self.priority or self.adaptive or self.dedup)
+        return not (self.merge or self.priority or self.adaptive or self.global_topk or self.dedup)
 
     # ---------------- upstream (agents) ----------------
     async def agent_reader(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
@@ -103,8 +108,9 @@ class Relay:
                     self.do_reset(cell)
                     continue
                 if kind == K_CONFIG:
-                    merge, priority, adaptive, _pad, dedup, maxq = CFG.unpack(data[32:42])
+                    merge, priority, adaptive, global_topk, dedup, maxq = CFG.unpack(data[32:42])
                     self.merge, self.priority, self.adaptive = bool(merge), bool(priority), bool(adaptive)
+                    self.global_topk = global_topk
                     self.dedup, self.max_queue = dedup, maxq
                     continue
                 if kind == K_STATS_REQ:
@@ -152,12 +158,40 @@ class Relay:
                     self.queue.remove(queued)
                     self.drops["superseded"] += 1
         (self.pqueue if (kind == K_TOMB and self.priority) else self.queue).append(data)
+        if kind == K_UP and self.global_topk:
+            self.trim_global_topk()
         if self.passthrough:
             while len(self.queue) > self.max_queue:
                 self.queue.popleft()
                 self.drops["backlog_cap"] += 1
         self.maxq = max(self.maxq, len(self.queue) + len(self.pqueue))
         self.queue_event.set()
+
+    def trim_global_topk(self) -> None:
+        """Keep only the highest-coverage distinct prefixes in the unsent FIFO.
+
+        The relay deliberately applies this at the shared bottleneck rather
+        than at sources: it sees all queued owners and can replace a lower
+        marginal prefix from one instance with a more valuable one from
+        another. Frames that have already entered the kernel are never
+        revoked, preserving TCP's causal ordering.
+        """
+        best: dict[int, int] = {}
+        for queued in self.queue:
+            qkind, _inst, _cell, _seq, qcoverage, qdigest, _sent = HDR.unpack(queued[:32])
+            if qkind == K_UP:
+                best[qdigest] = max(best.get(qdigest, 0), qcoverage)
+        keep = {digest for digest, _coverage in sorted(best.items(), key=lambda item: (-item[1], item[0]))[:self.global_topk]}
+        if len(keep) == len(best):
+            return
+        retained: deque[bytes] = deque()
+        for queued in self.queue:
+            qkind, _inst, _cell, _seq, _coverage, qdigest, _sent = HDR.unpack(queued[:32])
+            if qkind == K_UP and qdigest not in keep:
+                self.drops["global_topk"] += 1
+            else:
+                retained.append(queued)
+        self.queue = retained
 
     def do_reset(self, cell: int) -> None:
         self.queue.clear()
@@ -251,6 +285,7 @@ class Relay:
             self.drops["replica_cap"],
             self.drops["low_utility"],
             self.drops["backlog_cap"],
+            self.drops["global_topk"],
             self.maxq,
             int(self.ewma_dq * 1000),
         )

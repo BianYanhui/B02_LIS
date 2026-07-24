@@ -129,17 +129,23 @@ harness instance-agents (host) --TCP--> gateway container (b02-net, NET_ADMIN)
   python3).  Fixed 64-byte binary frames (format documented in the file
   header).  Per-cell config frame selects mechanisms: merge-superseded,
   tombstone priority lane, cross-instance replica cap (--dedup 2), adaptive
-  utility gate (EWMA delivery delay from real ack feedback).  Passthrough =
-  exact_fifo.  The downstream socket has SO_SNDBUF pinned and a low asyncio
-  high-water mark, so release blocks on real kernel backpressure; the
-  relay's internal FIFO is the pre-kernel queue a real aggregator controls.
+  utility gate (EWMA delivery delay from real ack feedback), and a global
+  Top-K gate over the unsent cross-instance queue. `local_topk` filters at
+  each source, while `hybrid` composes that source filter with the full
+  gateway policy. Passthrough = exact_fifo. The downstream socket has
+  SO_SNDBUF pinned and a low asyncio high-water mark, so release blocks on
+  real kernel backpressure; the relay's internal FIFO is the pre-kernel
+  queue a real aggregator controls.
   Passthrough mode drops oldest beyond a 200-message queue (metric
   relay_drop_backlog_cap).
 - `net/setup_net.sh` — idempotent: docker network `b02-net`
   (172.30.0.0/24), image `b02-gw` (alpine + iproute2 + iperf3 + python3),
   containers `gateway` (NET_ADMIN, 127.0.0.1:9700 published) and `bgserver`
   (iperf3 server :5201), tc HTB on gateway eth0 (parent = shared link;
-  children guaranteed half, ceil = full link).  `net/teardown_net.sh`
+  children guaranteed half, ceil = full link). The gateway uses a 296-byte
+  MTU by default: 104-byte signaling frames still fit unfragmented, while
+  TCP's minimum congestion window cannot mask the load-driven queueing of a
+  few-kbit/s test link. `net/teardown_net.sh`
   removes ONLY those.  Existing containers/networks are never touched.
 - `net/cell_rate.sh --sig-bit N` — per-cell link rate; cells specify
   `--rho`, and the harness computes rate = offered/rho where offered is

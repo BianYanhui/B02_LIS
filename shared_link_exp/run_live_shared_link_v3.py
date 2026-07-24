@@ -34,9 +34,10 @@ per-instance LRU shadow model for tombstones (capacity from server logs),
 physical vllm_cached_tokens as the ONLY reuse ground truth, cache_salt cell
 isolation, fixed-length outputs, V4-style integrity checks.
 
-Policies: ideal, exact_fifo (relay passthrough), agg_static (merge+priority
-+dedup2), agg_full (agg_static + adaptive utility gate).  local_topk from
-v1/v2 is dropped (v1 showed it strictly worse).
+Policies: ideal, exact_fifo (relay passthrough), local_topk (source-side
+bounded view), gateway mechanism ablations, agg_static (merge+priority
++dedup2), agg_full (agg_static + adaptive utility gate), and hybrid
+(local_topk + agg_full).
 """
 from __future__ import annotations
 
@@ -69,16 +70,23 @@ DISPATCH_PORT = 9701       # harness dispatcher endpoint, bound on the bridge IP
 FRAME = 64
 HDR = struct.Struct(">BBHIqQd")
 CFG = struct.Struct(">BBBBHI")
-STATS = struct.Struct(">IIIIIII")
+STATS = struct.Struct(">IIIIIIII")
 K_UP, K_TOMB, K_RESET, K_STATS_REQ, K_CONFIG, K_ACK, K_STATS, K_RESET_DONE = 1, 2, 3, 4, 5, 6, 7, 8
 WIRE_BYTES_PER_MSG = 104   # 64 payload + ~40 IP/TCP header; on-wire offered-load convention
 STALE_COVERAGE_THRESHOLD = 512
-LINK_POLICIES = ["exact_fifo", "agg_static", "agg_full"]
+DEFAULT_LINK_POLICIES = ["exact_fifo", "local_topk", "agg_static", "agg_full", "hybrid"]
 POLICY_FLAGS = {
-    "exact_fifo": dict(merge=0, priority=0, adaptive=0, dedup=0),
-    "agg_static": dict(merge=1, priority=1, adaptive=0, dedup=2),
-    "agg_full": dict(merge=1, priority=1, adaptive=1, dedup=2),
+    "exact_fifo": dict(merge=0, priority=0, adaptive=0, dedup=0, global_topk=0),
+    "local_topk": dict(merge=0, priority=0, adaptive=0, dedup=0, global_topk=0),
+    "merge_only": dict(merge=1, priority=0, adaptive=0, dedup=0, global_topk=0),
+    "priority_only": dict(merge=0, priority=1, adaptive=0, dedup=0, global_topk=0),
+    "dedup_only": dict(merge=0, priority=0, adaptive=0, dedup=2, global_topk=0),
+    "merge_priority": dict(merge=1, priority=1, adaptive=0, dedup=0, global_topk=0),
+    "agg_static": dict(merge=1, priority=1, adaptive=0, dedup=2, global_topk=1),
+    "agg_full": dict(merge=1, priority=1, adaptive=1, dedup=2, global_topk=1),
+    "hybrid": dict(merge=1, priority=1, adaptive=1, dedup=2, global_topk=1),
 }
+LOCAL_TOPK_POLICIES = {"local_topk", "hybrid"}
 MAX_QUEUE = 200            # relay passthrough drop-oldest cap (exact_fifo)
 DRAIN_TIMEOUT_S = 60.0
 BASE_WORDS = 2048
@@ -333,7 +341,7 @@ class LinkRuntime:
                 data = await reader.readexactly(FRAME)
                 kind, _instance, cell, _seq, _coverage, _digest, _sent = HDR.unpack(data[:32])
                 if kind == K_STATS and cell == self.cell_id and self.stats_future is not None and not self.stats_future.done():
-                    self.stats_future.set_result(STATS.unpack(data[32:60]))
+                    self.stats_future.set_result(STATS.unpack(data[32:64]))
         except (asyncio.IncompleteReadError, ConnectionResetError):
             return
 
@@ -350,7 +358,7 @@ class LinkRuntime:
                     continue
                 if kind == K_STATS:
                     if self.stats_future is not None and not self.stats_future.done():
-                        self.stats_future.set_result(STATS.unpack(data[32:60]))
+                        self.stats_future.set_result(STATS.unpack(data[32:64]))
                     continue
                 if kind not in (K_UP, K_TOMB):
                     continue
@@ -374,7 +382,7 @@ class LinkRuntime:
             self.down_writer = None
             writer.close()
 
-    async def configure_cell(self, dispatcher: Dispatcher, cell_id: int, digest_map: dict[int, str], policy: str) -> None:
+    async def configure_cell(self, dispatcher: Dispatcher, cell_id: int, digest_map: dict[int, str], policy: str, global_topk: int) -> None:
         self.dispatcher = dispatcher
         self.cell_id = cell_id
         self.digest_map = digest_map
@@ -386,7 +394,11 @@ class LinkRuntime:
         if not self.agent_writers:
             await self.open_agents()
         flags = POLICY_FLAGS[policy]
-        cfg_payload = CFG.pack(flags["merge"], flags["priority"], flags["adaptive"], 0, flags["dedup"], MAX_QUEUE)
+        cfg_payload = CFG.pack(
+            flags["merge"], flags["priority"], flags["adaptive"],
+            global_topk if flags["global_topk"] else 0,
+            flags["dedup"], MAX_QUEUE,
+        )
         self.agent_writers[0].write(HDR.pack(K_CONFIG, 0, cell_id, 0, 0, 0, time.time()) + cfg_payload.ljust(32, b"\x00"))
         await self.agent_writers[0].drain()
         for attempt in range(3):
@@ -421,13 +433,14 @@ class LinkRuntime:
         self.agent_writers[0].write(HDR.pack(K_STATS_REQ, 0, self.cell_id, 0, 0, 0, time.time()) + b"\x00" * 32)
         await self.agent_writers[0].drain()
         try:
-            forwarded, sup, cap, util, backlog, maxq, ewma_ms = await asyncio.wait_for(self.stats_future, timeout=15)
+            forwarded, sup, cap, util, backlog, global_topk, maxq, ewma_ms = await asyncio.wait_for(self.stats_future, timeout=15)
         except asyncio.TimeoutError:
             return {}
         return {
             "relay_forwarded": forwarded, "relay_drop_superseded": sup,
             "relay_drop_replica_cap": cap, "relay_drop_low_utility": util,
-            "relay_drop_backlog_cap": backlog, "relay_max_queue": maxq,
+            "relay_drop_backlog_cap": backlog, "relay_drop_global_topk": global_topk,
+            "relay_max_queue": maxq,
             "relay_ewma_dq_s": ewma_ms / 1000.0,
         }
 
@@ -512,9 +525,16 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
                    cache_salt: str, link: LinkRuntime, cell_uid: int, rate_state: dict, args: argparse.Namespace) -> tuple[dict, list[dict]]:
     dispatcher = Dispatcher(args.j, args.prefill_tokens_per_ms, args.queue_penalty_ms, args.guard_ms)
     shadows = [ShadowCache(args.kv_cache_tokens) for _ in URLS]
-    advertised: list[set[str]] = [set() for _ in URLS]
-    seq = itertools.count()
+    # `advertised` is the source's best-known dispatcher view.  For local
+    # filtering it is reconciled after each real resource update, so entries
+    # displaced from the local Top-K receive a withdrawal just like evictions.
+    advertised: list[dict[str, int]] = [dict() for _ in URLS]
+    local_entries: list[dict[str, int]] = [dict() for _ in URLS]
+    local_recency: list[dict[str, int]] = [dict() for _ in URLS]
+    local_clock = 0
     upserts_generated = 0
+    source_upserts_sent = 0
+    source_tombstones_sent = 0
     is_ideal = policy == "ideal"
     digest_map = {digest64(request.digest): request.digest for request in trace}
     sig_bit = 0
@@ -528,7 +548,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
             subprocess.call(["docker", "exec", "-d", "gateway", "iperf3", "-c", "bgserver", "-t", "7200"])
             await asyncio.sleep(1.0)
         tc_before = tc_snapshot(f"{cell_tag}_before", Path(args.out_dir))
-        await link.configure_cell(dispatcher, cell_uid % 60000, digest_map, policy)
+        await link.configure_cell(dispatcher, cell_uid % 60000, digest_map, policy, args.global_topk)
     records: list[dict] = []
     started = time.perf_counter()
     mid_at = int(len(trace) * 0.75)
@@ -556,13 +576,35 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
                         dispatcher.index[target].pop(victim, None)
                     upserts_generated += 1
                 else:
-                    link.send(K_UP, target, request.digest, request.coverage_tokens)
                     upserts_generated += 1
-                    advertised[target].add(request.digest)
-                    for victim in evicted:
-                        if victim in advertised[target]:
-                            link.send(K_TOMB, target, victim, 0)
-                            advertised[target].discard(victim)
+                    if policy in LOCAL_TOPK_POLICIES:
+                        local_clock += 1
+                        local_entries[target][request.digest] = request.coverage_tokens
+                        local_recency[target][request.digest] = local_clock
+                        for victim in evicted:
+                            local_entries[target].pop(victim, None)
+                            local_recency[target].pop(victim, None)
+                        selected = dict(sorted(
+                            local_entries[target].items(),
+                            key=lambda item: (-item[1], -local_recency[target][item[0]], item[0]),
+                        )[:args.topk])
+                        for digest in set(advertised[target]) - set(selected):
+                            link.send(K_TOMB, target, digest, 0)
+                            source_tombstones_sent += 1
+                        for digest, selected_coverage in selected.items():
+                            if advertised[target].get(digest) != selected_coverage:
+                                link.send(K_UP, target, digest, selected_coverage)
+                                source_upserts_sent += 1
+                        advertised[target] = selected
+                    else:
+                        link.send(K_UP, target, request.digest, request.coverage_tokens)
+                        source_upserts_sent += 1
+                        advertised[target][request.digest] = request.coverage_tokens
+                        for victim in evicted:
+                            if victim in advertised[target]:
+                                link.send(K_TOMB, target, victim, 0)
+                                source_tombstones_sent += 1
+                                advertised[target].pop(victim, None)
                 if request.discard:
                     continue
                 physical_cached = float(response["vllm_cached_tokens"] or 0)
@@ -595,7 +637,13 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
         tomb = link.delays["tombstone"]
         net_metrics = {
             "rho": rho, "sig_bit_per_s": sig_bit, "background_traffic": bg,
+            "source_local_topk": policy in LOCAL_TOPK_POLICIES,
+            "gateway_global_topk": args.global_topk if POLICY_FLAGS[policy]["global_topk"] else 0,
+            "source_upserts_sent": source_upserts_sent,
+            "source_tombstones_sent": source_tombstones_sent,
+            "source_suppressed_upserts": max(0, upserts_generated - source_upserts_sent),
             "net_msgs_sent": link.sent, "net_msgs_delivered": link.received,
+            "net_wire_bytes_sent": link.sent * WIRE_BYTES_PER_MSG,
             "net_undelivered_at_drain_end": link.sent - link.received,
             "ad_delivery_delay_mean_s": statistics.mean(up) if up else 0.0,
             "ad_delivery_delay_p50_s": percentile(up, 50),
@@ -763,12 +811,16 @@ async def run(args: argparse.Namespace) -> dict:
             await do_cell(rep, policy, rho, bg, trace, trace_hash, idx, ",".join(order_by_rep[rep]), suffix)
     else:
         rhos = [float(value) for value in args.rhos.split(",")]
+        policies = [value.strip() for value in args.policies.split(",") if value.strip()]
+        unknown = sorted(set(policies) - set(POLICY_FLAGS))
+        if unknown:
+            raise ValueError(f"unknown policies: {','.join(unknown)}")
         for rep in range(args.repetitions):
             trace_path = root / "traces" / f"shared_link_v3_trace_rep{rep}.csv"
             trace = make_trace(trace_path, rep, args)
             trace_hash = sha256_file(trace_path)
             plan: list[tuple[str, float | None, bool]] = [("ideal", None, False)]
-            plan += [(policy, rho, False) for policy in LINK_POLICIES for rho in rhos]
+            plan += [(policy, rho, args.background) for policy in policies for rho in rhos]
             if rep == 0:
                 # rep0's ideal cell doubles as the offered-rate calibration and
                 # must run before any link cell; the rest of rep0 is shuffled.
@@ -832,6 +884,12 @@ def main() -> None:
     parser.add_argument("--output-tokens", type=int, default=4)
     parser.add_argument("--kv-cache-tokens", type=int, required=True)
     parser.add_argument("--rhos", default="0.5,1.0,1.75")
+    parser.add_argument("--policies", default=",".join(DEFAULT_LINK_POLICIES),
+                        help="comma-separated link policies; includes gateway ablations")
+    parser.add_argument("--global-topk", type=int, default=16,
+                        help="distinct queued prefixes retained by gateway static/full policies")
+    parser.add_argument("--background", action="store_true",
+                        help="run every non-ideal cell with saturating iperf3 traffic")
     parser.add_argument("--initial-offered-bit-per-s", type=float, default=1248.0,
                         help="used until the first ideal cell measures the real offered rate")
     parser.add_argument("--j", type=int, default=4)
