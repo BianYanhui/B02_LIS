@@ -50,6 +50,11 @@ async def flush_agents(link: live.LinkRuntime) -> None:
         await writer.drain()
 
 
+async def require_deliveries(link: live.LinkRuntime, expected: int, label: str, timeout_s: float = 60.0) -> None:
+    if not await wait_for(link, lambda: link.received >= expected, timeout_s=timeout_s):
+        raise RuntimeError(f"{label}: received {link.received}, expected {expected} frames")
+
+
 async def wait_for(link: live.LinkRuntime, predicate, timeout_s: float = 10.0) -> bool:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
@@ -64,13 +69,8 @@ async def close_link(link: live.LinkRuntime) -> None:
         task.cancel()
     for writer in link.agent_writers:
         writer.close()
-    for writer in link.agent_writers:
-        try:
-            await asyncio.wait_for(writer.wait_closed(), timeout=1.0)
-        except (ConnectionError, asyncio.CancelledError, asyncio.TimeoutError):
-            pass
     link._server.close()
-    await link._server.wait_closed()
+    await asyncio.sleep(0)
 
 
 async def configure(link: live.LinkRuntime, policy: str, cell_id: int, names: list[str], max_inflight: int) -> live.Dispatcher:
@@ -118,7 +118,7 @@ async def merge_case(link: live.LinkRuntime, policy: str, cell_id: int, rate: in
         link.send(live.K_UP, 0, name, 256 * (step + 1))
     await flush_agents(link)
     print(json.dumps({"event": "semantic_drain_begin", "mechanism": "merge", "cell": cell_id}), flush=True)
-    await link.drain(timeout_s=60.0)
+    await require_deliveries(link, 10 if policy == "exact_fifo" else 1, f"merge/{policy}")
     print(json.dumps({"event": "semantic_drain_end", "mechanism": "merge", "cell": cell_id, "received": link.received}), flush=True)
     stats = delivered_stats(link)
     final = stats_summary(stats, dispatcher, name)
@@ -178,7 +178,8 @@ async def dedup_case(link: live.LinkRuntime, policy: str, overlap_percent: int, 
             link.send(live.K_UP, owner, name, 1024 + index)
     await flush_agents(link)
     print(json.dumps({"event": "semantic_drain_begin", "mechanism": "dedup", "cell": cell_id}), flush=True)
-    await link.drain(timeout_s=60.0)
+    expected = prefix_count + (replicated if policy == "dedup_only" else 2 * replicated)
+    await require_deliveries(link, expected, f"dedup/{policy}/overlap={overlap_percent}")
     print(json.dumps({"event": "semantic_drain_end", "mechanism": "dedup", "cell": cell_id, "received": link.received}), flush=True)
     stats = delivered_stats(link)
     unique_visible = sum(int(any(name in owner for owner in dispatcher.index)) for name in names)
