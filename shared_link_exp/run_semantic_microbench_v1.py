@@ -187,30 +187,45 @@ async def run(args: argparse.Namespace) -> list[dict]:
     # and never creates a connection to a GPU3/vLLM endpoint.
     live.URLS = [f"http://127.0.0.1:{8000 + index}" for index in range(3)]
     set_rate(args.rate_bit_per_s)
-    link = live.LinkRuntime()
-    await link.start()
     rows: list[dict] = []
     cell = 60_000
-    try:
-        for rep in range(args.repetitions):
-            for policy in ("exact_fifo", "merge_only"):
-                row = await merge_case(link, policy, cell, args.rate_bit_per_s)
+
+    async def isolated(case):
+        """Run one semantic workload with a fresh dispatcher TCP endpoint.
+
+        Resetting a live-serving cell intentionally closes the downstream
+        socket.  Reusing a single endpoint for many tiny microbench cells
+        introduces a control-plane race that is unrelated to the semantic
+        operation under test.  A fresh endpoint per case retains the same
+        relay/HTB data path while making the cases genuinely independent.
+        """
+        link = live.LinkRuntime()
+        await link.start()
+        try:
+            if not await wait_for(link, lambda: link.down_writer is not None, timeout_s=15.0):
+                raise RuntimeError("relay did not establish initial downstream connection")
+            return await case(link)
+        finally:
+            await close_link(link)
+            await asyncio.sleep(0.25)
+
+    for rep in range(args.repetitions):
+        for policy in ("exact_fifo", "merge_only"):
+            row = await isolated(lambda link: merge_case(link, policy, cell, args.rate_bit_per_s))
+            row.update({"rep": rep, "cell_id": cell})
+            rows.append(row)
+            cell += 1
+        for policy in ("exact_fifo", "priority_only"):
+            row = await isolated(lambda link: priority_case(link, policy, cell, args.rate_bit_per_s))
+            row.update({"rep": rep, "cell_id": cell})
+            rows.append(row)
+            cell += 1
+        for overlap in (0, 25, 50, 75):
+            for policy in ("exact_fifo", "dedup_only"):
+                row = await isolated(lambda link: dedup_case(link, policy, overlap, cell, args.rate_bit_per_s))
                 row.update({"rep": rep, "cell_id": cell})
                 rows.append(row)
                 cell += 1
-            for policy in ("exact_fifo", "priority_only"):
-                row = await priority_case(link, policy, cell, args.rate_bit_per_s)
-                row.update({"rep": rep, "cell_id": cell})
-                rows.append(row)
-                cell += 1
-            for overlap in (0, 25, 50, 75):
-                for policy in ("exact_fifo", "dedup_only"):
-                    row = await dedup_case(link, policy, overlap, cell, args.rate_bit_per_s)
-                    row.update({"rep": rep, "cell_id": cell})
-                    rows.append(row)
-                    cell += 1
-    finally:
-        await close_link(link)
     return rows
 
 
