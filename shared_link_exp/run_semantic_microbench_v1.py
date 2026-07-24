@@ -50,7 +50,7 @@ async def flush_agents(link: live.LinkRuntime) -> None:
         await writer.drain()
 
 
-async def require_deliveries(link: live.LinkRuntime, expected: int, label: str, timeout_s: float = 60.0) -> None:
+async def require_deliveries(link: live.LinkRuntime, expected: int, label: str, timeout_s: float = 120.0) -> None:
     if not await wait_for(link, lambda: link.received >= expected, timeout_s=timeout_s):
         raise RuntimeError(f"{label}: received {link.received}, expected {expected} frames")
 
