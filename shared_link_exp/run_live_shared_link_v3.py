@@ -901,12 +901,22 @@ async def run(args: argparse.Namespace) -> dict:
         unknown = sorted(set(policies) - set(POLICY_FLAGS))
         if unknown:
             raise ValueError(f"unknown policies: {','.join(unknown)}")
+        if args.paired_background and args.background:
+            raise ValueError("--paired-background and --background are mutually exclusive")
         for rep in range(args.repetitions):
             trace_path = root / "traces" / f"shared_link_v3_trace_rep{rep}.csv"
             trace = make_trace(trace_path, rep, args)
             trace_hash = sha256_file(trace_path)
             plan: list[tuple[str, float | None, bool]] = [("ideal", None, False)]
-            plan += [(policy, rho, args.background) for policy in policies for rho in rhos]
+            if args.paired_background:
+                # For every policy/rho, execute OFF and ON against the same
+                # deterministic trace.  The per-cell cache salt remains
+                # distinct, whereas prompt bytes and request ordering match.
+                plan += [(policy, rho, background)
+                         for policy in policies for rho in rhos
+                         for background in (False, True)]
+            else:
+                plan += [(policy, rho, args.background) for policy in policies for rho in rhos]
             if rep == 0:
                 # rep0's ideal cell doubles as the offered-rate calibration and
                 # must run before any link cell; the rest of rep0 is shuffled.
@@ -916,7 +926,10 @@ async def run(args: argparse.Namespace) -> dict:
             else:
                 order = list(plan)
                 random.Random(stable_int(args.seed, "cell-order", rep)).shuffle(order)
-            order_by_rep[rep] = ["ideal" if policy == "ideal" else f"{policy}@rho{rho}" for policy, rho, _ in order]
+            order_by_rep[rep] = [
+                "ideal" if policy == "ideal" else f"{policy}@rho{rho}" + ("+bg" if background else "")
+                for policy, rho, background in order
+            ]
             for order_index, (policy, rho, bg) in enumerate(order):
                 await do_cell(rep, policy, rho, bg, trace, trace_hash, order_index, ",".join(order_by_rep[rep]))
 

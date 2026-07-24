@@ -191,7 +191,9 @@ class Relay:
             qkind, _inst, _cell, _seq, qcoverage, qdigest, _sent = HDR.unpack(queued[:32])
             if qkind == K_UP:
                 best[qdigest] = max(best.get(qdigest, 0), qcoverage)
-        keep = {digest for digest, _coverage in sorted(best.items(), key=lambda item: (-item[1], item[0]))[:self.global_topk]}
+        # Adaptive mode changes state admission, not the physical link rate.
+        limit = max(1, self.global_topk // 4) if self.adaptive and self.ewma_dq > self.args.gate else self.global_topk
+        keep = {digest for digest, _coverage in sorted(best.items(), key=lambda item: (-item[1], item[0]))[:limit]}
         if len(keep) == len(best):
             return
         retained: deque[bytes] = deque()
