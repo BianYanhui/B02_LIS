@@ -1,0 +1,2 @@
+rep,cell_id,policy,rho,saved_prefill_retention_vs_ideal,delta_ttft_mean_ms_vs_ideal,delta_ttft_p95_ms_vs_ideal,delta_stale_fallback_rate_vs_ideal
+0,agg_static@rho1.1,agg_static,1.1,0.5277449822904369,-90.34051280555536,-1030.493956,0.0

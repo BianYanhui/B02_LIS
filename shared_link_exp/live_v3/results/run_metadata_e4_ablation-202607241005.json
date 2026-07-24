@@ -1,0 +1,49 @@
+{
+  "started_at_unix": 1784879717.3834531,
+  "finished_at_unix": 1784879981.2529552,
+  "duration_s": 263.86950278282166,
+  "arguments": {
+    "out_dir": "/home/byh/B02/shared_link_exp/live_v3",
+    "tag": "e4_ablation-202607241005",
+    "seed": 20260723,
+    "repetitions": 1,
+    "n_requests": 32,
+    "warmup": 8,
+    "pool_size": 32,
+    "overlap": 0.0,
+    "alpha": 0.55,
+    "steps": 3,
+    "concurrency": 4,
+    "output_tokens": 4,
+    "kv_cache_tokens": 50000,
+    "rhos": "1.1",
+    "policies": "exact_fifo,merge_only,priority_only,dedup_only,merge_priority,agg_static,agg_full,local_topk,hybrid",
+    "global_topk": 8,
+    "background": false,
+    "initial_offered_bit_per_s": 1248.0,
+    "j": 4,
+    "topk": 4,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "max_request_attempts": 3,
+    "cooldown_s": 1.0,
+    "smoke": false
+  },
+  "cell_order_by_rep": {
+    "0": [
+      "ideal",
+      "priority_only@rho1.1",
+      "agg_static@rho1.1",
+      "local_topk@rho1.1",
+      "dedup_only@rho1.1",
+      "merge_priority@rho1.1",
+      "exact_fifo@rho1.1",
+      "merge_only@rho1.1",
+      "agg_full@rho1.1",
+      "hybrid@rho1.1"
+    ]
+  },
+  "cells": 10,
+  "raw_requests": 240
+}

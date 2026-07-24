@@ -1,0 +1,41 @@
+{
+  "started_at_unix": 1784880026.1389768,
+  "finished_at_unix": 1784880096.5347714,
+  "duration_s": 70.39579558372498,
+  "arguments": {
+    "out_dir": "/home/byh/B02/shared_link_exp/live_v3",
+    "tag": "e5_k4-202607241020",
+    "seed": 20260723,
+    "repetitions": 1,
+    "n_requests": 48,
+    "warmup": 12,
+    "pool_size": 48,
+    "overlap": 0.0,
+    "alpha": 0.55,
+    "steps": 3,
+    "concurrency": 4,
+    "output_tokens": 4,
+    "kv_cache_tokens": 50000,
+    "rhos": "1.1",
+    "policies": "agg_static",
+    "global_topk": 4,
+    "background": false,
+    "initial_offered_bit_per_s": 1248.0,
+    "j": 4,
+    "topk": 4,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "max_request_attempts": 3,
+    "cooldown_s": 1.0,
+    "smoke": false
+  },
+  "cell_order_by_rep": {
+    "0": [
+      "ideal",
+      "agg_static@rho1.1"
+    ]
+  },
+  "cells": 2,
+  "raw_requests": 72
+}

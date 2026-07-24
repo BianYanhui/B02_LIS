@@ -1,0 +1,54 @@
+{
+  "started_at_unix": 1784876894.8371844,
+  "finished_at_unix": 1784877658.0191064,
+  "duration_s": 763.1819229125977,
+  "arguments": {
+    "out_dir": "/home/byh/B02/shared_link_exp/live_v3",
+    "tag": "e1_med-202607240720",
+    "seed": 20260723,
+    "repetitions": 2,
+    "n_requests": 96,
+    "warmup": 24,
+    "pool_size": 64,
+    "alpha": 0.55,
+    "steps": 3,
+    "concurrency": 4,
+    "output_tokens": 4,
+    "kv_cache_tokens": 104544,
+    "rhos": "0.3,0.8,1.3",
+    "policies": "exact_fifo,agg_full",
+    "global_topk": 16,
+    "background": false,
+    "initial_offered_bit_per_s": 1248.0,
+    "j": 4,
+    "topk": 8,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "max_request_attempts": 3,
+    "cooldown_s": 1.0,
+    "smoke": false
+  },
+  "cell_order_by_rep": {
+    "0": [
+      "ideal",
+      "exact_fifo@rho1.3",
+      "agg_full@rho1.3",
+      "exact_fifo@rho0.3",
+      "exact_fifo@rho0.8",
+      "agg_full@rho0.3",
+      "agg_full@rho0.8"
+    ],
+    "1": [
+      "agg_full@rho0.3",
+      "agg_full@rho1.3",
+      "exact_fifo@rho0.3",
+      "ideal",
+      "agg_full@rho0.8",
+      "exact_fifo@rho1.3",
+      "exact_fifo@rho0.8"
+    ]
+  },
+  "cells": 14,
+  "raw_requests": 1008
+}
