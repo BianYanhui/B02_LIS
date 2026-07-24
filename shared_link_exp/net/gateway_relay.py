@@ -137,6 +137,13 @@ class Relay:
         finally:
             writer.close()
 
+    def low_utility(self, coverage: int, t_send: float) -> bool:
+        if not self.adaptive or self.ewma_dq <= self.args.gate:
+            return False
+        age = time.time() - t_send
+        utility = (2.718281828459045 ** (-(age + self.ewma_dq) / self.args.tau)) * coverage - self.args.util_lambda * FRAME
+        return utility <= 0
+
     def enqueue(self, data: bytes, kind: int, instance: int, seq: int, coverage: int, digest: int, t_send: float) -> None:
         if kind == K_UP:
             if self.merge:
@@ -145,12 +152,9 @@ class Relay:
                     if qkind == K_UP and qinst == instance and qdig == digest:
                         self.queue.remove(queued)
                         self.drops["superseded"] += 1
-            if self.adaptive and self.ewma_dq > self.args.gate:
-                age = time.time() - t_send
-                utility = (2.718281828459045 ** (-(age + self.ewma_dq) / self.args.tau)) * coverage - self.args.util_lambda * FRAME
-                if utility <= 0:
-                    self.drops["low_utility"] += 1
-                    return
+            if self.low_utility(coverage, t_send):
+                self.drops["low_utility"] += 1
+                return
             if self.dedup:
                 replicas = self.replicas[digest]
                 if instance not in replicas and len(replicas) >= self.dedup:
@@ -264,6 +268,10 @@ class Relay:
                 await asyncio.sleep(0.2)
                 continue
             kind, instance, cell, seq, coverage, digest, t_send = HDR.unpack(data[:32])
+            if kind == K_UP and self.low_utility(coverage, t_send):
+                self.drops["low_utility"] += 1
+                self.replicas[digest].discard(instance)
+                continue
             try:
                 self.down_writer.write(data)
                 await self.down_writer.drain()
