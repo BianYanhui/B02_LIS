@@ -208,6 +208,10 @@ class Dispatcher:
         self.queue_penalty_ms = queue_penalty_ms
         self.guard_ms = guard_ms
         self.index: list[dict[str, int]] = [dict() for _ in URLS]
+        # Source-generation and arrival times are retained separately: a
+        # delivered-only delay percentile is not a freshness metric.
+        self.generated_at: list[dict[str, float]] = [dict() for _ in URLS]
+        self.received_at: list[dict[str, float]] = [dict() for _ in URLS]
         self.loads = [0 for _ in URLS]
         self.rr = 0
 
@@ -236,6 +240,16 @@ class Dispatcher:
             if estimated_net_ms > self.guard_ms:
                 return target, raw, len(evaluated), True, best_coverage, estimated_net_ms
         return native, raw, len(evaluated), False, native_coverage, 0.0
+
+    def apply_upsert(self, instance: int, digest: str, coverage: int, generated_at: float, received_at: float) -> None:
+        self.index[instance][digest] = coverage
+        self.generated_at[instance][digest] = generated_at
+        self.received_at[instance][digest] = received_at
+
+    def apply_tombstone(self, instance: int, digest: str) -> None:
+        self.index[instance].pop(digest, None)
+        self.generated_at[instance].pop(digest, None)
+        self.received_at[instance].pop(digest, None)
 
 
 class ShadowCache:
@@ -371,10 +385,10 @@ class LinkRuntime:
                 if name is None:
                     continue
                 if kind == K_UP:
-                    self.dispatcher.index[instance][name] = coverage
+                    self.dispatcher.apply_upsert(instance, name, coverage, t_send, now)
                     self.delays["upsert"].append(now - t_send)
                 else:
-                    self.dispatcher.index[instance].pop(name, None)
+                    self.dispatcher.apply_tombstone(instance, name)
                     self.delays["tombstone"].append(now - t_send)
                 self.received += 1
                 # feedback ack so the relay's adaptive gate sees REAL delay
@@ -528,6 +542,8 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
                    cache_salt: str, link: LinkRuntime, cell_uid: int, rate_state: dict, args: argparse.Namespace) -> tuple[dict, list[dict]]:
     dispatcher = Dispatcher(args.j, args.prefill_tokens_per_ms, args.queue_penalty_ms, args.guard_ms)
     shadows = [ShadowCache(args.kv_cache_tokens) for _ in URLS]
+    # Source shadow state and generation times define the AoI reference.
+    source_truth: list[dict[str, tuple[int, float]]] = [dict() for _ in URLS]
     # `advertised` is the source's best-known dispatcher view.  For local
     # filtering it is reconciled after each real resource update, so entries
     # displaced from the local Top-K receive a withdrawal just like evictions.
@@ -539,6 +555,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
     source_upserts_sent = 0
     source_tombstones_sent = 0
     is_ideal = policy == "ideal"
+    state_epoch_unix = time.time()
     overlap_seed_count = int(round(args.pool_size * args.overlap))
     overlap_seeds = [TraceRequest(
         request_id=-(index + 1), phase=0, lineage_id=index, step=0,
@@ -561,12 +578,16 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
     def publish_state(target: int, digest: str, coverage_tokens: int) -> None:
         """Publish one actual cache-state update via the active policy."""
         nonlocal local_clock, source_tombstones_sent, source_upserts_sent, upserts_generated
+        generated_at = time.time()
         evicted = shadows[target].insert(digest, coverage_tokens)
+        source_truth[target][digest] = (coverage_tokens, generated_at)
+        for victim in evicted:
+            source_truth[target].pop(victim, None)
         upserts_generated += 1
         if is_ideal:
-            dispatcher.index[target][digest] = coverage_tokens
+            dispatcher.apply_upsert(target, digest, coverage_tokens, generated_at, generated_at)
             for victim in evicted:
-                dispatcher.index[target].pop(victim, None)
+                dispatcher.apply_tombstone(target, victim)
             return
         if policy in LOCAL_TOPK_POLICIES:
             local_clock += 1
@@ -620,8 +641,20 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
                 tc_mid_done = True
             wave = trace[offset:offset + args.concurrency]
             decisions = []
+            freshness: dict[int, tuple] = {}
             for request in wave:
                 target, raw_fanout, evaluated, affinity, coverage, expected_net = dispatcher.choose(request)
+                dispatch_time_unix = time.time()
+                truth_coverage = max((entry[0] for source in source_truth for entry in [source.get(request.digest)] if entry), default=0)
+                view_coverage = max((view.get(request.digest, 0) for view in dispatcher.index), default=0)
+                known_generated_at = dispatcher.generated_at[target].get(request.digest)
+                dispatch_state_age_s = (dispatch_time_unix - (known_generated_at if known_generated_at is not None else state_epoch_unix)) if truth_coverage > 0 else None
+                view_missing = bool(truth_coverage > 0 and view_coverage == 0)
+                source_false_negative = bool(truth_coverage >= STALE_COVERAGE_THRESHOLD and view_coverage < STALE_COVERAGE_THRESHOLD)
+                target_truth_coverage = source_truth[target].get(request.digest, (0, state_epoch_unix))[0]
+                source_false_positive = bool(affinity and coverage > target_truth_coverage)
+                freshness[request.request_id] = (dispatch_time_unix, truth_coverage, view_coverage,
+                                                  dispatch_state_age_s, view_missing, source_false_negative, source_false_positive)
                 dispatcher.loads[target] += 1
                 decisions.append((request, target, raw_fanout, evaluated, affinity, coverage, expected_net))
             responses = await asyncio.gather(*[
@@ -634,6 +667,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
                 if request.discard:
                     continue
                 physical_cached = float(response["vllm_cached_tokens"] or 0)
+                dispatch_time_unix, truth_coverage, view_coverage, dispatch_state_age_s, view_missing, source_false_negative, source_false_positive = freshness[request.request_id]
                 records.append({
                     "request_id": request.request_id,
                     "phase": request.phase,
@@ -642,6 +676,14 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
                     "digest": request.digest,
                     "selected_instance": target,
                     "candidate_hit": affinity,
+                    "dispatch_time_unix": dispatch_time_unix,
+                    "source_truth_coverage_tokens": truth_coverage,
+                    "dispatcher_view_coverage_tokens": view_coverage,
+                    "dispatch_state_age_s": dispatch_state_age_s,
+                    "dispatcher_view_missing": view_missing,
+                    "source_view_false_negative": source_false_negative,
+                    "source_view_false_positive": source_false_positive,
+                    "physical_false_positive_affinity": bool(affinity and coverage >= STALE_COVERAGE_THRESHOLD and response["ok"] and physical_cached < STALE_COVERAGE_THRESHOLD),
                     "expected_coverage_tokens": coverage,
                     "expected_net_prefill_ms": expected_net,
                     "raw_candidate_fanout": raw_fanout,
@@ -689,6 +731,10 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
     ttfts = [float(row["ttft_ms"]) for row in success]
     latencies = [float(row["latency_ms"]) for row in success]
     shortfalls = [float(row["coverage_shortfall_tokens"]) for row in success]
+    state_ages = [float(row["dispatch_state_age_s"]) for row in records if row["dispatch_state_age_s"] is not None]
+    source_unique_prefixes = len({digest for source in source_truth for digest in source})
+    dispatcher_unique_prefixes = len({digest for view in dispatcher.index for digest in view})
+    wire_bytes = int(net_metrics.get("net_wire_bytes_sent", 0))
     n = len(records)
     metrics = {
         "request_count": n,
@@ -700,6 +746,17 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
         "upserts_per_s": upserts_generated / active_s if active_s > 0 else 0.0,
         "offered_wire_bit_per_s": (upserts_generated * WIRE_BYTES_PER_MSG * 8) / active_s if active_s > 0 else 0.0,
         "affinity_selection_rate": sum(bool(row["candidate_hit"]) for row in records) / n if n else 0.0,
+        "dispatch_state_age_defined_count": len(state_ages),
+        "dispatch_state_age_mean_s": statistics.mean(state_ages) if state_ages else 0.0,
+        "dispatch_state_age_p50_s": percentile(state_ages, 50),
+        "dispatch_state_age_p95_s": percentile(state_ages, 95),
+        "dispatcher_view_missing_at_dispatch_rate": sum(bool(row["dispatcher_view_missing"]) for row in records) / n if n else 0.0,
+        "source_view_false_negative_rate": sum(bool(row["source_view_false_negative"]) for row in records) / n if n else 0.0,
+        "source_view_false_positive_rate": sum(bool(row["source_view_false_positive"]) for row in records) / n if n else 0.0,
+        "physical_false_positive_affinity_rate": sum(bool(row["physical_false_positive_affinity"]) for row in records) / n if n else 0.0,
+        "source_unique_prefixes_at_end": source_unique_prefixes,
+        "dispatcher_unique_prefixes_at_end": dispatcher_unique_prefixes,
+        "dispatcher_unique_prefixes_per_wire_byte": dispatcher_unique_prefixes / wire_bytes if wire_bytes else 0.0,
         "vllm_cached_token_rate": sum(float(row["vllm_cached_tokens"] or 0) > 0 for row in records) / n if n else 0.0,
         "vllm_cached_tokens_total": sum(float(row["vllm_cached_tokens"] or 0) for row in records),
         "stale_fallback_count": sum(bool(row["stale_fallback"]) for row in records),
@@ -782,7 +839,7 @@ async def run(args: argparse.Namespace) -> dict:
             "evidence_type": "hybrid_live_vllm_real_kernel_link",
             "code_commit": git_commit(),
             "model": MODEL_ID,
-            "hardware": "4x Tesla T4; Qwen2.5-1.5B-Instruct; one vLLM instance/GPU on host; docker gateway+tc state channel",
+            "hardware": f"{len(URLS)}x Tesla T4; Qwen2.5-1.5B-Instruct; one vLLM instance/GPU on host; docker gateway+tc state channel",
             "cell_id": cell_id, "policy": policy,
             "wire_frame_bytes": FRAME, "wire_bytes_per_msg_assumed": WIRE_BYTES_PER_MSG,
             "rep": rep, "repetitions": args.repetitions, "seed": args.seed,
@@ -899,11 +956,13 @@ def smoke_report(cells: list[dict], checks: list[dict]) -> list[dict]:
 
 
 def main() -> None:
+    global URLS
     parser = argparse.ArgumentParser()
     parser.add_argument("--out-dir", default="/home/byh/B02/shared_link_exp/live_v3")
     parser.add_argument("--tag", default="v3")
     parser.add_argument("--seed", type=int, default=20260723)
     parser.add_argument("--repetitions", type=int, default=4)
+    parser.add_argument("--instances", type=int, default=4, help="number of local vLLM endpoints to include (ports 8000 onward)")
     parser.add_argument("--n-requests", type=int, default=128)
     parser.add_argument("--warmup", type=int, default=32)
     parser.add_argument("--pool-size", type=int, default=64)
@@ -921,6 +980,8 @@ def main() -> None:
                         help="distinct queued prefixes retained by gateway static/full policies")
     parser.add_argument("--background", action="store_true",
                         help="run every non-ideal cell with saturating iperf3 traffic")
+    parser.add_argument("--paired-background", action="store_true",
+                        help="for every policy/rho, run matched background OFF/ON cells on the same trace")
     parser.add_argument("--initial-offered-bit-per-s", type=float, default=1248.0,
                         help="used until the first ideal cell measures the real offered rate")
     parser.add_argument("--j", type=int, default=4)
@@ -932,6 +993,9 @@ def main() -> None:
     parser.add_argument("--cooldown-s", type=float, default=1.0)
     parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args()
+    if not 2 <= args.instances <= 4:
+        raise ValueError("instances must be in [2, 4]")
+    URLS = [f"http://127.0.0.1:{8000 + index}" for index in range(args.instances)]
     if args.smoke:
         args.repetitions = 1
         args.n_requests = 48
