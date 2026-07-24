@@ -954,8 +954,8 @@ def smoke_report(cells: list[dict], checks: list[dict]) -> list[dict]:
     add("b: delivery delay p95 materially larger at rho=1.3", p95_13 >= max(1.0, 3.0 * p95_05),
         f"p95 rho1.3={p95_13:.3f}s rho0.5={p95_05:.3f}s")
     ideal = by_id.get("ideal", {})
-    add("c: ideal bypasses the network", "ad_delivery_delay_p95_s" not in ideal and float(ideal.get("upserts_per_s", 0)) > 0,
-        f"ideal net fields absent, upserts_per_s={ideal.get('upserts_per_s')}")
+    add("c: ideal bypasses the network", not ideal.get("ad_delivery_delay_p95_s") and float(ideal.get("upserts_per_s", 0)) > 0,
+        f"ideal network delay field is absent/empty, upserts_per_s={ideal.get('upserts_per_s')}")
     add("d: integrity checks", all(row["status"] == "PASS" for row in checks),
         "; ".join(f"{row['check_name']}={row['status']}" for row in checks))
     bg_on = by_id.get("exact_fifo@rho0.5+bg", {})
