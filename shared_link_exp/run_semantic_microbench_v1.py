@@ -81,6 +81,10 @@ async def configure(link: live.LinkRuntime, policy: str, cell_id: int, names: li
     # cells independent.  Wait for the relay to establish the replacement
     # socket before injecting this cell's first frame; otherwise a short
     # microbench can finish its drain timeout before any frame has a route.
+    # Give the previous connection's EOF handler a chance to clear the old
+    # writer.  Without this grace period, `down_writer is not None` can still
+    # refer to the socket that the reset has just closed.
+    await asyncio.sleep(0.5)
     if not await wait_for(link, lambda: link.down_writer is not None, timeout_s=10.0):
         raise RuntimeError(f"downstream relay connection did not recover for cell {cell_id}")
     return dispatcher
