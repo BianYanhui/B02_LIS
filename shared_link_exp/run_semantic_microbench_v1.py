@@ -99,6 +99,17 @@ def stats_summary(stats: dict, dispatcher: live.Dispatcher, name: str) -> dict:
     }
 
 
+def delivered_stats(link: live.LinkRuntime) -> dict:
+    """Stats derived from frames actually received at the dispatcher.
+
+    The experiment's evidence is the downstream reception/coverage, not an
+    additional control RPC.  Under a deliberately tiny link, that RPC can
+    itself block while the semantic data path has already completed.  Keep
+    this benchmark independent of that auxiliary query.
+    """
+    return {"relay_forwarded": link.received}
+
+
 async def merge_case(link: live.LinkRuntime, policy: str, cell_id: int, rate: int) -> dict:
     name = f"merge-prefix-{policy}-{cell_id}"
     dispatcher = await configure(link, policy, cell_id, [name], max_inflight=1)
@@ -107,7 +118,7 @@ async def merge_case(link: live.LinkRuntime, policy: str, cell_id: int, rate: in
         link.send(live.K_UP, 0, name, 256 * (step + 1))
     await flush_agents(link)
     await link.drain(timeout_s=60.0)
-    stats = await link.fetch_stats()
+    stats = delivered_stats(link)
     final = stats_summary(stats, dispatcher, name)
     final.update({
         "mechanism": "merge",
@@ -138,7 +149,7 @@ async def priority_case(link: live.LinkRuntime, policy: str, cell_id: int, rate:
     link.send(live.K_TOMB, 0, critical, 0)
     await flush_agents(link)
     invalidated = await wait_for(link, lambda: critical not in dispatcher.index[0], timeout_s=60.0)
-    stats = await link.fetch_stats()
+    stats = delivered_stats(link)
     return {
         **stats_summary(stats, dispatcher, critical),
         "mechanism": "priority",
@@ -163,7 +174,7 @@ async def dedup_case(link: live.LinkRuntime, policy: str, overlap_percent: int, 
             link.send(live.K_UP, owner, name, 1024 + index)
     await flush_agents(link)
     await link.drain(timeout_s=60.0)
-    stats = await link.fetch_stats()
+    stats = delivered_stats(link)
     unique_visible = sum(int(any(name in owner for owner in dispatcher.index)) for name in names)
     forwarded = stats.get("relay_forwarded", 0)
     return {
