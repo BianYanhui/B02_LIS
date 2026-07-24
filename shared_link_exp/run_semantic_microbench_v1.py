@@ -117,7 +117,9 @@ async def merge_case(link: live.LinkRuntime, policy: str, cell_id: int, rate: in
     for step in range(10):
         link.send(live.K_UP, 0, name, 256 * (step + 1))
     await flush_agents(link)
+    print(json.dumps({"event": "semantic_drain_begin", "mechanism": "merge", "cell": cell_id}), flush=True)
     await link.drain(timeout_s=60.0)
+    print(json.dumps({"event": "semantic_drain_end", "mechanism": "merge", "cell": cell_id, "received": link.received}), flush=True)
     stats = delivered_stats(link)
     final = stats_summary(stats, dispatcher, name)
     final.update({
@@ -148,7 +150,9 @@ async def priority_case(link: live.LinkRuntime, policy: str, cell_id: int, rate:
         link.send(live.K_UP, i % 3, name, 256 + i)
     link.send(live.K_TOMB, 0, critical, 0)
     await flush_agents(link)
+    print(json.dumps({"event": "semantic_priority_wait_begin", "cell": cell_id}), flush=True)
     invalidated = await wait_for(link, lambda: critical not in dispatcher.index[0], timeout_s=60.0)
+    print(json.dumps({"event": "semantic_priority_wait_end", "cell": cell_id, "received": link.received, "invalidated": invalidated}), flush=True)
     stats = delivered_stats(link)
     return {
         **stats_summary(stats, dispatcher, critical),
@@ -173,7 +177,9 @@ async def dedup_case(link: live.LinkRuntime, policy: str, overlap_percent: int, 
         for owner in owners:
             link.send(live.K_UP, owner, name, 1024 + index)
     await flush_agents(link)
+    print(json.dumps({"event": "semantic_drain_begin", "mechanism": "dedup", "cell": cell_id}), flush=True)
     await link.drain(timeout_s=60.0)
+    print(json.dumps({"event": "semantic_drain_end", "mechanism": "dedup", "cell": cell_id, "received": link.received}), flush=True)
     stats = delivered_stats(link)
     unique_visible = sum(int(any(name in owner for owner in dispatcher.index)) for name in names)
     forwarded = stats.get("relay_forwarded", 0)
@@ -213,11 +219,17 @@ async def run(args: argparse.Namespace) -> list[dict]:
         link = live.LinkRuntime()
         await link.start()
         try:
+            print(json.dumps({"event": "semantic_wait_initial_downstream"}), flush=True)
             if not await wait_for(link, lambda: link.down_writer is not None, timeout_s=15.0):
                 raise RuntimeError("relay did not establish initial downstream connection")
-            return await case(link)
+            print(json.dumps({"event": "semantic_case_begin"}), flush=True)
+            row = await case(link)
+            print(json.dumps({"event": "semantic_case_end"}), flush=True)
+            return row
         finally:
+            print(json.dumps({"event": "semantic_close_begin"}), flush=True)
             await close_link(link)
+            print(json.dumps({"event": "semantic_close_end"}), flush=True)
             await asyncio.sleep(0.25)
 
     for rep in range(args.repetitions):
