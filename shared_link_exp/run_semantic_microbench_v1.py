@@ -66,8 +66,8 @@ async def close_link(link: live.LinkRuntime) -> None:
         writer.close()
     for writer in link.agent_writers:
         try:
-            await writer.wait_closed()
-        except (ConnectionError, asyncio.CancelledError):
+            await asyncio.wait_for(writer.wait_closed(), timeout=1.0)
+        except (ConnectionError, asyncio.CancelledError, asyncio.TimeoutError):
             pass
     link._server.close()
     await link._server.wait_closed()
