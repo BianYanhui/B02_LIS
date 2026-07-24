@@ -123,7 +123,14 @@ async def merge_case(link: live.LinkRuntime, policy: str, cell_id: int, rate: in
         link.send(live.K_UP, 0, name, 256 * (step + 1))
     await flush_agents(link)
     print(json.dumps({"event": "semantic_drain_begin", "mechanism": "merge", "cell": cell_id}), flush=True)
-    await require_deliveries(link, 10 if policy == "exact_fifo" else 1, f"merge/{policy}")
+    # Exact FIFO must deliver every extension.  Under merge, the first frame
+    # may have crossed the non-preemptive TCP release boundary before the
+    # rest of the burst arrives.  The semantic invariant is therefore that
+    # the *latest* coverage becomes visible, not exactly one received frame.
+    if policy == "exact_fifo":
+        await require_deliveries(link, 10, f"merge/{policy}")
+    elif not await wait_for(link, lambda: dispatcher.index[0].get(name) == 2560, timeout_s=120.0):
+        raise RuntimeError(f"merge/{policy}: final coverage did not arrive")
     print(json.dumps({"event": "semantic_drain_end", "mechanism": "merge", "cell": cell_id, "received": link.received}), flush=True)
     stats = delivered_stats(link)
     final = stats_summary(stats, dispatcher, name)
