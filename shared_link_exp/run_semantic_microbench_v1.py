@@ -42,7 +42,7 @@ def percentile(values: list[float], p: float) -> float | None:
 
 
 def set_rate(bit_per_s: int) -> None:
-    subprocess.run(["bash", str(CELL_RATE), str(bit_per_s)], check=True, text=True)
+    subprocess.run(["bash", str(CELL_RATE), "--sig-bit", str(bit_per_s)], check=True, text=True)
 
 
 async def flush_agents(link: live.LinkRuntime) -> None:
