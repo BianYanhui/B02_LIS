@@ -344,6 +344,32 @@ def tc_snapshot(tag: str, out_dir: Path) -> dict:
     return parse_tc(text)
 
 
+def gateway_update_events(cell_ids: set[int]) -> list[dict]:
+    """Read structured update events emitted by this isolated gateway.
+
+    Cell IDs are tag/seed-derived, so filtering avoids mixing earlier smoke or
+    calibration logs with a frozen formal run.  A later analysis pass joins
+    these enqueue/suppress/forward events with dispatcher-arrival events on
+    ``(relay_cell_id, update_id)``.
+    """
+    try:
+        output = subprocess.check_output(["docker", "logs", "b02-gateway4t4"], text=True, stderr=subprocess.STDOUT)
+    except Exception as exc:
+        raise RuntimeError(f"cannot collect b02-gateway4t4 update telemetry: {exc!r}") from exc
+    events: list[dict] = []
+    for line in output.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("event") == "update" and int(event.get("cell", -1)) in cell_ids:
+            events.append(event)
+    return events
+
+
 class LinkRuntime:
     """Run-wide networking state: dispatcher endpoint server, agent conns,
     per-cell views.  Acts as (a) the dispatcher endpoint: a TCP server on the
@@ -888,16 +914,22 @@ async def run(args: argparse.Namespace) -> dict:
     cells: list[dict] = []
     raw: list[dict] = []
     updates: list[dict] = []
-    cell_uid = 0
+    # A run-specific relay-cell namespace prevents docker-log telemetry from
+    # colliding with a previous smoke/calibration run.
+    cell_uid = stable_int("formal4t4-relay-cell", args.tag, args.seed, args.workload) % 50000
+    relay_cell_ids: set[int] = set()
     order_by_rep: dict[int, list[str]] = {}
 
     async def do_cell(rep: int, policy: str, rho: float | None, bg: bool, trace: list[TraceRequest], trace_hash: str, order_index: int, order_seq: str, suffix: str = "") -> dict:
         nonlocal cell_uid
         cell_uid += 1
+        relay_cell_id = cell_uid % 60000
+        if policy != IDEAL_POLICY:
+            relay_cell_ids.add(relay_cell_id)
         cell_id = IDEAL_POLICY if policy == IDEAL_POLICY else f"{policy}@rho{rho}" + ("+bg" if bg else "") + suffix
         cache_salt = f"formal4t4:{args.workload}:{args.tag}:{cell_id}:rep{rep}"
         args.current_rep = rep
-        metrics, records, cell_updates = await run_cell(trace, policy, rho, bg, f"rep{rep}_{cell_id}_{args.tag}", cache_salt, link, cell_uid, rate_state, args)
+        metrics, records, cell_updates = await run_cell(trace, policy, rho, bg, f"rep{rep}_{cell_id}_{args.tag}", cache_salt, link, relay_cell_id, rate_state, args)
         if policy == IDEAL_POLICY and metrics["offered_wire_bit_per_s"] > 0:
             rate_state["offered_bit_per_s"] = metrics["offered_wire_bit_per_s"]
         row = {
@@ -907,7 +939,7 @@ async def run(args: argparse.Namespace) -> dict:
             "code_commit": git_commit(),
             "model": MODEL_ID,
             "hardware": f"{len(URLS)}x Tesla T4; Qwen2.5-1.5B-Instruct; one vLLM instance/GPU on host; docker gateway+tc state channel",
-            "cell_id": cell_id, "policy": policy, "workload": args.workload,
+            "cell_id": cell_id, "relay_cell_id": relay_cell_id, "policy": policy, "workload": args.workload,
             "policy_definition": "Immediate dispatcher visibility; no signaling cost; upper bound." if policy == IDEAL_POLICY else POLICY_DEFS[policy]["definition"],
             "wire_frame_bytes": FRAME, "wire_bytes_per_msg_assumed": WIRE_BYTES_PER_MSG,
             "rep": rep, "repetitions": args.repetitions, "seed": args.seed,
@@ -1000,7 +1032,8 @@ async def run(args: argparse.Namespace) -> dict:
             for order_index, (policy, rho, bg) in enumerate(order):
                 await do_cell(rep, policy, rho, bg, trace, trace_hash, order_index, ",".join(order_by_rep[rep]))
 
-    return {"cells": cells, "raw": raw, "updates": updates, "order_by_rep": order_by_rep}
+    return {"cells": cells, "raw": raw, "updates": updates,
+            "gateway_events": gateway_update_events(relay_cell_ids), "order_by_rep": order_by_rep}
 
 
 def smoke_report(cells: list[dict], checks: list[dict]) -> list[dict]:
@@ -1092,7 +1125,7 @@ def main() -> None:
         raise ValueError(f"frozen manifest does not exist: {args.frozen_manifest}")
     started = time.time()
     result = asyncio.run(run(args))
-    cells, raw, updates = result["cells"], result["raw"], result["updates"]
+    cells, raw, updates, gateway_events = result["cells"], result["raw"], result["updates"], result["gateway_events"]
     if any(float(row["request_error_rate"]) > 0 for row in cells):
         raise RuntimeError("live request error observed; do not use this run")
     checks = validate_records(raw, args.output_tokens)
@@ -1112,6 +1145,7 @@ def main() -> None:
     raw_dir, summary_dir = root / "raw" / args.stage, root / "summary"
     write_csv(raw_dir / f"requests_{args.tag}.csv", raw)
     write_csv(raw_dir / f"updates_{args.tag}.csv", updates)
+    write_csv(raw_dir / f"gateway_events_{args.tag}.csv", gateway_events)
     write_csv(summary_dir / f"cells_{args.tag}.csv", cells)
     write_csv(summary_dir / f"pairs_{args.tag}.csv", paired_rows(cells))
     write_csv(summary_dir / f"sanity_checks_{args.tag}.csv", checks)
@@ -1120,6 +1154,7 @@ def main() -> None:
         "duration_s": time.time() - started, "arguments": vars(args),
         "cell_order_by_rep": {str(rep): order for rep, order in result["order_by_rep"].items()},
         "cells": len(cells), "raw_requests": len(raw), "update_events": len(updates),
+        "gateway_update_events": len(gateway_events),
         "frozen_manifest": args.frozen_manifest,
         "frozen_manifest_sha256": sha256_file(Path(args.frozen_manifest)) if args.frozen_manifest else "",
     }
