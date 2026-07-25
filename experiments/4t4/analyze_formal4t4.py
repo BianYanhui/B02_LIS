@@ -273,6 +273,28 @@ def correctness_rows(churn: list[dict[str, str]], baseline: list[dict[str, str]]
     return out
 
 
+def native_validation_rows(native_dir: Path) -> list[dict[str, Any]]:
+    """Import the owner-runtime microbench without conflating it with TCP data."""
+    paths = sorted(native_dir.glob("gpu*/vllm_native_validation_microbench.csv"))
+    if len(paths) != 4:
+        raise RuntimeError(f"expected native validation evidence from four GPUs in {native_dir}, found {len(paths)}")
+    out: list[dict[str, Any]] = []
+    for path in paths:
+        gpu = path.parent.name
+        checks = path.parent / "vllm_native_validation_sanity_checks.csv"
+        if not checks.is_file() or any(row.get("status") != "PASS" for row in read_csv(checks)):
+            raise RuntimeError(f"native validation checks failed or missing: {path.parent}")
+        for row in read_csv(path):
+            out.append({"stage": "native_owner_validation", "policy": gpu, "scenario": row.get("scenario", ""),
+                        "operations": integer(row, "operations"), "validation_success_count": integer(row, "validation_success_count"),
+                        "fallback_count": integer(row, "fallback_count"), "unsafe_reuse_count": integer(row, "unsafe_reuse_count"),
+                        "release_failures": integer(row, "release_failures"),
+                        "blocked_evictions": integer(row, "blocked_evictions"),
+                        "eviction_attempts": integer(row, "eviction_attempts"),
+                        "validate_p95_us": number(row, "validate_p95_us"), "status": row.get("status", "")})
+    return out
+
+
 def select_aggregate(rows: list[dict[str, Any]], workload: str, policy: str, rho: float) -> dict[str, Any] | None:
     for row in rows:
         if row["workload"] == workload and row["policy"] == policy and row["rho"] == f"{rho:.1f}":
@@ -481,7 +503,7 @@ def summarize_pair(pairs: list[dict[str, Any]], workload: str, baseline: str, me
 
 
 def report_text(aggregates: list[dict[str, Any]], pairs: list[dict[str, Any]], buckets: list[dict[str, Any]],
-                recovery: list[dict[str, Any]], churn: list[dict[str, str]], selection_path: Path) -> str:
+                recovery: list[dict[str, Any]], churn: list[dict[str, str]], native: list[dict[str, Any]], selection_path: Path) -> str:
     lines = ["# Frozen 4x Tesla T4 supplementary experiment", "",
              "This report uses only VALID formal rows. Confidence intervals and paired effects use repetitions as the statistical unit; individual requests are not treated as independent runs.", ""]
     lines += ["## Required findings", ""]
@@ -503,7 +525,7 @@ def report_text(aggregates: list[dict[str, Any]], pairs: list[dict[str, Any]], b
               "6. **Original-compatible TTFT:** compare its corresponding paired effects above. A weak or wide-CI TTFT shift alongside a freshness shift should be reported as such, not promoted to a serving-latency claim.",
               "7. **Cached-token buckets:** `ttft_by_reuse_bucket.csv` and Fig. C report mean and P95 TTFT by actual vLLM cached-token coverage, including zero-cache requests.",
               "8. **Dynamic recovery:** `dynamic_recovery.csv` measures time from the restored low-capacity phase until both state age and view-missing return within 10% of the initial-low mean; censored runs are recorded as 45 s.",
-              "9. **High churn:** Fig. E and `correctness.csv` report stale positives, fallback rate, and tombstone delay. Native owner validation is reported separately from cache-telemetry fallback.",
+              f"9. **High churn:** Fig. E and `correctness.csv` report stale positives, fallback rate, and tombstone delay. The separate live owner runtime check contains {sum(integer(row, 'fallback_count') for row in native)} native fallback decisions across four endpoints, with {sum(integer(row, 'unsafe_reuse_count') for row in native)} unsafe reuses.",
               "10. **Safety:** `incorrect_kv_reuse_count` and `request_error_rate` must both remain zero in every VALID churn row; otherwise this report is invalid.",
               "11. **Mechanism attribution:** LatestOnly, AgeCov-Greedy, and StaticSemantic are intentionally narrow ablations. Their paired comparisons identify which aggregation, utility ranking, invalidation urgency/replica suppression, and adaptive admission components carry the observed effect.", ""]
     if selection_path.is_file():
@@ -530,6 +552,8 @@ def main() -> None:
     buckets = reuse_buckets(raw / "baseline")
     accounting = signaling_accounting(baseline)
     correctness = correctness_rows(churn, baseline)
+    native = native_validation_rows(raw / "native_validation")
+    correctness.extend(native)
     write_csv(summary / "cell_aggregates.csv", aggregates)
     write_csv(summary / "paired_results.csv", pairs)
     write_csv(summary / "paired_result_aggregates.csv", pair_summary)
@@ -542,7 +566,7 @@ def main() -> None:
     recovery = plot_dynamic(raw / "dynamic", figures / "fig_dynamic_recovery.pdf")
     write_csv(summary / "dynamic_recovery.csv", recovery)
     plot_churn(churn, figures / "fig_churn_correctness.pdf")
-    text = report_text(aggregates, pairs, buckets, recovery, churn, root / "calibration" / "ratefifo_selection.json")
+    text = report_text(aggregates, pairs, buckets, recovery, churn, native, root / "calibration" / "ratefifo_selection.json")
     report.mkdir(parents=True, exist_ok=True)
     (report / "final_report.md").write_text(text + "\n")
     print(json.dumps({"baseline_rows": len(baseline), "churn_rows": len(churn), "dynamic_rows": len(dynamic),
