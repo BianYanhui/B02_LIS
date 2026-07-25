@@ -1,41 +1,41 @@
 #!/usr/bin/env bash
-# Run one low -> high -> low shared-link experiment using GPUs 0--2 only.
-# The live harness owns request generation and state signaling.  This wrapper
-# changes only the real tc HTB signaling service rate after the link cell has
-# begun, and writes phase timestamps for post-hoc per-phase AoI/TTFT analysis.
+# Execute one frozen low -> high -> low capacity trace for a 4T4 policy.
+# Usage: run_dynamic_4t4.sh <RateFIFO|LatestOnly|StaticSemantic|Adaptive> <tag> <seed> <manifest>
 set -euo pipefail
 
 ROOT=/home/byh/B02
 PY="$ROOT/poc/.venv/bin/python"
-HARNESS="$ROOT/shared_link_exp/run_live_shared_link_v3.py"
-RATE="$ROOT/shared_link_exp/net/cell_rate.sh"
-OUT="$ROOT/shared_link_exp/live_v3/results"
+HARNESS="$ROOT/experiments/4t4/run_formal4t4.py"
+RATE="$ROOT/experiments/4t4/net/cell_rate_4t4.sh"
+OUT="$ROOT/analysis/formal4t4"
 
-POLICY=${1:?usage: run_dynamic_step_v1.sh <agg_static|agg_full> <tag> <seed>}
-TAG=${2:?usage: run_dynamic_step_v1.sh <agg_static|agg_full> <tag> <seed>}
-SEED=${3:?usage: run_dynamic_step_v1.sh <agg_static|agg_full> <tag> <seed>}
+POLICY=${1:?usage: run_dynamic_4t4.sh <RateFIFO|LatestOnly|StaticSemantic|Adaptive> <tag> <seed> <manifest>}
+TAG=${2:?missing tag}
+SEED=${3:?missing seed}
+MANIFEST=${4:?missing frozen manifest}
 
 case "$POLICY" in
-  agg_static|agg_full) ;;
-  *) echo "policy must be agg_static or agg_full" >&2; exit 2;;
+  RateFIFO|LatestOnly|StaticSemantic|Adaptive) ;;
+  *) echo "unsupported dynamic policy: $POLICY" >&2; exit 2;;
 esac
+[[ -f "$MANIFEST" ]] || { echo "manifest missing: $MANIFEST" >&2; exit 2; }
 
-LOG="$OUT/dynamic_${TAG}.log"
-EVENTS="$OUT/dynamic_events_${TAG}.jsonl"
+LOG="$OUT/raw/dynamic/${TAG}.log"
+EVENTS="$OUT/raw/dynamic/phases_${TAG}.jsonl"
+mkdir -p "$OUT/raw/dynamic"
 if [[ -e "$LOG" || -e "$EVENTS" ]]; then
-  echo "refusing to overwrite existing dynamic evidence for tag=$TAG" >&2
+  echo "refusing to overwrite dynamic evidence for tag=$TAG" >&2
   exit 3
 fi
 
-# Keep enough measured requests in every rate interval.  The previous
-# 24-request warm-up plus a 30 s first dwell could consume the entire
-# initial low-rate period, yielding no dispatch-time low-phase samples.
+# 192 requests leave samples in all three 45-second phases at concurrency 4.
 "$PY" "$HARNESS" \
-  --tag "$TAG" --seed "$SEED" --instances 3 --repetitions 1 \
-  --n-requests 96 --warmup 12 --pool-size 32 --alpha 1.2 --steps 3 \
-  --concurrency 3 --output-tokens 4 --kv-cache-tokens 50000 \
-  --rhos 0.5 --policies "$POLICY" --global-topk 16 \
-  --relay-max-inflight 2 --cooldown-s 0.5 >"$LOG" 2>&1 &
+  --stage dynamic --tag "$TAG" --seed "$SEED" --frozen-manifest "$MANIFEST" \
+  --instances 4 --repetitions 1 --workload reuse_intensive \
+  --n-requests 192 --warmup 24 --pool-size 64 --overlap 0.25 --alpha 1.2 --steps 3 \
+  --concurrency 4 --output-tokens 4 --kv-cache-tokens 104544 \
+  --rhos 0.5 --policies "$POLICY" --global-topk 16 --relay-max-inflight 4 --rate-burst-frames 4 \
+  --cooldown-s 0.5 >"$LOG" 2>&1 &
 HARNESS_PID=$!
 
 abort() {
@@ -51,12 +51,9 @@ while ! grep -q "cell rate set: link=" "$LOG"; do
   fi
   sleep 0.25
 done
-
-# The harness begins the link cell at rho=0.5.  Preserve that measured low
-# rate, then apply rho=1.2 for the middle phase (low_rate * 0.5 / 1.2).
 LOW_RATE=$(sed -nE 's/.*cell rate set: link=([0-9]+)bit.*/\1/p' "$LOG" | tail -1)
 [[ -n "$LOW_RATE" ]] || { echo "could not parse initial low rate" >&2; abort; exit 4; }
-HIGH_RATE=$((LOW_RATE * 5 / 12))
+HIGH_RATE=$((LOW_RATE * 5 / 12))  # rho 0.5 -> rho 1.2
 [[ "$HIGH_RATE" -ge 64 ]] || HIGH_RATE=64
 
 stamp() {

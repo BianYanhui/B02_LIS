@@ -641,7 +641,10 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
         sig_bit = max(64, int(rate_state["offered_bit_per_s"] / rho))
         print(sh(["bash", str(NET_DIR / "cell_rate_4t4.sh"), "--sig-bit", str(sig_bit)]).strip(), flush=True)
         if bg:
-            subprocess.call(["docker", "exec", "-d", "b02-gateway4t4", "iperf3", "-c", "b02-bgserver4t4", "-p", "5211", "-t", "7200"])
+            background_cmd = ["docker", "exec", "-d", "b02-gateway4t4", "iperf3", "-c", "b02-bgserver4t4", "-p", "5211", "-t", "7200"]
+            if args.background_rate:
+                background_cmd += ["-b", args.background_rate]
+            subprocess.call(background_cmd)
             await asyncio.sleep(1.0)
         tc_before = tc_snapshot(f"{cell_tag}_before", Path(args.out_dir))
         await link.configure_cell(dispatcher, cell_uid % 60000, digest_map, policy, args.global_topk,
@@ -779,6 +782,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
         tomb = link.delays["tombstone"]
         net_metrics = {
             "rho": rho, "sig_bit_per_s": sig_bit, "background_traffic": bg,
+            "background_rate": args.background_rate if bg else "none",
             "relay_max_inflight": args.relay_max_inflight,
             "source_local_topk": False,
             "gateway_global_topk": args.global_topk if POLICY_DEFS[policy]["global_topk"] else 0,
@@ -1090,6 +1094,8 @@ def main() -> None:
                         help="RateFIFO token bucket burst; calibration selects the frozen formal value")
     parser.add_argument("--background", action="store_true",
                         help="run every non-ideal cell with saturating iperf3 traffic")
+    parser.add_argument("--background-rate", default="",
+                        help="optional iperf3 TCP pacing rate such as 1000 or 10K; empty means saturating background")
     parser.add_argument("--paired-background", action="store_true",
                         help="for every policy/rho, run matched background OFF/ON cells on the same trace")
     parser.add_argument("--initial-offered-bit-per-s", type=float, default=1248.0,
