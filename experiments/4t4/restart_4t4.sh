@@ -3,10 +3,16 @@
 # It never terminates an unrelated B02 server: only PIDs recorded in this
 # experiment's own server-log directory may be replaced.  Usage:
 #   restart_4t4.sh [gpu_memory_utilization] [max_model_len]
+#
+# The installed vLLM carries the B02 owner-validation developer endpoints.
+# Enabling them exposes test-only HTTP routes but does not alter generation or
+# scheduler settings; this lets the separate high-churn safety experiment use
+# a real owner-side ValidateAndPin operation.
 set -euo pipefail
 
 MEM_UTIL="${1:-0.40}"
 MAX_MODEL_LEN="${2:-6144}"
+DEV_MODE="${VLLM_SERVER_DEV_MODE:-1}"
 
 ROOT=/home/byh/B02
 VLLM="$ROOT/poc/.venv/bin/vllm"
@@ -42,7 +48,7 @@ done
 
 for GPU in 0 1 2 3; do
   PORT=$((8000 + GPU))
-  CUDA_VISIBLE_DEVICES="$GPU" nohup "$VLLM" serve "$MODEL" \
+  CUDA_VISIBLE_DEVICES="$GPU" VLLM_SERVER_DEV_MODE="$DEV_MODE" nohup "$VLLM" serve "$MODEL" \
     --host 127.0.0.1 --port "$PORT" \
     --gpu-memory-utilization "$MEM_UTIL" \
     --max-model-len "$MAX_MODEL_LEN" --max-num-seqs 8 \
@@ -63,7 +69,15 @@ for ATTEMPT in $(seq 1 180); do
     sleep 2
     KV=$(sed -nE 's/.*GPU KV cache size: ([0-9,]+) tokens.*/\1/p' "$LOG_DIR/vllm_0.log" | tail -1 | tr -d ',')
     [ -n "$KV" ] || { echo "could not parse GPU KV cache size" >&2; exit 1; }
-    echo "formal4t4_vllm_ready mem_util=${MEM_UTIL} max_model_len=${MAX_MODEL_LEN}"
+    if [[ "$DEV_MODE" == "1" ]]; then
+      for PORT in 8000 8001 8002 8003; do
+        curl -fsS "http://127.0.0.1:${PORT}/b02/native_pin/status" >/dev/null || {
+          echo "native validation endpoint unavailable on port ${PORT}" >&2
+          exit 1
+        }
+      done
+    fi
+    echo "formal4t4_vllm_ready mem_util=${MEM_UTIL} max_model_len=${MAX_MODEL_LEN} native_validation=${DEV_MODE}"
     echo "KV_CACHE_TOKENS=${KV}"
     exit 0
   fi
