@@ -16,8 +16,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from transformers import AutoTokenizer
 
-MODEL = "Qwen2.5-1.5B-Instruct"
 MODEL_PATH = "/home/byh/.cache/modelscope/qwen/Qwen2.5-1.5B-Instruct"
+# vLLM exposes a local-path model ID when launched from this cached checkpoint.
+# Use that exact API ID; report text still names the Qwen model explicitly.
+MODEL = MODEL_PATH
 SUFFIX_A = "\nTask A: Reply only READY."
 SUFFIX_B = "\nTask B: Summarize the context in one sentence."
 
