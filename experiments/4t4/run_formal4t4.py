@@ -370,6 +370,37 @@ def gateway_update_events(cell_ids: set[int]) -> list[dict]:
     return events
 
 
+def enforce_frozen_manifest(args: argparse.Namespace) -> None:
+    """Reject any baseline invocation that diverges from its frozen record."""
+    if args.stage != "baseline":
+        return
+    if not args.frozen_manifest:
+        raise ValueError("baseline stage requires --frozen-manifest")
+    manifest = json.loads(Path(args.frozen_manifest).read_text())
+    if manifest.get("model") != MODEL_ID or manifest.get("hardware", {}).get("instances") != 4:
+        raise ValueError("manifest model or four-instance mapping mismatch")
+    workload = manifest.get("workloads", {}).get(args.workload)
+    if not workload:
+        raise ValueError(f"workload not present in frozen manifest: {args.workload}")
+    expected = {
+        "n_requests": workload["requests"], "warmup": workload["warmup"],
+        "concurrency": workload["concurrency"], "pool_size": workload["pool_size"],
+        "alpha": workload["alpha"], "overlap": workload["replica_overlap"],
+        "repetitions": manifest["formal"]["repetitions"],
+        "rate_burst_frames": manifest["network"]["ratefifo_burst_frames"],
+    }
+    for name, value in expected.items():
+        if getattr(args, name) != value:
+            raise ValueError(f"baseline parameter differs from frozen manifest: {name}={getattr(args, name)} expected={value}")
+    manifest_rhos = [float(value) for value in manifest["network"]["rhos"]]
+    supplied_rhos = [float(value) for value in args.rhos.split(",")]
+    if supplied_rhos != manifest_rhos:
+        raise ValueError(f"baseline rho grid differs from frozen manifest: {supplied_rhos} != {manifest_rhos}")
+    supplied_policies = [value.strip() for value in args.policies.split(",") if value.strip()]
+    if supplied_policies != [policy for policy in POLICY_DEFS]:
+        raise ValueError("baseline policy order/content differs from frozen manifest")
+
+
 class LinkRuntime:
     """Run-wide networking state: dispatcher endpoint server, agent conns,
     per-cell views.  Acts as (a) the dispatcher endpoint: a TCP server on the
@@ -1129,6 +1160,7 @@ def main() -> None:
         raise ValueError("rate-burst-frames must be positive")
     if args.frozen_manifest and not Path(args.frozen_manifest).is_file():
         raise ValueError(f"frozen manifest does not exist: {args.frozen_manifest}")
+    enforce_frozen_manifest(args)
     started = time.time()
     result = asyncio.run(run(args))
     cells, raw, updates, gateway_events = result["cells"], result["raw"], result["updates"], result["gateway_events"]
