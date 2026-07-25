@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # High-churn stale-hint experiment. The 75% physical replica preseed plus a
-# 64-prefix reuse-intensive pool exceeds the measured per-GPU cache working
-# set; the existing LRU shadow therefore emits eviction tombstones into the
-# same TCP/tc path while physical cached-token telemetry detects fallbacks.
+# 64-prefix reuse-intensive pool creates cache pressure.  Every third
+# dispatch wave additionally executes a real vLLM prefix-cache reset on one
+# rotating owner and advances its native restart epoch; reset tombstones use
+# the same TCP/tc path while physical cached-token telemetry detects fallbacks.
 set -euo pipefail
 
 ROOT=/home/byh/B02
@@ -19,5 +20,6 @@ for POLICY in FullSync RateFIFO LatestOnly Adaptive; do
     --frozen-manifest "$MANIFEST" --instances 4 --repetitions 5 --workload reuse_intensive \
     --n-requests 120 --warmup 24 --pool-size 64 --overlap 0.75 --alpha 1.4 --steps 3 \
     --concurrency 4 --output-tokens 4 --kv-cache-tokens "$KV" --rhos 1.2 --policies "$POLICY" \
-    --global-topk 16 --relay-max-inflight 4 --rate-burst-frames "$BURST" --cooldown-s 1.0
+    --global-topk 16 --relay-max-inflight 4 --rate-burst-frames "$BURST" --cooldown-s 1.0 \
+    --churn-reset-every-waves 3 --churn-advance-epoch
 done

@@ -309,6 +309,13 @@ class ShadowCache:
             evicted.append(victim)
         return evicted
 
+    def reset(self) -> list[str]:
+        """Mirror a test-only physical owner cache reset."""
+        evicted = list(self.entries)
+        self.entries.clear()
+        self.total = 0
+        return evicted
+
 
 def sh(args: list[str]) -> str:
     return subprocess.check_output(args, text=True)
@@ -655,6 +662,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
     source_upserts_sent = 0
     source_tombstones_sent = 0
     is_ideal = policy == IDEAL_POLICY
+    forced_owner_resets = 0
     state_epoch_unix = time.time()
     overlap_seed_count = int(round(args.pool_size * args.overlap))
     phase0_coverage = {request.lineage_id: request.coverage_tokens for request in trace if request.phase == 0}
@@ -720,7 +728,45 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
                 raise RuntimeError("overlap preseed vLLM request failed")
             for target in range(len(URLS)):
                 publish_state(target, seed_request.digest, seed_request.coverage_tokens)
+
+        async def force_owner_churn(wave_index: int) -> None:
+            """Inject a physical cache reset and state invalidations in churn only.
+
+            The reset is issued to vLLM's real developer endpoint.  Its
+            tombstones subsequently use the same LinkRuntime TCP/gateway/tc
+            path as ordinary state events, so a dispatcher can temporarily
+            retain a stale positive while the owner has already dropped KV.
+            ``advance_epoch`` represents a restart epoch without taking an
+            endpoint down mid-request; the separate native matrix verifies
+            the corresponding owner-side validation path on all endpoints.
+            """
+            nonlocal source_tombstones_sent, forced_owner_resets
+            interval = args.churn_reset_every_waves
+            if interval <= 0 or wave_index == 0 or wave_index % interval:
+                return
+            target = (wave_index // interval) % len(URLS)
+            async with session.post(URLS[target] + "/reset_prefix_cache") as response:
+                if response.status != 200:
+                    raise RuntimeError(f"owner cache reset failed on instance {target}: HTTP {response.status}")
+                await response.read()
+            if args.churn_advance_epoch:
+                async with session.post(URLS[target] + "/b02/native_pin/advance_epoch") as response:
+                    if response.status != 200:
+                        raise RuntimeError(f"owner epoch advance failed on instance {target}: HTTP {response.status}")
+                    await response.read()
+            stale_digests = shadows[target].reset()
+            for digest in stale_digests:
+                source_truth[target].pop(digest, None)
+                if is_ideal:
+                    dispatcher.apply_tombstone(target, digest)
+                elif digest in advertised[target]:
+                    link.send(K_TOMB, target, digest, 0)
+                    source_tombstones_sent += 1
+                    advertised[target].pop(digest, None)
+            forced_owner_resets += 1
+
         for offset in range(0, len(trace), args.concurrency):
+            await force_owner_churn(offset // args.concurrency)
             if not tc_mid_done and offset >= mid_at:
                 tc_mid = tc_snapshot(f"{cell_tag}_mid", Path(args.out_dir))
                 tc_mid_done = True
@@ -797,6 +843,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
                     "validation_result": validation_result,
                     "fallback": stale_fallback,
                     "stale_fallback": stale_fallback,
+                    "forced_owner_resets_before_request": forced_owner_resets,
                     "coverage_shortfall_tokens": max(0.0, float(coverage) - physical_cached) if response["ok"] else None,
                     "prompt_sha256": hashlib.sha256(prompt_for(request).encode()).hexdigest(),
                     **response,
@@ -819,6 +866,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
             "gateway_global_topk": args.global_topk if POLICY_DEFS[policy]["global_topk"] else 0,
             "source_upserts_sent": source_upserts_sent,
             "source_tombstones_sent": source_tombstones_sent,
+            "forced_owner_resets": forced_owner_resets,
             "source_suppressed_upserts": max(0, upserts_generated - source_upserts_sent),
             "net_msgs_sent": link.sent, "net_msgs_delivered": link.received,
             "net_wire_bytes_sent": link.sent * WIRE_BYTES_PER_MSG,
@@ -1129,6 +1177,10 @@ def main() -> None:
                         help="optional iperf3 TCP pacing rate such as 1000 or 10K; empty means saturating background")
     parser.add_argument("--paired-background", action="store_true",
                         help="for every policy/rho, run matched background OFF/ON cells on the same trace")
+    parser.add_argument("--churn-reset-every-waves", type=int, default=0,
+                        help="stage=churn only: reset one owner prefix cache every N dispatch waves")
+    parser.add_argument("--churn-advance-epoch", action="store_true",
+                        help="stage=churn only: pair reset injection with the native owner restart-epoch transition")
     parser.add_argument("--initial-offered-bit-per-s", type=float, default=1248.0,
                         help="used until the first ideal cell measures the real offered rate")
     parser.add_argument("--j", type=int, default=4)
@@ -1158,6 +1210,10 @@ def main() -> None:
         raise ValueError("relay_max_inflight must be nonnegative")
     if args.rate_burst_frames < 1:
         raise ValueError("rate-burst-frames must be positive")
+    if args.churn_reset_every_waves < 0:
+        raise ValueError("churn-reset-every-waves must be nonnegative")
+    if (args.churn_reset_every_waves or args.churn_advance_epoch) and args.stage != "churn":
+        raise ValueError("churn reset/epoch injection is permitted only for stage=churn")
     if args.frozen_manifest and not Path(args.frozen_manifest).is_file():
         raise ValueError(f"frozen manifest does not exist: {args.frozen_manifest}")
     enforce_frozen_manifest(args)
