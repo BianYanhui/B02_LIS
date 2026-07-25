@@ -66,6 +66,8 @@ def number(row: dict[str, Any], key: str, default: float = 0.0) -> float:
     value = row.get(key, default)
     if value in (None, "", "None"):
         return default
+    if isinstance(value, str) and value.lower() in {"true", "false"}:
+        return 1.0 if value.lower() == "true" else 0.0
     return float(value)
 
 
