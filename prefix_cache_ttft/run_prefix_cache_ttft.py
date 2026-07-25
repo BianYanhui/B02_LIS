@@ -168,9 +168,9 @@ async def main_async(args):
         for i in range(2):
             p,_=make_prefix(tok,128,f"warm-{i}"); await request(s,args.url,p+SUFFIX_A,f"warm-{i}","warmup")
         hp,ha=make_prefix(tok,512,"sanity-hit"); mp,ma=make_prefix(tok,512,"sanity-miss")
-        miss=await request(s,args.url,mp+SUFFIX_B,"sanity-miss","sanity miss")
-        await request(s,args.url,hp+SUFFIX_A,"sanity-hit","sanity populate")
-        hit=await request(s,args.url,hp+SUFFIX_B,"sanity-hit","sanity hit")
+        miss=await request(s,args.url,mp+SUFFIX_B,f"{args.run_id}/sanity-miss","sanity miss")
+        await request(s,args.url,hp+SUFFIX_A,f"{args.run_id}/sanity-hit","sanity populate")
+        hit=await request(s,args.url,hp+SUFFIX_B,f"{args.run_id}/sanity-hit","sanity hit")
         sanity={"prefix_tokens_requested":512,"hit_prefix_tokens_actual":ha,"miss_prefix_tokens_actual":ma,"miss":miss,"hit":hit}
         (out/"sanity_check.json").write_text(json.dumps(sanity,indent=2)+"\n")
         print(f"Miss cached tokens = {miss['cached_tokens']}"); print(f"Hit cached tokens = {hit['cached_tokens']}")
@@ -182,21 +182,22 @@ async def main_async(args):
                 hp,ha=make_prefix(tok,length,f"hit-L{length}-R{rep}"); mp,ma=make_prefix(tok,length,f"miss-L{length}-R{rep}")
                 order="hit_then_miss" if rng.randrange(2) else "miss_then_hit"
                 async def hitrow():
-                    await request(s,args.url,hp+SUFFIX_A,f"hit/L{length}/R{rep}","populate")
-                    r=await request(s,args.url,hp+SUFFIX_B,f"hit/L{length}/R{rep}","hit")
+                    salt=f"{args.run_id}/hit/L{length}/R{rep}"
+                    await request(s,args.url,hp+SUFFIX_A,salt,"populate")
+                    r=await request(s,args.url,hp+SUFFIX_B,salt,"hit")
                     r.update(prefix_length_tokens=length,prefix_length_actual_tokens=ha,repetition=rep,condition="hit",order=order); return r
                 async def missrow():
-                    r=await request(s,args.url,mp+SUFFIX_B,f"miss/L{length}/R{rep}","miss")
+                    r=await request(s,args.url,mp+SUFFIX_B,f"{args.run_id}/miss/L{length}/R{rep}","miss")
                     r.update(prefix_length_tokens=length,prefix_length_actual_tokens=ma,repetition=rep,condition="miss",order=order); return r
                 rows.extend([await hitrow(),await missrow()] if order=="hit_then_miss" else [await missrow(),await hitrow()])
                 print(f"completed L={length} rep={rep} {order}",flush=True)
     fields=["prefix_length_tokens","prefix_length_actual_tokens","repetition","condition","order","ttft_ms","prompt_tokens","cached_tokens","generated_tokens","total_request_latency_ms","timestamp_utc","request_id","server_request_id"]
     write(out/"raw_results.csv",rows,fields); summary,paired=aggregate(rows); write(out/"summary.csv",summary); write(out/"paired_summary.csv",paired)
     figure(summary,paired,out/"fig_prefix_cache_ttft.pdf"); markdown(paired,out/"report.md",args)
-    (out/"run_manifest.json").write_text(json.dumps({"model":MODEL,"url":args.url,"prefix_lengths":args.prefix_lengths,"repetitions":args.repetitions,"seed":args.seed,"concurrency":1,"excluded_components":["dispatcher","gateway","tc","signaling","multi-instance scheduling"]},indent=2)+"\n")
+    (out/"run_manifest.json").write_text(json.dumps({"model":MODEL,"url":args.url,"prefix_lengths":args.prefix_lengths,"repetitions":args.repetitions,"seed":args.seed,"run_id":args.run_id,"concurrency":1,"excluded_components":["dispatcher","gateway","tc","signaling","multi-instance scheduling"]},indent=2)+"\n")
 
 
 if __name__=="__main__":
-    p=argparse.ArgumentParser(); p.add_argument("--url",default="http://127.0.0.1:8010"); p.add_argument("--model-path",default=MODEL_PATH); p.add_argument("--output",default="analysis/prefix_cache_ttft"); p.add_argument("--prefix-lengths",type=int,nargs="+",default=[512,1024,2048,4096,8192]); p.add_argument("--repetitions",type=int,default=15); p.add_argument("--seed",type=int,default=20260725); p.add_argument("--timeout",type=int,default=240); args=p.parse_args()
+    p=argparse.ArgumentParser(); p.add_argument("--url",default="http://127.0.0.1:8010"); p.add_argument("--model-path",default=MODEL_PATH); p.add_argument("--output",default="analysis/prefix_cache_ttft"); p.add_argument("--prefix-lengths",type=int,nargs="+",default=[512,1024,2048,4096,8192]); p.add_argument("--repetitions",type=int,default=15); p.add_argument("--seed",type=int,default=20260725); p.add_argument("--run-id",default=f"prefix-cache-{uuid.uuid4().hex}"); p.add_argument("--timeout",type=int,default=240); args=p.parse_args()
     if args.repetitions<10 or any(x<=0 or x%16 for x in args.prefix_lengths): raise ValueError("need >=10 repetitions and positive 16-token-multiple lengths")
     asyncio.run(main_async(args))
