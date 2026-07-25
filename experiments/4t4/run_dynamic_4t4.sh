@@ -29,11 +29,11 @@ if [[ -e "$LOG" || -e "$EVENTS" ]]; then
   exit 3
 fi
 
-# 192 requests leave samples in all three 45-second phases at concurrency 4.
+# Keep requests flowing through each of the three 45-second phases.
 "$PY" "$HARNESS" \
   --stage dynamic --tag "$TAG" --seed "$SEED" --frozen-manifest "$MANIFEST" \
   --instances 4 --repetitions 1 --workload reuse_intensive \
-  --n-requests 192 --warmup 24 --pool-size 64 --overlap 0.25 --alpha 1.2 --steps 3 \
+  --n-requests 320 --warmup 24 --pool-size 64 --overlap 0.25 --alpha 1.2 --steps 3 \
   --concurrency 4 --output-tokens 4 --kv-cache-tokens 104544 \
   --rhos 0.5 --policies "$POLICY" --global-topk 16 --relay-max-inflight 4 --rate-burst-frames "$BURST" \
   --cooldown-s 0.5 >"$LOG" 2>&1 &
@@ -70,6 +70,8 @@ stamp high "$HIGH_RATE"
 sleep 45
 bash "$RATE" --sig-bit "$LOW_RATE" >>"$LOG" 2>&1
 stamp low_recovery "$LOW_RATE"
+sleep 45
+stamp complete "$LOW_RATE"
 
 wait "$HARNESS_PID"
 trap - INT TERM
