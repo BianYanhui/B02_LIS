@@ -263,7 +263,7 @@ def correctness_rows(churn: list[dict[str, str]], baseline: list[dict[str, str]]
     out: list[dict[str, Any]] = []
     fields = ["source_view_false_positive_rate", "physical_false_positive_affinity_rate", "stale_fallback_rate",
               "fallback_count", "validation_attempt_count", "validation_failure_count", "incorrect_kv_reuse_count",
-              "request_error_rate", "tombstone_delay_p95_s"]
+              "request_error_rate", "tombstone_delay_p95_s", "forced_owner_resets"]
     for (stage, policy), items in sorted(grouped.items()):
         record: dict[str, Any] = {"stage": stage, "policy": policy, "n_runs": len(items)}
         for field in fields:
@@ -525,7 +525,7 @@ def report_text(aggregates: list[dict[str, Any]], pairs: list[dict[str, Any]], b
               "6. **Original-compatible TTFT:** compare its corresponding paired effects above. A weak or wide-CI TTFT shift alongside a freshness shift should be reported as such, not promoted to a serving-latency claim.",
               "7. **Cached-token buckets:** `ttft_by_reuse_bucket.csv` and Fig. C report mean and P95 TTFT by actual vLLM cached-token coverage, including zero-cache requests.",
               "8. **Dynamic recovery:** `dynamic_recovery.csv` measures time from the restored low-capacity phase until both state age and view-missing return within 10% of the initial-low mean; censored runs are recorded as 45 s.",
-              f"9. **High churn:** Fig. E and `correctness.csv` report stale positives, fallback rate, and tombstone delay. The separate live owner runtime check contains {sum(integer(row, 'fallback_count') for row in native)} native fallback decisions across four endpoints, with {sum(integer(row, 'unsafe_reuse_count') for row in native)} unsafe reuses.",
+              f"9. **High churn:** Fig. E and `correctness.csv` report stale positives, fallback rate, tombstone delay, and injected physical owner-cache resets. The separate live owner runtime check contains {sum(integer(row, 'fallback_count') for row in native)} native fallback decisions across four endpoints, with {sum(integer(row, 'unsafe_reuse_count') for row in native)} unsafe reuses.",
               "10. **Safety:** `incorrect_kv_reuse_count` and `request_error_rate` must both remain zero in every VALID churn row; otherwise this report is invalid.",
               "11. **Mechanism attribution:** LatestOnly, AgeCov-Greedy, and StaticSemantic are intentionally narrow ablations. Their paired comparisons identify which aggregation, utility ranking, invalidation urgency/replica suppression, and adaptive admission components carry the observed effect.", ""]
     if selection_path.is_file():
