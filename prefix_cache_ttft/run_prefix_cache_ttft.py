@@ -53,7 +53,7 @@ async def ready(url):
                 raise RuntimeError(f"vLLM unavailable: HTTP {r.status}")
 
 
-async def request(session, url, prompt, salt, label):
+async def _one_request(session, url, prompt, salt, label):
     request_id, usage, server_id = "pcache-" + uuid.uuid4().hex, {}, ""
     payload = {"model": MODEL, "messages": [{"role": "user", "content": prompt}],
                "max_tokens": 1, "min_tokens": 1, "ignore_eos": True, "temperature": 0.0,
@@ -85,6 +85,19 @@ async def request(session, url, prompt, salt, label):
             "ttft_ms": ((first or end) - begin) / 1e6, "total_request_latency_ms": (end - begin) / 1e6,
             "prompt_tokens": usage["prompt_tokens"], "cached_tokens": details.get("cached_tokens", 0),
             "generated_tokens": usage.get("completion_tokens", 0)}
+
+
+async def request(session, url, prompt, salt, label):
+    """Retry only transient client-side disconnects, as in the live harness."""
+    errors = []
+    for attempt in range(1, 4):
+        try:
+            return await _one_request(session, url, prompt, salt, label)
+        except (aiohttp.ClientError, asyncio.TimeoutError, ConnectionError) as exc:
+            errors.append(repr(exc))
+            if attempt < 3:
+                await asyncio.sleep(0.1 * attempt)
+    raise RuntimeError(f"{label}: transient request failures after 3 attempts: {errors}")
 
 
 def write(path, rows, fields=None):
