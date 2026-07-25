@@ -21,9 +21,10 @@ case "$LEVEL" in
   *) echo "background level must be none, medium, or high" >&2; exit 2;;
 esac
 [[ -f "$MANIFEST" ]] || { echo "manifest missing: $MANIFEST" >&2; exit 2; }
+BURST=$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["network"]["ratefifo_burst_frames"])' "$MANIFEST")
 
 exec "$PY" "$HARNESS" --out-dir "$OUT" --stage background --tag "$TAG" --seed "$SEED" \
   --frozen-manifest "$MANIFEST" --instances 4 --repetitions 5 --workload reuse_intensive \
   --n-requests 120 --warmup 24 --pool-size 64 --overlap 0.25 --alpha 1.2 --steps 3 \
   --concurrency 4 --output-tokens 4 --kv-cache-tokens 104544 --rhos 1.0 --policies "$POLICY" \
-  --global-topk 16 --relay-max-inflight 4 --rate-burst-frames 4 --cooldown-s 1.0 "${BG_ARGS[@]}"
+  --global-topk 16 --relay-max-inflight 4 --rate-burst-frames "$BURST" --cooldown-s 1.0 "${BG_ARGS[@]}"

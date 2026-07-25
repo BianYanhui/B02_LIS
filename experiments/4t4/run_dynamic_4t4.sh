@@ -19,6 +19,7 @@ case "$POLICY" in
   *) echo "unsupported dynamic policy: $POLICY" >&2; exit 2;;
 esac
 [[ -f "$MANIFEST" ]] || { echo "manifest missing: $MANIFEST" >&2; exit 2; }
+BURST=$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["network"]["ratefifo_burst_frames"])' "$MANIFEST")
 
 LOG="$OUT/raw/dynamic/${TAG}.log"
 EVENTS="$OUT/raw/dynamic/phases_${TAG}.jsonl"
@@ -34,7 +35,7 @@ fi
   --instances 4 --repetitions 1 --workload reuse_intensive \
   --n-requests 192 --warmup 24 --pool-size 64 --overlap 0.25 --alpha 1.2 --steps 3 \
   --concurrency 4 --output-tokens 4 --kv-cache-tokens 104544 \
-  --rhos 0.5 --policies "$POLICY" --global-topk 16 --relay-max-inflight 4 --rate-burst-frames 4 \
+  --rhos 0.5 --policies "$POLICY" --global-topk 16 --relay-max-inflight 4 --rate-burst-frames "$BURST" \
   --cooldown-s 0.5 >"$LOG" 2>&1 &
 HARNESS_PID=$!
 
