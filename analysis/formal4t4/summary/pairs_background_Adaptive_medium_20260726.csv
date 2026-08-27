@@ -1,0 +1,6 @@
+rep,cell_id,policy,workload,rho,saved_prefill_retention_vs_ideal,delta_ttft_mean_ms_vs_ideal,delta_ttft_p95_ms_vs_ideal,delta_stale_fallback_rate_vs_ideal
+0,Adaptive@rho1.0+bg,Adaptive,reuse_intensive,1.0,0.8579029040124141,199.09282330208316,-503.30524499999956,0.0
+1,Adaptive@rho1.0+bg,Adaptive,reuse_intensive,1.0,0.8780022874571102,-137.05207389583302,-723.8655259999996,0.0
+2,Adaptive@rho1.0+bg,Adaptive,reuse_intensive,1.0,0.9458313136209404,-7.43367214583327,147.74961900000017,0.0
+3,Adaptive@rho1.0+bg,Adaptive,reuse_intensive,1.0,0.9056325567679151,292.12926864583324,483.340913,0.0
+4,Adaptive@rho1.0+bg,Adaptive,reuse_intensive,1.0,0.8749425287356322,67.44541323958333,537.3564009999991,0.0

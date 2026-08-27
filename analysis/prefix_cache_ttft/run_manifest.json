@@ -1,0 +1,21 @@
+{
+  "model": "/home/byh/.cache/modelscope/qwen/Qwen2.5-1.5B-Instruct",
+  "url": "http://127.0.0.1:8010",
+  "prefix_lengths": [
+    512,
+    1024,
+    2048,
+    4096
+  ],
+  "repetitions": 15,
+  "seed": 20260725,
+  "run_id": "prefix-cache-eb37645edc8b47e4b2da0ceeb8b3be1c",
+  "concurrency": 1,
+  "excluded_components": [
+    "dispatcher",
+    "gateway",
+    "tc",
+    "signaling",
+    "multi-instance scheduling"
+  ]
+}

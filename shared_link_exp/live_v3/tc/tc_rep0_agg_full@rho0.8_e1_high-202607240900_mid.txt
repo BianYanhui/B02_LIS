@@ -1,0 +1,28 @@
+qdisc htb 1: root refcnt 49 r2q 10 default 0x20 direct_packets_stat 0 direct_qlen 1000
+ Sent 209288 bytes 2250 pkt (dropped 0, overlimits 109 requeues 0) 
+ backlog 5Kb 40p requeues 0
+qdisc bfifo 10: parent 1:10 limit 64Kb
+ Sent 121342 bytes 957 pkt (dropped 0, overlimits 0 requeues 0) 
+ backlog 3054b 6p requeues 0
+qdisc bfifo 20: parent 1:20 limit 64Kb
+ Sent 87946 bytes 1293 pkt (dropped 0, overlimits 0 requeues 0) 
+ backlog 2076b 34p requeues 0
+---
+class htb 1:10 parent 1:1 leaf 10: prio 0 rate 1096bit ceil 2192bit burst 1600b cburst 1600b
+ Sent 121342 bytes 957 pkt (dropped 0, overlimits 5 requeues 0) 
+ backlog 3054b 6p requeues 0
+ lended: 740 borrowed: 98 giants: 0
+ tokens: -70711632 ctokens: 55885036
+
+class htb 1:1 root rate 2192bit ceil 2192bit burst 1600b cburst 1600b
+ Sent 209288 bytes 2250 pkt (dropped 0, overlimits 104 requeues 0) 
+ backlog 0b 0p requeues 0
+ lended: 98 borrowed: 0 giants: 0
+ tokens: -180067635 ctokens: -180067635
+
+class htb 1:20 parent 1:1 leaf 20: prio 0 rate 1096bit ceil 2192bit burst 1600b cburst 1600b
+ Sent 87946 bytes 1293 pkt (dropped 0, overlimits 0 requeues 0) 
+ backlog 2076b 34p requeues 0
+ lended: 1293 borrowed: 0 giants: 0
+ tokens: -7527184 ctokens: 87477189
+

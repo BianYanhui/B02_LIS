@@ -1,0 +1,25 @@
+{
+  "prefix_tokens_requested": 512,
+  "hit_prefix_tokens_actual": 512,
+  "miss_prefix_tokens_actual": 512,
+  "miss": {
+    "request_id": "pcache-ba36c797ced843af968133f926cbabf1",
+    "server_request_id": "chatcmpl-80fb23d4e9d04c1c96953839e99f893f",
+    "timestamp_utc": "2026-07-25T13:12:49.074671+00:00",
+    "ttft_ms": 220.192415,
+    "total_request_latency_ms": 220.244577,
+    "prompt_tokens": 553,
+    "cached_tokens": 0,
+    "generated_tokens": 1
+  },
+  "hit": {
+    "request_id": "pcache-3bb8d661e98247f9972557dfff3602e6",
+    "server_request_id": "chatcmpl-0233366dcd0e46289dc7367a4049548a",
+    "timestamp_utc": "2026-07-25T13:12:49.294183+00:00",
+    "ttft_ms": 44.411833,
+    "total_request_latency_ms": 44.478306,
+    "prompt_tokens": 553,
+    "cached_tokens": 528,
+    "generated_tokens": 1
+  }
+}

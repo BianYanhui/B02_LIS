@@ -1,0 +1,13 @@
+relay_forwarded,visible_holders,visible_coverage,mechanism,policy,rate_bit_per_s,updates_generated,duration_s,expected_final_coverage,final_coverage_correct,wire_bytes_forwarded,upsert_delay_p95_s,delivered_updates,rep,cell_id,routine_updates_before_invalidation,invalidation_delivered,invalidation_delay_s,ordinary_upserts_delivered_before_invalidation,overlap_percent,distinct_prefixes_generated,replicated_prefixes,unique_prefixes_visible,unique_prefixes_per_wire_byte
+10,1,2560,merge,exact_fifo,562,10,28.836113691329956,2560,True,1040,27.591494202613827,10,0,60000,,,,,,,,,
+1,1,2560,merge,merge_only,562,10,5.650953054428101,2560,True,104,5.64026403427124,1,0,60001,,,,,,,,,
+17,0,0,priority,exact_fifo,562,,,,,1768,,,0,60002,18,True,57.584125995635986,15,,,,,
+3,0,0,priority,priority_only,562,,,,,312,,,0,60003,18,True,5.8650524616241455,1,,,,,
+8,,,dedup,exact_fifo,562,8,,,,832,32.23910349607468,,0,60004,,,,,0,8,0,8,0.009615384615384616
+8,,,dedup,dedup_only,562,8,,,,832,32.23852400779724,,0,60005,,,,,0,8,0,8,0.009615384615384616
+12,,,dedup,exact_fifo,562,12,,,,1248,42.543432998657224,,0,60006,,,,,25,8,2,8,0.00641025641025641
+10,,,dedup,dedup_only,562,12,,,,1040,36.8719474196434,,0,60007,,,,,25,8,2,8,0.007692307692307693
+16,,,dedup,exact_fifo,562,16,,,,1664,51.73588138818741,,0,60008,,,,,50,8,4,8,0.004807692307692308
+12,,,dedup,dedup_only,562,16,,,,1248,42.567007184028625,,0,60009,,,,,50,8,4,8,0.00641025641025641
+20,,,dedup,exact_fifo,562,20,,,,2080,67.07221978902817,,0,60010,,,,,75,8,6,8,0.0038461538461538464
+14,,,dedup,dedup_only,562,20,,,,1456,53.33885499238968,,0,60011,,,,,75,8,6,8,0.005494505494505495

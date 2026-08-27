@@ -1,0 +1,119 @@
+{
+  "schema": "formal4t4-v1",
+  "frozen_at_unix": 1785002349.6596265,
+  "code_commit": "57547bb975e2b0d8e46febc9d747fa8b223c60ab",
+  "model": "/home/byh/.cache/modelscope/qwen/Qwen2.5-1.5B-Instruct",
+  "hardware": {
+    "gpus": [
+      "Tesla T4",
+      "Tesla T4",
+      "Tesla T4",
+      "Tesla T4"
+    ],
+    "instances": 4,
+    "mapping": {
+      "0": {
+        "gpu": 0,
+        "port": 8000
+      },
+      "1": {
+        "gpu": 1,
+        "port": 8001
+      },
+      "2": {
+        "gpu": 2,
+        "port": 8002
+      },
+      "3": {
+        "gpu": 3,
+        "port": 8003
+      }
+    }
+  },
+  "vllm": {
+    "gpu_memory_utilization": 0.4,
+    "max_model_len": 6144,
+    "max_num_seqs": 8,
+    "prefix_caching": true,
+    "prompt_tokens_details": true,
+    "block_size": 16,
+    "enforce_eager": true,
+    "kv_cache_tokens_per_instance": 104544,
+    "server_development_validation_endpoints": true
+  },
+  "network": {
+    "path": "instance agent -> TCP b02-gateway4t4 -> Docker bridge -> tc HTB/bfifo -> dispatcher",
+    "frame_bytes": 64,
+    "wire_bytes_per_msg": 104,
+    "rho_definition": "offered state load / available signaling service budget",
+    "rhos": [
+      0.5,
+      0.8,
+      1.0,
+      1.2
+    ],
+    "budget_rule": "all non-Ideal policies use the same physical HTB parent rate B_s=offered/rho",
+    "ratefifo_burst_frames": 1,
+    "relay_max_inflight": 4,
+    "tc": "HTB parent with signaling class 1:10 and background class 1:20; bfifo queues; MTU 296"
+  },
+  "policies": {
+    "FullSync": "FIFO full event synchronization; no semantic suppression.",
+    "RateFIFO": "FIFO token bucket at the same physical B_s(t); no KV semantics.",
+    "LatestOnly": "Latest unsent (owner,prefix) replacement only.",
+    "AgeCov-Greedy": "pending priority = age_s * max(coverage_tokens,1) / 64 bytes.",
+    "StaticSemantic": "replacement + invalidation priority + replica cap two; no adaptive admission.",
+    "Adaptive": "StaticSemantic + EWMA delay/queue utility admission and dynamic global useful-prefix set.",
+    "Ideal": "Immediate state visibility upper bound; not deployable."
+  },
+  "workloads": {
+    "original_compatible": {
+      "requests": 120,
+      "warmup": 24,
+      "concurrency": 4,
+      "pool_size": 32,
+      "alpha": 1.2,
+      "lineage_steps": 3,
+      "prefix_coverage": "2048 + 512-token extensions",
+      "replica_overlap": 0.0
+    },
+    "reuse_intensive": {
+      "requests": 120,
+      "warmup": 24,
+      "concurrency": 4,
+      "pool_size": 64,
+      "alpha": 1.2,
+      "prefix_distribution_tokens": {
+        "1024": 0.35,
+        "2048": 0.4,
+        "4096": 0.25
+      },
+      "suffix": "distinct task turn per request",
+      "replica_overlap": 0.25
+    }
+  },
+  "formal": {
+    "repetitions": 5,
+    "paired_seeds": [
+      2026072600,
+      2026072601,
+      2026072602,
+      2026072603,
+      2026072604
+    ],
+    "request_generation": "fixed-seed Zipf, byte-identical logical prompts across policies within rep",
+    "excluded_components": [
+      "Python delay simulation",
+      "offline reuse accounting"
+    ]
+  },
+  "calibration": {
+    "not_for_paper": true,
+    "ratefifo_candidates": [
+      1,
+      4,
+      16
+    ],
+    "selection_rule": "choose the candidate with the lowest mean normalized (p95 state age + view-missing) over rho 0.8,1.0,1.2; tie -> medium burst 4"
+  }
+}

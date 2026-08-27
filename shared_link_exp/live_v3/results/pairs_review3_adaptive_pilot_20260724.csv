@@ -1,0 +1,5 @@
+rep,cell_id,policy,rho,saved_prefill_retention_vs_ideal,delta_ttft_mean_ms_vs_ideal,delta_ttft_p95_ms_vs_ideal,delta_stale_fallback_rate_vs_ideal
+0,exact_fifo@rho1.2,exact_fifo,1.2,0.56078860898138,97.5635772222222,223.56567799999993,0.0
+0,agg_full@rho0.8,agg_full,0.8,0.332420591456736,182.1215120555555,264.6953020000001,0.0
+0,exact_fifo@rho0.8,exact_fifo,0.8,0.332420591456736,193.5747129166666,55.03915499999994,0.0
+0,agg_full@rho1.2,agg_full,1.2,0.332420591456736,227.72028555555562,263.0009140000002,0.0

@@ -1,0 +1,4 @@
+rep,cell_id,policy,workload,rho,saved_prefill_retention_vs_ideal,delta_ttft_mean_ms_vs_ideal,delta_ttft_p95_ms_vs_ideal,delta_stale_fallback_rate_vs_ideal
+0,RateFIFO@rho0.8,RateFIFO,reuse_intensive,0.8,0.6148796498905909,168.18206363888885,-81.48261000000002,0.0
+0,RateFIFO@rho1.0,RateFIFO,reuse_intensive,1.0,0.649890590809628,148.00395613888873,68.24763899999971,0.0
+0,RateFIFO@rho1.2,RateFIFO,reuse_intensive,1.2,0.649890590809628,196.09881425000003,249.5885189999999,0.0

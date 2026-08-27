@@ -1,0 +1,104 @@
+{
+  "status": "CALIBRATION_ONLY_NOT_FOR_PAPER",
+  "selection_rule": "For rho in {0.8,1.0,1.2}, normalize p95 dispatch-state age and view-missing rate by the across-candidate median at that rho, add them, then average over rhos; numerical tie -> medium (4 frames).",
+  "candidate_bursts_frames": [
+    1,
+    4,
+    16
+  ],
+  "rhos": [
+    0.8,
+    1.0,
+    1.2
+  ],
+  "per_rho_scales": {
+    "0.8": {
+      "age_scale_s": 37.7372784614563,
+      "view_missing_scale": 0.3055555555555556
+    },
+    "1.0": {
+      "age_scale_s": 38.728684425354004,
+      "view_missing_scale": 0.3333333333333333
+    },
+    "1.2": {
+      "age_scale_s": 39.05591177940369,
+      "view_missing_scale": 0.3333333333333333
+    }
+  },
+  "per_burst_inputs": {
+    "1": {
+      "0.8": {
+        "p95_state_age_s": 33.66744637489319,
+        "view_missing": 0.2222222222222222,
+        "request_count": 36.0
+      },
+      "1.0": {
+        "p95_state_age_s": 34.74352049827576,
+        "view_missing": 0.2222222222222222,
+        "request_count": 36.0
+      },
+      "1.2": {
+        "p95_state_age_s": 34.08380150794983,
+        "view_missing": 0.2222222222222222,
+        "request_count": 36.0
+      }
+    },
+    "4": {
+      "0.8": {
+        "p95_state_age_s": 37.7372784614563,
+        "view_missing": 0.3055555555555556,
+        "request_count": 36.0
+      },
+      "1.0": {
+        "p95_state_age_s": 38.728684425354004,
+        "view_missing": 0.3333333333333333,
+        "request_count": 36.0
+      },
+      "1.2": {
+        "p95_state_age_s": 39.13033604621887,
+        "view_missing": 0.3333333333333333,
+        "request_count": 36.0
+      }
+    },
+    "16": {
+      "0.8": {
+        "p95_state_age_s": 41.13416647911072,
+        "view_missing": 0.3333333333333333,
+        "request_count": 36.0
+      },
+      "1.0": {
+        "p95_state_age_s": 40.20320963859558,
+        "view_missing": 0.3333333333333333,
+        "request_count": 36.0
+      },
+      "1.2": {
+        "p95_state_age_s": 39.05591177940369,
+        "view_missing": 0.3333333333333333,
+        "request_count": 36.0
+      }
+    }
+  },
+  "per_burst_normalized_component": {
+    "1": {
+      "0.8": 1.619426262119711,
+      "1.0": 1.5637671236997661,
+      "1.2": 1.5393591722331115
+    },
+    "4": {
+      "0.8": 2.0,
+      "1.0": 2.0,
+      "1.2": 2.001905582623075
+    },
+    "16": {
+      "0.8": 2.1809232137113987,
+      "1.0": 2.0380732068522387,
+      "1.2": 2.0
+    }
+  },
+  "mean_normalized_score": {
+    "1": 1.5741841860175296,
+    "4": 2.0006351942076916,
+    "16": 2.0729988068545455
+  },
+  "selected_ratefifo_burst_frames": 1
+}

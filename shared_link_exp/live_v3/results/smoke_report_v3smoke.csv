@@ -1,0 +1,6 @@
+check,status,detail
+a: real tc backlog at rho=1.3,PASS,tc_sig_backlog mid=2530B after=3818B relay_max_queue=None
+b: delivery delay p95 materially larger at rho=1.3,FAIL,p95 rho1.3=18.206s rho0.5=8.438s
+c: ideal bypasses the network,PASS,"ideal net fields absent, upserts_per_s=2.890139917902269"
+d: integrity checks,PASS,same logical request has byte-identical prompt and input token count across cells=PASS; same logical request has fixed output token count across cells=PASS; vLLM usage telemetry present for every request=PASS; transient live retries recorded in raw data=PASS
+e: iperf3 background sharing raises signaling delay,FAIL,p95 bg_on=20.120s bg_off=29.638s class1:20_bytes_during_bg_cell=7570

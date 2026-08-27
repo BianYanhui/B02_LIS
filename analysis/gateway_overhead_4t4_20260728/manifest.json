@@ -1,0 +1,34 @@
+{
+  "benchmark": "gateway_enqueue_overhead_4t4",
+  "metric_scope": "Relay.enqueue controller work; excludes frame construction, TCP/tc transport, and JSON-line telemetry I/O",
+  "controller_configuration": {
+    "mode": "Adaptive",
+    "merge": true,
+    "tombstone_priority": true,
+    "replica_cap": 2,
+    "global_topk": 16,
+    "tau_s": 30.0,
+    "util_lambda": 16.0,
+    "delay_gate_s": 2.0,
+    "queue_gate_frames": 8,
+    "max_queue_frames": 4096
+  },
+  "workload": {
+    "coverages_tokens": [
+      1024,
+      2048,
+      4096
+    ],
+    "owners": 4,
+    "distinct_digest_cycle": 4096,
+    "tombstone_every_n_updates": 19
+  },
+  "single_core_affinity": "cpu0",
+  "relay_sha256": "40265375a62439e1d3ef5b5a1a317e938a3327d3aa97ecaf6d455b4547f03368",
+  "update_counts": [
+    10000,
+    50000,
+    100000
+  ],
+  "repetitions": 3
+}

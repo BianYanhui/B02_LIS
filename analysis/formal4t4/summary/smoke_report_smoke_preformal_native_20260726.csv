@@ -1,0 +1,6 @@
+check,status,detail
+a: four vLLM instances have live request telemetry,PASS,Ideal=20 requests; FullSync@rho1.0=20 requests; Adaptive@rho1.0=20 requests
+b: real tc signaling path carries frames,PASS,class1:10=22950B sent=96
+c: ideal bypasses the network,PASS,"ideal network delay field is absent/empty, upserts_per_s=2.8339712184241583"
+d: integrity checks,PASS,same logical request has byte-identical prompt and input token count across cells=PASS; same logical request has fixed output token count across cells=PASS; vLLM usage telemetry present for every request=PASS; cached tokens never exceed prompt tokens=PASS; dispatch state age is non-negative=PASS; selected owner IDs are valid=PASS; all four instances receive measured requests=PASS; transient live retries recorded in raw data=PASS; generated state frames cover all delivered frames=PASS; tc shaping path carried signaling bytes=PASS
+e: policy-specific state telemetry is complete,PASS,Adaptive sent=96 delivered=36

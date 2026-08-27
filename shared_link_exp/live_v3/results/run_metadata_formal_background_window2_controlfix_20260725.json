@@ -1,0 +1,65 @@
+{
+  "started_at_unix": 1784909654.4998796,
+  "finished_at_unix": 1784911765.036168,
+  "duration_s": 2110.5362899303436,
+  "arguments": {
+    "out_dir": "/home/byh/B02/shared_link_exp/live_v3",
+    "tag": "formal_background_window2_controlfix_20260725",
+    "seed": 20260723,
+    "repetitions": 5,
+    "instances": 3,
+    "n_requests": 72,
+    "warmup": 18,
+    "pool_size": 32,
+    "overlap": 0.0,
+    "alpha": 1.2,
+    "steps": 3,
+    "concurrency": 3,
+    "output_tokens": 4,
+    "kv_cache_tokens": 50000,
+    "rhos": "0.8",
+    "policies": "exact_fifo",
+    "global_topk": 16,
+    "relay_max_inflight": 2,
+    "background": false,
+    "paired_background": true,
+    "initial_offered_bit_per_s": 1248.0,
+    "j": 4,
+    "topk": 8,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "max_request_attempts": 3,
+    "cooldown_s": 0.5,
+    "smoke": false
+  },
+  "cell_order_by_rep": {
+    "0": [
+      "ideal",
+      "exact_fifo@rho0.8",
+      "exact_fifo@rho0.8+bg"
+    ],
+    "1": [
+      "ideal",
+      "exact_fifo@rho0.8+bg",
+      "exact_fifo@rho0.8"
+    ],
+    "2": [
+      "exact_fifo@rho0.8+bg",
+      "exact_fifo@rho0.8",
+      "ideal"
+    ],
+    "3": [
+      "exact_fifo@rho0.8+bg",
+      "exact_fifo@rho0.8",
+      "ideal"
+    ],
+    "4": [
+      "exact_fifo@rho0.8+bg",
+      "exact_fifo@rho0.8",
+      "ideal"
+    ]
+  },
+  "cells": 15,
+  "raw_requests": 810
+}

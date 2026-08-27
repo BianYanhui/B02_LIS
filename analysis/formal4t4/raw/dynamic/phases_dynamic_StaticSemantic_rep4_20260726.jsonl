@@ -1,0 +1,4 @@
+{"timestamp_unix":1785053842.536122542,"phase":"low_initial","sig_bit_per_s":1776,"policy":"StaticSemantic","tag":"dynamic_StaticSemantic_rep4_20260726"}
+{"timestamp_unix":1785053887.629456306,"phase":"high","sig_bit_per_s":740,"policy":"StaticSemantic","tag":"dynamic_StaticSemantic_rep4_20260726"}
+{"timestamp_unix":1785053932.725496555,"phase":"low_recovery","sig_bit_per_s":1776,"policy":"StaticSemantic","tag":"dynamic_StaticSemantic_rep4_20260726"}
+{"timestamp_unix":1785053977.731396314,"phase":"complete","sig_bit_per_s":1776,"policy":"StaticSemantic","tag":"dynamic_StaticSemantic_rep4_20260726"}

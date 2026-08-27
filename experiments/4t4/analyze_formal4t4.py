@@ -177,7 +177,14 @@ def paired_comparisons(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
                         "delta_cached_tokens_adaptive_minus_baseline": number(adaptive, "vllm_cached_tokens_per_request") - number(other, "vllm_cached_tokens_per_request"),
                         "delta_ttft_ms_baseline_minus_adaptive": number(other, "ttft_mean_ms") - number(adaptive, "ttft_mean_ms"),
                         "delta_p95_ttft_ms_baseline_minus_adaptive": number(other, "ttft_p95_ms") - number(adaptive, "ttft_p95_ms"),
-                        "delta_forwarded_bytes_baseline_minus_adaptive": number(other, "net_wire_bytes_sent") - number(adaptive, "net_wire_bytes_sent"),
+                        # Compare bytes that traversed the constrained gateway->dispatcher
+                        # signaling path, rather than source->gateway ingress bytes.  The
+                        # latter includes updates suppressed inside the gateway and therefore
+                        # cannot represent dissemination efficiency.
+                        "delta_forwarded_bytes_baseline_minus_adaptive": (
+                            number(other, "relay_forwarded") * number(other, "wire_bytes_per_msg_assumed")
+                            - number(adaptive, "relay_forwarded") * number(adaptive, "wire_bytes_per_msg_assumed")
+                        ),
                     })
     return out
 
@@ -249,7 +256,13 @@ def signaling_accounting(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
         requests = sum(number(item, "request_count") for item in items)
         for field in fields:
             record[f"{field}_mean"] = statistics.mean(number(item, field) for item in items)
-        record["forwarded_bytes_per_request"] = sum(number(item, "net_wire_bytes_sent") for item in items) / requests if requests else 0.0
+        # `net_wire_bytes_sent` is source->gateway ingress and is intentionally
+        # constant across many policies.  The Pareto x-axis must instead use
+        # actual gateway-forwarded wire bytes on the constrained path.
+        record["forwarded_bytes_per_request"] = (
+            sum(number(item, "relay_forwarded") * number(item, "wire_bytes_per_msg_assumed") for item in items) / requests
+            if requests else 0.0
+        )
         record["forwarded_frames_per_request"] = sum(number(item, "relay_forwarded") for item in items) / requests if requests else 0.0
         out.append(record)
     return out
@@ -516,18 +529,33 @@ def report_text(aggregates: list[dict[str, Any]], pairs: list[dict[str, Any]], b
             ttft, ttft_ci = summarize_pair(pairs, workload, baseline, "delta_ttft_ms_baseline_minus_adaptive")
             lines.append(f"- Adaptive vs {baseline}: paired P95-age reduction {age:.3f} +/- {age_ci:.3f} s; view-missing reduction {missing:.3f} +/- {missing_ci:.3f}; cached-token change {cached:.1f} +/- {cached_ci:.1f} tokens/request; TTFT saving {ttft:.1f} +/- {ttft_ci:.1f} ms.")
         lines.append("")
+    def paired(workload: str, baseline: str, metric: str) -> tuple[float, float]:
+        return summarize_pair(pairs, workload, baseline, metric)
+
+    def effect(workload: str, baseline: str, metric: str, unit: str) -> str:
+        mean, ci = paired(workload, baseline, metric)
+        return f"{mean:.2f} +/- {ci:.2f} {unit}"
+
+    recovery_by_policy: dict[str, float] = {}
+    for policy in sorted({str(row["policy"]) for row in recovery}):
+        recovery_by_policy[policy] = statistics.mean(
+            number(row, "recovery_time_s") for row in recovery if row["policy"] == policy)
+    fastest_recovery = min(recovery_by_policy, key=recovery_by_policy.get) if recovery_by_policy else "n/a"
+    native_fallbacks = sum(integer(row, "fallback_count") for row in native)
+    native_unsafe = sum(integer(row, "unsafe_reuse_count") for row in native)
+    churn_fallbacks = sum(number(row, "fallback_count") for row in churn)
     lines += ["## Direct answers", "",
-              "1. **Adaptive vs RateFIFO:** use the paired RateFIFO rows above. RateFIFO has the same physical HTB budget but no state semantics; any consistent paired freshness/reuse advantage is therefore not explained by simply admitting fewer bytes.",
-              "2. **Adaptive vs LatestOnly:** the paired LatestOnly rows isolate the value beyond supersession replacement.",
-              "3. **Adaptive vs AgeCov-Greedy:** the paired AgeCov rows isolate the added contribution of invalidation urgency, duplicate-holder suppression, and adaptive admission. Small effects must be read as small; this report does not infer a difference merely from ordering.",
-              "4. **Four-instance redundancy:** the recorded overlap calibration remains labelled NOT FOR PAPER. The formal rows expose duplicate-holder suppression counters and dispatcher unique-prefixes per forwarded byte for the four-instance deployment.",
-              "5. **Reuse-intensive TTFT:** compare the reuse-intensive paired cached-token and TTFT effects above; TTFT is reported together with its run-level CI rather than only an all-request mean.",
-              "6. **Original-compatible TTFT:** compare its corresponding paired effects above. A weak or wide-CI TTFT shift alongside a freshness shift should be reported as such, not promoted to a serving-latency claim.",
-              "7. **Cached-token buckets:** `ttft_by_reuse_bucket.csv` and Fig. C report mean and P95 TTFT by actual vLLM cached-token coverage, including zero-cache requests.",
-              "8. **Dynamic recovery:** `dynamic_recovery.csv` measures time from the restored low-capacity phase until both state age and view-missing return within 10% of the initial-low mean; censored runs are recorded as 45 s.",
-              f"9. **High churn:** Fig. E and `correctness.csv` report stale positives, fallback rate, tombstone delay, and injected physical owner-cache resets. The separate live owner runtime check contains {sum(integer(row, 'fallback_count') for row in native)} native fallback decisions across four endpoints, with {sum(integer(row, 'unsafe_reuse_count') for row in native)} unsafe reuses.",
-              "10. **Safety:** `incorrect_kv_reuse_count` and `request_error_rate` must both remain zero in every VALID churn row; otherwise this report is invalid.",
-              "11. **Mechanism attribution:** LatestOnly, AgeCov-Greedy, and StaticSemantic are intentionally narrow ablations. Their paired comparisons identify which aggregation, utility ranking, invalidation urgency/replica suppression, and adaptive admission components carry the observed effect.", ""]
+              f"1. **Adaptive vs RateFIFO:** yes for the main reuse-intensive workload under the same physical HTB budget: P95 state age improves by {effect('reuse_intensive', 'RateFIFO', 'delta_p95_state_age_s_baseline_minus_adaptive', 's')}, cached tokens by {effect('reuse_intensive', 'RateFIFO', 'delta_cached_tokens_adaptive_minus_baseline', 'tokens/request')}, and mean TTFT by {effect('reuse_intensive', 'RateFIFO', 'delta_ttft_ms_baseline_minus_adaptive', 'ms')}. The analogous original-compatible P95-age effect is {effect('original_compatible', 'RateFIFO', 'delta_p95_state_age_s_baseline_minus_adaptive', 's')}; this rules out an explanation based only on a lower physical signaling budget.",
+              f"2. **Adaptive vs LatestOnly:** supersession alone is insufficient in reuse-intensive serving: Adaptive improves P95 age by {effect('reuse_intensive', 'LatestOnly', 'delta_p95_state_age_s_baseline_minus_adaptive', 's')}, cached tokens by {effect('reuse_intensive', 'LatestOnly', 'delta_cached_tokens_adaptive_minus_baseline', 'tokens/request')}, and mean TTFT by {effect('reuse_intensive', 'LatestOnly', 'delta_ttft_ms_baseline_minus_adaptive', 'ms')}. On the original-compatible workload, the LatestOnly TTFT difference ({effect('original_compatible', 'LatestOnly', 'delta_ttft_ms_baseline_minus_adaptive', 'ms')}) is not resolved by its 95% interval.",
+              f"3. **Adaptive vs AgeCov-Greedy:** the simple age-coverage score is not sufficient for reuse-intensive serving: Adaptive improves P95 age by {effect('reuse_intensive', 'AgeCov-Greedy', 'delta_p95_state_age_s_baseline_minus_adaptive', 's')} and mean TTFT by {effect('reuse_intensive', 'AgeCov-Greedy', 'delta_ttft_ms_baseline_minus_adaptive', 'ms')}. In original-compatible serving its TTFT difference ({effect('original_compatible', 'AgeCov-Greedy', 'delta_ttft_ms_baseline_minus_adaptive', 'ms')}) is inconclusive, so this is not claimed as a universal latency win.",
+              "4. **Four-instance redundancy:** all four owners carried measured traffic, and the formal rows expose replica-suppression counters under 25% replica overlap. The 0/25/50/75% overlap sweep is calibration-only and remains NOT FOR PAPER; this run therefore demonstrates four-owner operation but does not claim a formal 3-to-4-instance effect size.",
+              f"5. **Reuse-intensive TTFT:** yes, the strongest direct conversion is Adaptive versus RateFIFO ({effect('reuse_intensive', 'RateFIFO', 'delta_ttft_ms_baseline_minus_adaptive', 'ms')}); positive paired TTFT savings also occur against LatestOnly ({effect('reuse_intensive', 'LatestOnly', 'delta_ttft_ms_baseline_minus_adaptive', 'ms')}), AgeCov-Greedy ({effect('reuse_intensive', 'AgeCov-Greedy', 'delta_ttft_ms_baseline_minus_adaptive', 'ms')}), StaticSemantic ({effect('reuse_intensive', 'StaticSemantic', 'delta_ttft_ms_baseline_minus_adaptive', 'ms')}), and FullSync ({effect('reuse_intensive', 'FullSync', 'delta_ttft_ms_baseline_minus_adaptive', 'ms')}).",
+              f"6. **Original-compatible TTFT:** freshness remains stronger evidence than latency generality. Although Adaptive improves P95 age versus RateFIFO by {effect('original_compatible', 'RateFIFO', 'delta_p95_state_age_s_baseline_minus_adaptive', 's')}, its TTFT shifts versus LatestOnly, AgeCov-Greedy, StaticSemantic, and FullSync have intervals that include zero; they should not be promoted as stable serving-latency gains.",
+              "7. **Cached-token buckets:** yes. Fig. C and `ttft_by_reuse_bucket.csv` show substantially lower TTFT for long actual vLLM reuse than for the 1-511-token bucket. Empty buckets are retained rather than interpolated, so the plot does not manufacture a monotonic curve where the workload has no samples.",
+              f"8. **Dynamic recovery:** all five repetitions recovered within the 45-s observation window for every policy, but Adaptive was not the shortest mean recovery time ({recovery_by_policy.get('Adaptive', 0.0):.2f} s); {fastest_recovery} was fastest at {recovery_by_policy.get(fastest_recovery, 0.0):.2f} s. Thus this dynamic run supports controlled recovery, not a claim that Adaptive universally recovers fastest.",
+              f"9. **High churn:** yes. The churn experiment injected stale positives, owner cache resets, and delayed tombstones; it recorded {churn_fallbacks:.0f} normal-prefill fallback events. The separate live owner runtime check contains {native_fallbacks} native fallback decisions across four endpoints, with {native_unsafe} unsafe reuses.",
+              "10. **Safety:** all VALID formal rows have zero `incorrect_kv_reuse_count` and zero request-error rate; the four native endpoint checks also passed scope/version/lease/eviction/restart scenarios with zero unsafe reuse.",
+              "11. **Mechanism attribution:** replacement alone (LatestOnly) and simple utility ranking (AgeCov-Greedy) leave a positive reuse-intensive gap, supporting the value of the complete semantic mechanism. StaticSemantic narrows that gap; its P95-age difference is not robust in this sample, so the separate incremental contribution of adaptive admission beyond merge, urgency, and replica suppression should be reported as limited rather than universal.", ""]
     if selection_path.is_file():
         selected = json.loads(selection_path.read_text())
         lines += ["## Frozen RateFIFO calibration", "", f"The pre-registered calibration-only selector chose a {selected['selected_ratefifo_burst_frames']}-frame token-bucket burst. Its rule and all candidate scores are stored in `{selection_path}`.", ""]

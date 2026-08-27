@@ -1,0 +1,7 @@
+policy,check,status,detail
+LatestOnly,ten extensions retain one latest unsent update,PASS,"{""queue"": 1, ""superseded"": 9}"
+RateFIFO,token bucket is semantic-free and limits admission,PASS,"{""queue"": 1, ""rate_limit"": 1}"
+StaticSemantic,replica cap and non-preemptive tombstone priority,PASS,"{""duplicate_holder"": 1, ""priority_queue"": 1}"
+AgeCov-Greedy,selection is exactly age x coverage / bytes,PASS,"{""selected_seq"": 1}"
+Adaptive,congestion-aware low-utility admission activates,PASS,"{""low_utility"": 1}"
+FullSync,all events remain FIFO without suppression,PASS,"{""queue"": 3, ""drops"": {}}"

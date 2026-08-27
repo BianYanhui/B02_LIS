@@ -1,0 +1,11 @@
+check_name,status,offending_rows,suggested_fix
+same logical request has byte-identical prompt and input token count across cells,PASS,0,remove all policy data from semantic prompt
+same logical request has fixed output token count across cells,PASS,0,keep min_tokens=max_tokens and ignore_eos
+vLLM usage telemetry present for every request,PASS,0,restart vLLM with --enable-prompt-tokens-details
+cached tokens never exceed prompt tokens,PASS,0,inspect response telemetry parser
+dispatch state age is non-negative,PASS,0,inspect cross-process timestamps
+selected owner IDs are valid,PASS,0,check four-endpoint dispatcher map
+all four instances receive measured requests,PASS,0,check load balancing and endpoint health
+transient live retries recorded in raw data,PASS,4,inspect prior_attempt_errors if retries are nonzero
+generated state frames cover all delivered frames,PASS,0,inspect relay cell reset or frame counters
+tc shaping path carried signaling bytes,PASS,0,inspect b02-gateway4t4 HTB setup

@@ -1,0 +1,3 @@
+{"timestamp_unix":1784912254.837879043,"phase":"low_initial","sig_bit_per_s":1350,"policy":"agg_static","tag":"dynamic_static_rep0_20260725"}
+{"timestamp_unix":1784912284.931698198,"phase":"high","sig_bit_per_s":562,"policy":"agg_static","tag":"dynamic_static_rep0_20260725"}
+{"timestamp_unix":1784912325.030205525,"phase":"low_recovery","sig_bit_per_s":1350,"policy":"agg_static","tag":"dynamic_static_rep0_20260725"}

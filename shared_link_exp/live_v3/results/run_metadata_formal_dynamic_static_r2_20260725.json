@@ -1,0 +1,44 @@
+{
+  "started_at_unix": 1784914697.0026355,
+  "finished_at_unix": 1784914983.1014056,
+  "duration_s": 286.0987706184387,
+  "arguments": {
+    "out_dir": "/home/byh/B02/shared_link_exp/live_v3",
+    "tag": "formal_dynamic_static_r2_20260725",
+    "seed": 2026072513,
+    "repetitions": 1,
+    "instances": 3,
+    "n_requests": 96,
+    "warmup": 12,
+    "pool_size": 32,
+    "overlap": 0.0,
+    "alpha": 1.2,
+    "steps": 3,
+    "concurrency": 3,
+    "output_tokens": 4,
+    "kv_cache_tokens": 50000,
+    "rhos": "0.5",
+    "policies": "agg_static",
+    "global_topk": 16,
+    "relay_max_inflight": 2,
+    "background": false,
+    "paired_background": false,
+    "initial_offered_bit_per_s": 1248.0,
+    "j": 4,
+    "topk": 8,
+    "prefill_tokens_per_ms": 50.0,
+    "queue_penalty_ms": 2.0,
+    "guard_ms": 0.5,
+    "max_request_attempts": 3,
+    "cooldown_s": 0.5,
+    "smoke": false
+  },
+  "cell_order_by_rep": {
+    "0": [
+      "ideal",
+      "agg_static@rho0.5"
+    ]
+  },
+  "cells": 2,
+  "raw_requests": 168
+}

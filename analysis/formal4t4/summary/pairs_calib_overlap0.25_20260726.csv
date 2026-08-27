@@ -1,0 +1,3 @@
+rep,cell_id,policy,workload,rho,saved_prefill_retention_vs_ideal,delta_ttft_mean_ms_vs_ideal,delta_ttft_p95_ms_vs_ideal,delta_stale_fallback_rate_vs_ideal
+0,Adaptive@rho1.0,Adaptive,reuse_intensive,1.0,0.6405990016638935,572.8473443888889,729.6070750000003,0.0
+0,FullSync@rho1.0,FullSync,reuse_intensive,1.0,0.6405990016638935,487.16686036111116,412.59956999999986,0.0

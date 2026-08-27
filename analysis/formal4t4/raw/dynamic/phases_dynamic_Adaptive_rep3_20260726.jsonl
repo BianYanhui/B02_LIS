@@ -1,0 +1,4 @@
+{"timestamp_unix":1785057066.555955317,"phase":"low_initial","sig_bit_per_s":1638,"policy":"Adaptive","tag":"dynamic_Adaptive_rep3_20260726"}
+{"timestamp_unix":1785057111.652932744,"phase":"high","sig_bit_per_s":682,"policy":"Adaptive","tag":"dynamic_Adaptive_rep3_20260726"}
+{"timestamp_unix":1785057156.740996730,"phase":"low_recovery","sig_bit_per_s":1638,"policy":"Adaptive","tag":"dynamic_Adaptive_rep3_20260726"}
+{"timestamp_unix":1785057201.745024594,"phase":"complete","sig_bit_per_s":1638,"policy":"Adaptive","tag":"dynamic_Adaptive_rep3_20260726"}

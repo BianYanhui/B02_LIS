@@ -1,0 +1,4 @@
+{"timestamp_unix":1785043409.278966308,"phase":"low_initial","sig_bit_per_s":1744,"policy":"RateFIFO","tag":"dynamic_RateFIFO_rep1_20260726"}
+{"timestamp_unix":1785043454.370878836,"phase":"high","sig_bit_per_s":726,"policy":"RateFIFO","tag":"dynamic_RateFIFO_rep1_20260726"}
+{"timestamp_unix":1785043499.467107546,"phase":"low_recovery","sig_bit_per_s":1744,"policy":"RateFIFO","tag":"dynamic_RateFIFO_rep1_20260726"}
+{"timestamp_unix":1785043544.471539503,"phase":"complete","sig_bit_per_s":1744,"policy":"RateFIFO","tag":"dynamic_RateFIFO_rep1_20260726"}
