@@ -358,7 +358,7 @@ def parse_tc(text: str) -> dict:
 
 
 def tc_snapshot(tag: str, out_dir: Path) -> dict:
-    text = sh(["bash", str(NET_DIR / "tc_stats_4t4.sh")])
+    text = sh(["bash", str(NET_DIR / "tc_stats.sh")])
     ensure_dir(out_dir / "tc")
     (out_dir / "tc" / f"tc_{tag}.txt").write_text(text)
     return parse_tc(text)
@@ -701,7 +701,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
     tc_mid_done = is_ideal
     if not is_ideal:
         sig_bit = max(64, int(rate_state["offered_bit_per_s"] / rho))
-        print(sh(["bash", str(NET_DIR / "cell_rate_4t4.sh"), "--sig-bit", str(sig_bit)]).strip(), flush=True)
+        print(sh(["bash", str(NET_DIR / "cell_rate.sh"), "--sig-bit", str(sig_bit)]).strip(), flush=True)
         if bg:
             background_cmd = ["docker", "exec", "-d", "b02-gateway4t4", "iperf3", "-c", "b02-bgserver4t4", "-p", "5211", "-t", "7200"]
             if args.background_rate:
