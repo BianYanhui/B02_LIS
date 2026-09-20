@@ -792,7 +792,7 @@ async def run_cell(trace: list[TraceRequest], policy: str, rho: float | None, bg
                     for k in range(extra):
                         if fanin_stop.is_set():
                             return
-                        link.send(K_UP, k % len(URLS), f"__fanin_{k}_{tick}", 256)
+                        link.send(K_UP, k % len(URLS), f"__fanin_{k}", 256)
                         fanin_frames_sent += 1
                 except Exception:
                     return
