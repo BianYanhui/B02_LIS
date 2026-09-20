@@ -44,14 +44,8 @@ def mean_ci(values: list[float]) -> tuple[float, float]:
     return mu, 1.96 * se
 
 
-def load_cells() -> list[dict]:
-    rows: list[dict] = []
-    summary = ROOT / "summary"
-    if not summary.is_dir():
-        return rows
-    for path in sorted(summary.glob("cells_*.csv")):
-        rows.extend(read_csv(path))
-    return [row for row in rows if row.get("status") == "VALID"]
+def load_valid(path: Path) -> list[dict]:
+    return [row for row in read_csv(path) if row.get("status") == "VALID"]
 
 
 def write_csv(path: Path, rows: list[dict]) -> None:
@@ -66,14 +60,15 @@ def write_csv(path: Path, rows: list[dict]) -> None:
 
 
 def main() -> None:
-    cells = load_cells()
+    calibrate = load_valid(ROOT / "summary" / "cells_calibrate.csv")
+    fanin_cells = load_valid(ROOT / "summary" / "cells_fanin.csv")
+    cells = calibrate + fanin_cells
     ROOT.joinpath("figures").mkdir(exist_ok=True)
     ROOT.joinpath("summary").mkdir(exist_ok=True)
 
-    calibrate = [row for row in cells if "calibrate" in row.get("experiment_id", "") or row.get("drain_fps") in ("", "0", "0.0")]
-    # Prefer Ideal upsert rate from any unconstrained cell.
-    ideals = [row for row in cells if row.get("policy") == "Ideal"]
-    live_n4 = [row for row in cells if row.get("policy") != "Ideal" and int(fnum(row, "cluster_n", 4)) == 4]
+    # Prefer Ideal upsert rate from unconstrained calibration, not smoke or fan-in.
+    ideals = [row for row in calibrate if row.get("policy") == "Ideal"]
+    live_n4 = [row for row in calibrate if row.get("policy") != "Ideal"]
     source = ideals[0] if ideals else (calibrate[0] if calibrate else (cells[0] if cells else None))
     l4 = fnum(source, "upserts_per_s") if source else 3.0
     prefixes = fnum(source, "source_unique_prefixes_at_end", 50.0) if source else 50.0
@@ -102,7 +97,7 @@ def main() -> None:
     write_csv(ROOT / "summary" / "anchor_L_of_N.csv", anchor_rows)
 
     # Live measured offered rate and outcomes.
-    live = [row for row in cells if row.get("policy") in {"RateFIFO", "StaticSemantic", "Adaptive"}]
+    live = [row for row in fanin_cells if row.get("policy") in {"RateFIFO", "StaticSemantic", "Adaptive"}]
     grouped: dict[tuple, list] = defaultdict(list)
     for row in live:
         key = (int(fnum(row, "cluster_n", 4)), row["policy"])
@@ -137,7 +132,8 @@ def main() -> None:
             "apply_upsert_p50_us": mean_ci([fnum(r, "apply_upsert_p50_us") for r in group])[0],
             "apply_upsert_p95_us": mean_ci([fnum(r, "apply_upsert_p95_us") for r in group])[0],
         })
-    write_csv(ROOT / "summary" / "cells_fanin.csv", fanin_rows)
+    # Keep harness per-cell cells_fanin.csv; write means for the letter tables.
+    write_csv(ROOT / "summary" / "cells_fanin_means.csv", fanin_rows)
     write_csv(ROOT / "summary" / "delay_breakdown.csv", delay_rows)
 
     fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.15), dpi=160)
