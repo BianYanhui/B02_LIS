@@ -451,17 +451,35 @@ class LinkRuntime:
         ip = bridge_ip()
         server = await asyncio.start_server(self._on_downstream, ip, DISPATCH_PORT)
         self._server = server
-        await self.open_agents()
 
     async def open_agents(self) -> None:
+        for writer in getattr(self, "agent_writers", []) or []:
+            try:
+                writer.close()
+            except Exception:
+                pass
         self.agent_writers = []
         self.agent_readers = []
-        for _ in URLS:
-            reader, writer = await asyncio.open_connection("127.0.0.1", RELAY_PORT)
-            sock = writer.get_extra_info("socket")
-            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            self.agent_writers.append(writer)
-            self.agent_readers.append(asyncio.create_task(self._on_agent(reader)))
+        last_error = None
+        for _attempt in range(8):
+            try:
+                writers = []
+                readers = []
+                for _ in URLS:
+                    reader, writer = await asyncio.open_connection("127.0.0.1", RELAY_PORT)
+                    sock = writer.get_extra_info("socket")
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                    writers.append(writer)
+                    readers.append(asyncio.create_task(self._on_agent(reader)))
+                self.agent_writers = writers
+                self.agent_readers = readers
+                last_error = None
+                break
+            except (ConnectionRefusedError, OSError) as exc:
+                last_error = exc
+                await asyncio.sleep(0.3)
+        if last_error is not None:
+            raise last_error
 
     async def _on_agent(self, reader: asyncio.StreamReader) -> None:
         """Receive unshaped relay-control replies on each agent connection."""
@@ -544,8 +562,7 @@ class LinkRuntime:
         self.queue_gate = queue_gate
         self.reset_done.clear()
         self.stats_future = None
-        if not self.agent_writers:
-            await self.open_agents()
+        await self.open_agents()
         flags = POLICY_DEFS[policy]
         cfg_payload = CFG.pack(
             flags["mode"], flags["merge"], flags["priority"], flags["adaptive"],
