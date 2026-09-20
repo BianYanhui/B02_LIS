@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Isolated control-plane path: 100 mbit HTB (not the independent variable)
+# plus netem RTT on the signaling class. Drain μ lives in the relay.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SIG_BIT=100000000
+NETEM_DELAY=40
+NETEM_JITTER=5
+MTU=1500
+REBUILD=0
+
+while (($#)); do
+  case "$1" in
+    --sig-bit) SIG_BIT="$2"; shift 2;;
+    --netem-delay) NETEM_DELAY="$2"; shift 2;;
+    --netem-jitter) NETEM_JITTER="$2"; shift 2;;
+    --mtu) MTU="$2"; shift 2;;
+    --rebuild) REBUILD=1; shift;;
+    *) echo "unknown arg: $1" >&2; exit 1;;
+  esac
+done
+
+if ! docker network inspect b02-4t4-net >/dev/null 2>&1; then
+  docker network create --subnet 172.31.0.0/24 b02-4t4-net >/dev/null
+fi
+NET_ID="$(docker network inspect b02-4t4-net -f '{{.Id}}')"
+BRIDGE_IP="$(ip -4 -o addr show dev "br-${NET_ID:0:12}" | awk '{print $4}' | cut -d/ -f1)"
+[ -n "$BRIDGE_IP" ] || { echo "cannot determine b02-4t4-net bridge IP" >&2; exit 1; }
+
+if ((REBUILD)) || ! docker image inspect b02-gw4t4-cp >/dev/null 2>&1; then
+  docker build -t b02-gw4t4-cp -f "$HERE/Dockerfile" "$HERE" >/dev/null
+fi
+
+for c in b02-gateway4t4 b02-bgserver4t4; do
+  if docker ps -a --format '{{.Names}}' | grep -qx "$c"; then
+    docker rm -f "$c" >/dev/null
+  fi
+done
+
+docker run -d --name b02-gateway4t4 --network b02-4t4-net --cap-add NET_ADMIN \
+  -p 127.0.0.1:9710:9710 \
+  b02-gw4t4-cp --listen 9710 --downstream "${BRIDGE_IP}:9711" >/dev/null
+
+docker run -d --name b02-bgserver4t4 --network b02-4t4-net \
+  --entrypoint iperf3 b02-gw4t4-cp -s -p 5211 >/dev/null
+
+HALF=$((SIG_BIT / 2))
+docker exec b02-gateway4t4 sh -c "
+  set -e
+  ip link set dev eth0 mtu ${MTU}
+  tc qdisc replace dev eth0 root handle 1: htb default 20
+  tc class add dev eth0 parent 1: classid 1:1 htb rate ${SIG_BIT}bit
+  tc class add dev eth0 parent 1:1 classid 1:10 htb rate ${HALF}bit ceil ${SIG_BIT}bit
+  tc class add dev eth0 parent 1:1 classid 1:20 htb rate ${HALF}bit ceil ${SIG_BIT}bit
+  tc class add dev eth0 parent 1:1 classid 1:30 htb rate ${SIG_BIT}bit ceil ${SIG_BIT}bit
+  if [ \"${NETEM_DELAY}\" != \"0\" ]; then
+    tc qdisc add dev eth0 parent 1:10 handle 10: netem delay ${NETEM_DELAY}ms ${NETEM_JITTER}ms limit 10000
+  else
+    tc qdisc add dev eth0 parent 1:10 handle 10: bfifo limit 65536
+  fi
+  tc qdisc add dev eth0 parent 1:20 handle 20: bfifo limit 65536
+  tc qdisc add dev eth0 parent 1:30 handle 30: bfifo limit 8192
+  tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip dport 9711 0xffff flowid 1:10
+  tc filter add dev eth0 protocol ip parent 1:0 prio 2 u32 match ip dport 5211 0xffff flowid 1:20
+  tc filter add dev eth0 protocol ip parent 1:0 prio 3 u32 match ip sport 9710 0xffff flowid 1:30
+"
+
+echo "b02-4t4-net ready: bridge=${BRIDGE_IP} gateway+bgserver running, sig=${SIG_BIT}bit/s netem=${NETEM_DELAY}ms jitter=${NETEM_JITTER}ms mtu=${MTU}"
