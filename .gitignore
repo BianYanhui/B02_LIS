@@ -31,3 +31,6 @@ shared_link_exp/live_v2/run.log
 
 # analysis runtime pid files
 analysis/**/*.pid
+
+# Oversized control-plane fan-in gateway event log (>100MB GitHub limit)
+supplemental_20260920_controlplane/raw/fanin/gateway_events_fanin.csv
