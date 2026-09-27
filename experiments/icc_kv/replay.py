@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import json
 import random
 import time
 from pathlib import Path
@@ -47,28 +48,34 @@ def expand(events: list[dict], copies: int, correlated: bool, seed: int) -> list
 
 
 async def replay(runtime: PathRuntime, events: list[dict], cell: int, speed: float, seconds: float) -> int:
+    """Replay the trace, repeating it until `seconds` elapse."""
     assert runtime.agent is not None
     origin = int(events[0]["timestamp_ns"])
+    span_s = max(1e-3, (int(events[-1]["timestamp_ns"]) - origin) / 1e9)
     started = time.perf_counter()
     seq = 1
     sent = 0
-    for row in events:
-        if time.perf_counter() - started >= seconds:
-            break
-        due = started + ((int(row["timestamp_ns"]) - origin) / 1e9) / speed
-        delay = due - time.perf_counter()
-        if delay > 0:
-            await asyncio.sleep(delay)
-        kind = K_TOMB if row["event_type"] in {"evict", "invalidate"} else K_UP
-        await runtime.send_event(
-            kind, int(row["worker_id"]), cell, seq, int(row["coverage"]),
-            int.from_bytes(__import__("hashlib").blake2b(row["prefix_id"].encode(), digest_size=8).digest(), "big"),
-            time.time(),
-        )
-        seq += 1
-        sent += 1
-        if sent % 200 == 0:
-            await runtime.drain_agent()
+    cycle = 0
+    while time.perf_counter() - started < seconds:
+        base = started + cycle * (span_s / max(speed, 1e-6))
+        for row in events:
+            if time.perf_counter() - started >= seconds:
+                break
+            due = base + ((int(row["timestamp_ns"]) - origin) / 1e9) / max(speed, 1e-6)
+            delay = due - time.perf_counter()
+            if delay > 0:
+                await asyncio.sleep(delay)
+            kind = K_TOMB if row["event_type"] in {"evict", "invalidate"} else K_UP
+            await runtime.send_event(
+                kind, int(row["worker_id"]), cell, seq, int(row["coverage"]),
+                int.from_bytes(__import__("hashlib").blake2b(row["prefix_id"].encode(), digest_size=8).digest(), "big"),
+                time.time(),
+            )
+            seq += 1
+            sent += 1
+            if sent % 200 == 0:
+                await runtime.drain_agent()
+        cycle += 1
     await runtime.drain_agent()
     await asyncio.sleep(1.0)
     return sent
@@ -102,27 +109,32 @@ async def run_scale(trace: Path, capacity: float, rhos: list[float], methods: li
     prepare_fixed_gateway()
     runtime = PathRuntime()
     await runtime.start()
-    rows = []
-    cell = 1
+    out_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = out_dir / "scale_summary.json"
+    rows: list[dict] = []
+    if summary_path.exists():
+        rows = json.loads(summary_path.read_text()).get("rows", [])
+    done = {(row["seed"], row["rho"], row["method"], row["correlated"]) for row in rows}
+    cell = 1 + len(rows)
     for seed in range(seeds):
         expanded = expand(events, copies, correlated, seed)
         for rho in rhos:
-            # Speed is chosen so one pass's natural duration maps onto the target rate.
             span_s = max(1e-3, (int(expanded[-1]["timestamp_ns"]) - int(expanded[0]["timestamp_ns"])) / 1e9)
             natural = len(expanded) / span_s
             target = rho * capacity
             speed = target / natural if natural else 1.0
             for method in methods:
+                if (seed, rho, method, correlated) in done:
+                    continue
                 rate = capacity if method == "RateFIFO" else 0.0
                 await runtime.configure(cell, method, rate)
                 sent = await replay(runtime, expanded, cell, speed, seconds)
                 row = summarize(method, rho, capacity, sent, list(runtime.dispatcher.applied), seconds)
                 row.update({"seed": seed, "copies": copies, "correlated": correlated, "cell": cell, "speed": speed})
                 rows.append(row)
+                write_json(summary_path, {**runtime.meta(), "rows": rows})
                 print(row, flush=True)
                 cell += 1
-    out_dir.mkdir(parents=True, exist_ok=True)
-    write_json(out_dir / "scale_summary.json", {**runtime.meta(), "rows": rows})
 
 
 def main() -> None:

@@ -119,6 +119,7 @@ class PathRuntime:
         self._server: asyncio.AbstractServer | None = None
         self.agent = None
         self._agent_task: asyncio.Task | None = None
+        self._write_lock = asyncio.Lock()
 
     async def start(self) -> None:
         os.sched_setaffinity(0, {1})
@@ -171,11 +172,13 @@ class PathRuntime:
 
     async def send_event(self, kind: int, worker: int, cell: int, seq: int, coverage: int, digest: int, generated_at: float) -> None:
         assert self.agent is not None
-        self.agent.write(frame(kind, worker, cell, seq, coverage, digest, generated_at))
+        async with self._write_lock:
+            self.agent.write(frame(kind, worker, cell, seq, coverage, digest, generated_at))
 
     async def drain_agent(self) -> None:
         if self.agent is not None:
-            await self.agent.drain()
+            async with self._write_lock:
+                await self.agent.drain()
 
     def meta(self) -> dict:
         return {
