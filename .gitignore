@@ -1,5 +1,11 @@
 docx/prompt/
 
+# Local paper draft; do not publish the manuscript PDF
+Bare_Demo_of_IEEEtran_cls_for_IEEE_Journals.pdf
+
+# ICC fixed-capacity raw runs (summaries are committed separately when cited)
+analysis/icc_kv/
+
 # Python
 __pycache__/
 *.pyc
