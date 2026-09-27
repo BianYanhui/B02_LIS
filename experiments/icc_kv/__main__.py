@@ -7,6 +7,7 @@ from pathlib import Path
 
 from experiments.icc_kv.capacity import RATES, run_capacity
 from experiments.icc_kv.collect import collect
+from experiments.icc_kv.replay import run_scale
 from experiments.icc_kv.runtime import OUT
 
 
@@ -23,12 +24,29 @@ def main() -> None:
     tr.add_argument("--max-requests", type=int, default=2000)
     tr.add_argument("--kv-cache-tokens", type=int, default=104544)
     tr.add_argument("--out-dir", type=Path, default=OUT / "trace")
+    sc = sub.add_parser("scale")
+    sc.add_argument("--trace", type=Path, default=OUT / "trace" / "events.csv")
+    sc.add_argument("--capacity", type=float, required=True)
+    sc.add_argument("--rhos", default="0.5,0.8,1.0,1.2")
+    sc.add_argument("--methods", default="FullSync,RateFIFO,StaticSemantic,Adaptive")
+    sc.add_argument("--copies", type=int, default=4)
+    sc.add_argument("--correlated", action="store_true")
+    sc.add_argument("--seeds", type=int, default=5)
+    sc.add_argument("--seconds", type=float, default=180.0)
+    sc.add_argument("--out-dir", type=Path, default=OUT / "scale")
     args = parser.parse_args()
     if args.cmd == "capacity":
         rates = [int(item) for item in args.rates.split(",") if item]
         asyncio.run(run_capacity(rates, args.reps, args.seconds, args.out_dir))
-    else:
+    elif args.cmd == "trace":
         asyncio.run(collect(args.out_dir, args.seconds, args.max_requests, args.kv_cache_tokens))
+    else:
+        asyncio.run(run_scale(
+            args.trace, args.capacity,
+            [float(item) for item in args.rhos.split(",")],
+            [item for item in args.methods.split(",") if item],
+            args.copies, args.correlated, args.seeds, args.seconds, args.out_dir,
+        ))
 
 
 if __name__ == "__main__":
