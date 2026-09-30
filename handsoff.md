@@ -28,35 +28,35 @@
 
 ## 可变交接
 
-更新时间：2026-09-30 11:48（UTC+8）。没有实验在跑。ultrahigh 已结束。用户没说「继续」就不要开新的长实验。
+更新时间：2026-09-30 12:11（UTC+8）。没有实验在跑。ultrahigh 已结束。用户没说「继续」就不要开新的长实验。
 
 ### 正在做的事
 
-ICC 固定容量实验。C=8000 那一轮的容量、两种扩展、突发、端到端、消融都已完成。随后按用户要求重选 C，并只把 2 倍负载跑完。进程 `2275150` 不在了。9711 没有在听。
+ICC 固定容量实验。C=8000 那一轮的容量、两种扩展、突发、端到端、消融都已完成。随后重选 C，并只把 2 倍负载跑完。12:11 核对：没有 `experiments.icc_kv` 进程，pid `2275150` 不在，9711 没有在听。
 
 ### 当前状态
 
-工作状态：已完成，停着。没有 icc_kv 的 python 进程。
+工作状态：已完成，停着。
 
-C 的重扫日志是 `/home/byh/B02/analysis/icc_kv/capacity_cscan.log`，没有 summary json，因为扫到 14000 后进程被停掉。
+C 的重扫日志是 `/home/byh/B02/analysis/icc_kv/capacity_cscan.log`，没有 summary json。日志末尾：
 
-- 13000：3/3 全部送达，P95 约 4–11 毫秒，稳定。
-- 14000：3/3 缺口约 13%–17%，P95 约 13 秒、37 秒、37 秒，不稳定。
+- 13000：3/3 全部送达，P95 约 4–11 毫秒，`stable` 为 true。
+- 14000：3/3 缺口约 13%、15%、17%，P95 约 13 秒、37 秒、37 秒，`stable` 为 false。
 
-C 取 13000。1.2 倍是 15600，已经高于 14000。旧文件 `/home/byh/B02/analysis/icc_kv/capacity/capacity_summary.json` 里的 8000 不要再拿来乘 ρ。
+C 取 13000。1.2 倍是 15600，已经高于 14000。旧文件 `/home/byh/B02/analysis/icc_kv/capacity/capacity_summary.json` 里的 `capacity_events_per_s = 8000` 不要再拿来乘 ρ。
 
-`/home/byh/B02/analysis/icc_kv/e2e_c13000/e2e_summary.json` 共 29 行。其中 ultrahigh 20/20（5 个 seed × FullSync、StaticSemantic、Adaptive、Ideal，每格 500 条请求，容量 13000）。另外 9 行是更早停掉的 near、high，以及 seed 0 的 xhigh FullSync。日志：`/home/byh/B02/analysis/icc_kv/e2e_ultrahigh.log`。
+`/home/byh/B02/analysis/icc_kv/e2e_c13000/e2e_summary.json` 共 29 行，容量都是 13000。其中 ultrahigh 20/20（5 个 seed × FullSync、StaticSemantic、Adaptive、Ideal，每格 500 条请求，`background_rho = 2.0`）。另外 9 行是更早停掉的 near、high 各 4 行，以及 seed 0 的 xhigh FullSync 1 行。日志：`/home/byh/B02/analysis/icc_kv/e2e_ultrahigh.log`。
 
-seed 0、ultrahigh（cell 19–22）：FullSync 假阴性 0.008、prefill 232.8、TTFT 970 ms；Adaptive 假阴性 0.860、prefill 370.7、TTFT 1026 ms。错放率都是 0。FullSync 这一格的 prefill 可能吃到被杀掉的 xhigh 留下的缓存盐 `icc-e2e-19`。seed 1–4 四种方法的 prefill 完全相同，假阴性 FullSync 约 0.012–0.060，Adaptive 约 0.87–0.88。2 倍没有让 Adaptive 的视图好过 FullSync。
+ultrahigh 的错放率全是 0。宽松假阴性：FullSync 在 seed 0–4 为 0.008、0.060、0.016、0.012、0.018；Adaptive 为 0.860、0.878、0.870、0.880、0.876。seed 0 的 FullSync prefill 是 232.8，同 seed 另外三种方法是 370.7，TTFT 分别是 970 ms 和 1026 ms。seed 1–4 四种方法的 prefill 完全相同。2 倍没有让 Adaptive 的视图好过 FullSync。
 
 更早的 C=8000 结果仍在：
 
-- 容量 8000：`/home/byh/B02/analysis/icc_kv/capacity/capacity_summary.json`。
+- 容量 8000：`/home/byh/B02/analysis/icc_kv/capacity/capacity_summary.json`，18 行。
 - 独立扩展 80/80、相关扩展 80/80、突发 40/40。
 - 端到端 60/60：`/home/byh/B02/analysis/icc_kv/e2e/e2e_summary.json`。
-- 消融 40/40：`/home/byh/B02/analysis/icc_kv/ablation/e2e_summary.json`。错放率和 coverage regret 全是 0。
+- 消融 40/40：`/home/byh/B02/analysis/icc_kv/ablation/e2e_summary.json`。错放率和 coverage regret 最大值都是 0。
 
-机器：vLLM 仍空转，pid 8000=`1375061`、8001=`1375062`、8002=`1375063`、8003=`1375064`，从 2026-09-28 08:52 UTC 起，显存约 6.2–6.7 GiB，利用率 0%。网关容器 `b02-gateway4t4` 听 `127.0.0.1:9710`，已启动约 9 小时。`b02-bgserver4t4` 也在。没人要求就不要停这些进程。
+机器：vLLM 仍空转，pid 8000=`1375061`、8001=`1375062`、8002=`1375063`、8003=`1375064`，从 2026-09-28 08:52 UTC 起。四张 T4 显存约 6.2–6.7 GiB / 15 GiB，利用率 0%。网关容器 `4af2176a7ea1`（`b02-gateway4t4`，Up 10 hours）听 `127.0.0.1:9710`。背景容器 `bc278c4e1e1f`（`b02-bgserver4t4`，Up 10 hours）。没人要求就不要停这些进程。
 
 已经定下来的结论：
 
@@ -78,7 +78,7 @@ seed 0、ultrahigh（cell 19–22）：FullSync 假阴性 0.008、prefill 232.8�
 
 ### Git
 
-分支 `main`，写这份交接之前与 `origin/main` 同步。最近一次已推送的交接是 `b343f0e`。
+分支 `main`。昨晚的交接已推送：`e7e159d`（2026-09-30 03:49 UTC，Update the handoff after the 2x load run finished）。再往前是 `b343f0e`。
 
 未提交、这次不要加进去：`experiments/icc_kv/runtime.py`（`PathRuntime.stop()`）、`replay.py`、`burst.py`、`capacity.py`（`--all-rates`，扫完不稳定档也继续）、`e2e.py`（`high`/`xhigh`/`ultrahigh` 负载，burst 基线 0.9，严格错放和宽松假阴性/假阳性同时记录）。用户没说就不要 commit 这些，不要 amend。
 
