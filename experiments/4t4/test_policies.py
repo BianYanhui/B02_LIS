@@ -101,6 +101,19 @@ def main() -> None:
                  "detail": json.dumps({"selected_seq": gw.HDR.unpack(selected[:32])[3]})})
 
     r = relay()
+    configure(r, gw.MODE_STATIC, merge=True, priority=True, dedup=2)
+    for owner in (16, 17):
+        frame, sent = up(owner, owner=owner)
+        r.enqueue(frame, gw.K_UP, owner, owner, 1024, 7, sent)
+    for owner in (0, 1, 2):
+        frame, sent = up(100 + owner, owner=owner)
+        r.enqueue(frame, gw.K_UP, owner, 100 + owner, 1024, 7, sent)
+    queued_owners = {gw.HDR.unpack(item[:32])[1] for item in r.queue}
+    rows.append({"policy": "StaticSemantic", "check": "background instances do not consume replica slots",
+                 "status": "PASS" if r.drops["replica_cap"] == 1 and queued_owners >= {16, 17, 0, 1} and 2 not in queued_owners and 16 not in r.replicas[7] else "FAIL",
+                 "detail": json.dumps({"replica_cap": r.drops["replica_cap"], "queued_owners": sorted(queued_owners), "replicas": sorted(r.replicas[7])})})
+
+    r = relay()
     configure(r, gw.MODE_ADAPTIVE, merge=True, priority=True, adaptive=True, dedup=2)
     r.ewma_dq = 10.0
     frame, sent = up(1, coverage=1)

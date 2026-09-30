@@ -50,8 +50,12 @@ Mechanisms (set per cell via a config frame; passthrough = all off):
   Adaptive: StaticSemantic plus congestion-aware utility admission and a
             dynamically tightened global coverage set.
   --priority: tombstones go to a priority lane released first (non-preemptive).
-  --dedup N:  replica cap: at most N instances may hold queued-or-forwarded
-              upserts per digest (drop excess).
+  --dedup N:  replica cap: at most N routable instances may hold
+              queued-or-forwarded upserts per digest (drop excess).
+              Instance ids at or above BACKGROUND_INSTANCE are harness
+              background load. They still enter the queue and the utility
+              gate, but they are not routing candidates and do not consume
+              or occupy those N slots.
   --global-topk K: retain only the K highest-coverage distinct prefixes in
               the unsent cross-instance queue.
   --adaptive: utility gate: drop an upsert when the ack-measured EWMA
@@ -77,6 +81,9 @@ import time
 from collections import Counter, defaultdict, deque
 
 FRAME = 64
+# e2e background replay sends worker_id + 16. Routing only considers 0-3,
+# so those frames must not take a replica-cap slot away from a real worker.
+BACKGROUND_INSTANCE = 16
 HDR = struct.Struct(">BBHIqQd")
 CFG = struct.Struct(">BBBBHIIIII")
 STATS = struct.Struct(">IIIIIIII")
@@ -253,7 +260,7 @@ class Relay:
                 self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
                                  selected=False, reason="low_utility")
                 return
-            if self.dedup:
+            if self.dedup and instance < BACKGROUND_INSTANCE:
                 replicas = self.replicas[digest]
                 if instance not in replicas and len(replicas) >= self.dedup:
                     self.drops["replica_cap"] += 1
