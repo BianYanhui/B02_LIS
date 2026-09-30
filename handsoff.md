@@ -28,64 +28,58 @@
 
 ## 可变交接
 
-更新时间：2026-09-29 17:36（UTC+8）。消融正在跑，已完成 29/40。不要再开一份，也不要停掉 pid `1727905` 或现有 vLLM。
+更新时间：2026-09-30 11:48（UTC+8）。没有实验在跑。ultrahigh 已结束。用户没说「继续」就不要开新的长实验。
 
 ### 正在做的事
 
-ICC 固定容量实验。容量、独立扩展、相关扩展、突发、端到端都已完成。消融从 2026-09-29 03:11 UTC 起单独在跑，17:36 时已运行约 6 小时 24 分。
-
-Python pid `1727905`，父 shell pid `1727900`：
-
-`poc/.venv/bin/python -u -m experiments.icc_kv.e2e --trace /home/byh/B02/analysis/icc_kv/trace/events.csv --capacity 8000 --scenarios near,burst --methods FullSync,StaticSemantic,AdaptiveNoPriority,Adaptive --seeds 5 --requests 500 --kv-cache-tokens 104544 --out-dir /home/byh/B02/analysis/icc_kv/ablation`
-
-工作目录 `/home/byh/B02`。日志：`/home/byh/B02/analysis/icc_kv/ablation_run.log`。网关容器 `cd9de618e029`（`b02-gateway4t4`，Up 6 hours）听 `127.0.0.1:9710`。dispatcher 由 pid `1727905` 听 `172.31.0.1:9711`。背景容器 `a5b1a7bf2b69`（`b02-bgserver4t4`）。
-
-`/home/byh/B02/analysis/icc_kv/ablation/e2e_summary.json` 在 09:27 UTC 有 29 行。最后一格是 seed 3、burst、FullSync，cell 38，500 条请求，错放率 0。下一格是 seed 3、burst、StaticSemantic。每格大约 13 分钟，剩下 11 格大约还要 2 到 3 小时。29 格的错放率和 coverage regret 最大值都是 0；同一 seed 同一场景里 prefill 和复用 token 不随方法变。
+ICC 固定容量实验。C=8000 那一轮的容量、两种扩展、突发、端到端、消融都已完成。随后按用户要求重选 C，并只把 2 倍负载跑完。进程 `2275150` 不在了。9711 没有在听。
 
 ### 当前状态
 
-不要再跑 `python -m experiments.icc_kv.overnight`。上一轮过夜进程 `1288945` 已在 2026-09-28 17:48:01 UTC 退出。它的消融在启动 4 秒后失败：`ConnectionResetError('Connection lost')`。这次是新进程。resume 键是 `(seed, scenario, method)`。
+工作状态：已完成，停着。没有 icc_kv 的 python 进程。
 
-已完成：
+C 的重扫日志是 `/home/byh/B02/analysis/icc_kv/capacity_cscan.log`，没有 summary json，因为扫到 14000 后进程被停掉。
 
-- 容量：`/home/byh/B02/analysis/icc_kv/capacity/capacity_summary.json`，`capacity_events_per_s = 8000`。500–8000 稳定，缺口 0，P95 约 0.4–3 ms。16000 不稳定，缺口约 13%–15%，P95 约 34–38 秒。
-- 独立扩展：`/home/byh/B02/analysis/icc_kv/scale_independent/scale_summary.json`，80/80。
-- 相关扩展：`/home/byh/B02/analysis/icc_kv/scale_correlated/scale_summary.json`，80/80。
-- 突发：`/home/byh/B02/analysis/icc_kv/burst/burst_summary.json`，40/40。
-- 端到端：`/home/byh/B02/analysis/icc_kv/e2e/e2e_summary.json`，60/60。每格 500 条请求。2026-09-28 08:54:27–17:47:57 UTC。
+- 13000：3/3 全部送达，P95 约 4–11 毫秒，稳定。
+- 14000：3/3 缺口约 13%–17%，P95 约 13 秒、37 秒、37 秒，不稳定。
 
-vLLM 没重启。pid：8000=`1375061`，8001=`1375062`，8002=`1375063`，8003=`1375064`，从 2026-09-28 08:52 UTC 起一直在。四张 T4 显存大约 6.2–6.7 GiB / 15 GiB；17:36 时 GPU 0 利用率约 90%，其余约 0%，因为请求是串行的。
+C 取 13000。1.2 倍是 15600，已经高于 14000。旧文件 `/home/byh/B02/analysis/icc_kv/capacity/capacity_summary.json` 里的 8000 不要再拿来乘 ρ。
 
-2026-09-29 下午跟用户对过结果，结论如下。不要把这次的 `applied/sent` 说成以前的送达率，也不要把突发的 16 秒、37 秒写成已经测出了错放：
+`/home/byh/B02/analysis/icc_kv/e2e_c13000/e2e_summary.json` 共 29 行。其中 ultrahigh 20/20（5 个 seed × FullSync、StaticSemantic、Adaptive、Ideal，每格 500 条请求，容量 13000）。另外 9 行是更早停掉的 near、high，以及 seed 0 的 xhigh FullSync。日志：`/home/byh/B02/analysis/icc_kv/e2e_ultrahigh.log`。
 
-- 这次 `applied/sent` 是调度器收下的帧除以塞进网关的帧。Adaptive 和 StaticSemantic 在每个稳态 ρ 都大约 15%，滞后 1–2 毫秒，FullSync 是 100%。差值来自网关里的合并、副本上限 2，以及突发时的效用门控，不是链路把帧弄丢。突发里 FullSync 的 90%（5 倍，P95 约 16.3 秒）和 85%（10 倍，P95 约 36.9 秒）才是没送完。Adaptive 在 5 倍时收下约 22%、P95 约 3 毫秒，10 倍时收下约 10%、P95 约 5.8 秒。
-- 稳态 ρ=1.2 是 9600 events/s，高于 C=8000，FullSync 仍全部收下。独立回放 P95 约 15 毫秒、P99 约 61 毫秒；相关回放 P95 约 5.6 毫秒。请求串行，TTFT 大约 540–670 毫秒，这个延迟落在同一次请求里，到不了「下一次放置时视图过期」。拐点在 8000 和 16000 之间。1.2 倍没有把链路打成旧 tc 那种每秒大约 1 帧的管子。
-- 突发回放的 16 秒和 37 秒只统计控制帧从发出到调度器收下的时间。那一组没有 vLLM，也没有调用 `choose`。端到端的 burst 只用了同一档 5 倍形状：基线 0.65×C 跑 25 秒，再以 26000 events/s 冲 5 秒。10 倍没有接到真实请求上。
-- 旧的复用基线是 `/home/byh/B02/analysis/formal4t4/summary/cells_baseline_reuse_20260726.csv`，每格大约 184 条更新。ρ=0.5 时 FullSync 转发 184、Adaptive 转发约 116；ρ=1.2 时两边都大约 60，因为 tc 只容得下这么多。Adaptive 以前不是送达更多。当时拉开的是假阴性（ρ=1.2 时 FullSync 0.45、Adaptive 0.24）和 TTFT（大约 1881 ms 对 1668 ms）。那张表的假阳性率是 0。状态年龄 P95 是 100–200 秒。
-- 端到端 60 格和消融已完成的 29 格，`wrong_placement_rate` 和 `coverage_regret_mean` 都是 0，prefill 和复用只随 seed 变。原因：`choose` 在视图没有覆盖时默认 worker 0；`truth` 在请求做完后立刻写在刚选中的 worker 上，理想放置也选 0；背景事件的 worker id 加了 16，`choose` 只扫 0–3。不要为了这个重跑前面的阶段。
+seed 0、ultrahigh（cell 19–22）：FullSync 假阴性 0.008、prefill 232.8、TTFT 970 ms；Adaptive 假阴性 0.860、prefill 370.7、TTFT 1026 ms。错放率都是 0。FullSync 这一格的 prefill 可能吃到被杀掉的 xhigh 留下的缓存盐 `icc-e2e-19`。seed 1–4 四种方法的 prefill 完全相同，假阴性 FullSync 约 0.012–0.060，Adaptive 约 0.87–0.88。2 倍没有让 Adaptive 的视图好过 FullSync。
 
-对照图在聊天旁边的画布，不在这个仓库里：`/home/byh/.cursor/projects/home-byh-B02/canvases/icc-fixed-capacity-results.canvas.tsx`。
+更早的 C=8000 结果仍在：
+
+- 容量 8000：`/home/byh/B02/analysis/icc_kv/capacity/capacity_summary.json`。
+- 独立扩展 80/80、相关扩展 80/80、突发 40/40。
+- 端到端 60/60：`/home/byh/B02/analysis/icc_kv/e2e/e2e_summary.json`。
+- 消融 40/40：`/home/byh/B02/analysis/icc_kv/ablation/e2e_summary.json`。错放率和 coverage regret 全是 0。
+
+机器：vLLM 仍空转，pid 8000=`1375061`、8001=`1375062`、8002=`1375063`、8003=`1375064`，从 2026-09-28 08:52 UTC 起，显存约 6.2–6.7 GiB，利用率 0%。网关容器 `b02-gateway4t4` 听 `127.0.0.1:9710`，已启动约 9 小时。`b02-bgserver4t4` 也在。没人要求就不要停这些进程。
+
+已经定下来的结论：
+
+- 8000 不能当 C。C 要让 1.2 倍出现明显排队，且不低于 13000。测出来的点是 13000 稳、14000 不稳。
+- 严格错放只在派到不同 worker 且理想覆盖大于 0 时计数。宽松假阴性是真值覆盖不低于 512、视图最高覆盖仍低于 512。先看严格；严格为 0 时用宽松。
+- 到 2 倍为止，Adaptive 的宽松假阴性高于 FullSync。原因是网关丢掉了前景更新，不是 FullSync 的队列把视图拖过期。错放率仍是 0，因为空视图默认 worker 0，真值也写在刚选中的 worker 上。seed 1–4 的 prefill 不随方法变。
+- 因此 near、high、xhigh、burst 不用为了找 Adaptive 的视图优势再跑。2 倍已经是这套负载里最有机会的一档，没有出现。
 
 ### 下一步
 
-用户说「继续」时，先看 pid `1727905` 是否还在，以及 `/home/byh/B02/analysis/icc_kv/ablation/e2e_summary.json` 是否超过 29 行。超过 30 分钟没有新行，再看 `ablation_run.log`、9711 和四张卡。进程若已退出：先读日志里的 traceback。同一条命令会按 summary 的 key 跳过已完成格子。不要另起一套 vLLM，也不要再启动 `overnight`。消融自己跑完之前，不要改放置逻辑，也不要开新的长实验。
+用户说「继续」时，不要重跑 C=8000 的队列，不要把五档矩阵自动续上，也不要再启动 `python -m experiments.icc_kv.overnight`。等用户指定下一件事。在那之前不要改放置逻辑，也不要开新的长实验。
 
 ### 已经定下来的约束
 
 - Gateway：docker `b02-gateway4t4`，`--cpus 1 --cpuset-cpus 0`，`--max-queue 4096`，tau 30，util_lambda 16，gate 2，adaptive queue gate 8。Dispatcher 绑 CPU 1。HTB 天花板固定 1 Gbit，不按 ρ 改 C。
-- 背景 reporter 的 worker id 用 `worker_id + 16`，避免覆盖真实 worker 0–3。Ideal 对前景更新本地生效，不把它们送进链路。消融这一轮没有 Ideal，方法是 FullSync、StaticSemantic、AdaptiveNoPriority、Adaptive。
-- 不要把 4 张 GPU 写成大规模系统。不要把 0.73–3.04 updates/s（旧文里按 ρ 配的 HTB 预算）和 84.5×10³ updates/s（单核 `AdaptiveRelay.enqueue` 微基准）写成同一个瓶颈。
+- 背景 reporter 的 worker id 用 `worker_id + 16`。`choose` 只扫 worker 0–3。Ideal 对前景更新本地生效，不送进链路。
+- 不要把 4 张 GPU 写成大规模系统。不要把 0.73–3.04 updates/s 和 84.5×10³ updates/s 写成同一个瓶颈。
 - Python：`/home/byh/B02/poc/.venv/bin/python`。原始结果目录 `analysis/icc_kv/` 已在 `.gitignore`。
 
 ### Git
 
-分支 `main`，与 `origin/main` 同步（这次提交之前）。已提交：
+分支 `main`，写这份交接之前与 `origin/main` 同步。最近一次已推送的交接是 `b343f0e`。
 
-- `f253f02` Add a fixed-capacity ICC harness and keep the manuscript PDF untracked.
-- `4e65c7c` Record live KV traces and replay them against one fixed capacity.
-- `f2df559` Queue the ICC runs so each stage starts when the previous one finishes.
-- `f8a15ff` Add a handoff note so the next agent can resume the ICC queue.
-
-这次交接只提交 `handsoff.md`。仍未提交、用户没说就不要 commit：`experiments/icc_kv/runtime.py`、`replay.py`、`burst.py`、`capacity.py`、`e2e.py`（`PathRuntime.stop()` 及各阶段 `finally`，用来关掉 9711，避免下一阶段 `address already in use`）。不要 amend。
+未提交、这次不要加进去：`experiments/icc_kv/runtime.py`（`PathRuntime.stop()`）、`replay.py`、`burst.py`、`capacity.py`（`--all-rates`，扫完不稳定档也继续）、`e2e.py`（`high`/`xhigh`/`ultrahigh` 负载，burst 基线 0.9，严格错放和宽松假阴性/假阳性同时记录）。用户没说就不要 commit 这些，不要 amend。
 
 不要提交、不要推送：`Bare_Demo_of_IEEEtran_cls_for_IEEE_Journals.pdf`、`analysis/icc_kv/`、未跟踪的 `analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`。
