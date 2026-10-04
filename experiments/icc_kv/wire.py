@@ -7,6 +7,7 @@ import time
 FRAME = 64
 HDR = struct.Struct(">BBHIqQd")
 CFG = struct.Struct(">BBBBHIIIII")
+STATS = struct.Struct(">IIIIIIII")
 K_UP, K_TOMB, K_RESET, K_STATS_REQ, K_CONFIG, K_ACK, K_STATS, K_RESET_DONE = 1, 2, 3, 4, 5, 6, 7, 8
 WIRE_BYTES = 104
 

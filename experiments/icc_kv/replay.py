@@ -109,32 +109,35 @@ async def run_scale(trace: Path, capacity: float, rhos: list[float], methods: li
     prepare_fixed_gateway()
     runtime = PathRuntime()
     await runtime.start()
-    out_dir.mkdir(parents=True, exist_ok=True)
-    summary_path = out_dir / "scale_summary.json"
-    rows: list[dict] = []
-    if summary_path.exists():
-        rows = json.loads(summary_path.read_text()).get("rows", [])
-    done = {(row["seed"], row["rho"], row["method"], row["correlated"]) for row in rows}
-    cell = 1 + len(rows)
-    for seed in range(seeds):
-        expanded = expand(events, copies, correlated, seed)
-        for rho in rhos:
-            span_s = max(1e-3, (int(expanded[-1]["timestamp_ns"]) - int(expanded[0]["timestamp_ns"])) / 1e9)
-            natural = len(expanded) / span_s
-            target = rho * capacity
-            speed = target / natural if natural else 1.0
-            for method in methods:
-                if (seed, rho, method, correlated) in done:
-                    continue
-                rate = capacity if method == "RateFIFO" else 0.0
-                await runtime.configure(cell, method, rate)
-                sent = await replay(runtime, expanded, cell, speed, seconds)
-                row = summarize(method, rho, capacity, sent, list(runtime.dispatcher.applied), seconds)
-                row.update({"seed": seed, "copies": copies, "correlated": correlated, "cell": cell, "speed": speed})
-                rows.append(row)
-                write_json(summary_path, {**runtime.meta(), "rows": rows})
-                print(row, flush=True)
-                cell += 1
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        summary_path = out_dir / "scale_summary.json"
+        rows: list[dict] = []
+        if summary_path.exists():
+            rows = json.loads(summary_path.read_text()).get("rows", [])
+        done = {(row["seed"], row["rho"], row["method"], row["correlated"]) for row in rows}
+        cell = 1 + len(rows)
+        for seed in range(seeds):
+            expanded = expand(events, copies, correlated, seed)
+            for rho in rhos:
+                span_s = max(1e-3, (int(expanded[-1]["timestamp_ns"]) - int(expanded[0]["timestamp_ns"])) / 1e9)
+                natural = len(expanded) / span_s
+                target = rho * capacity
+                speed = target / natural if natural else 1.0
+                for method in methods:
+                    if (seed, rho, method, correlated) in done:
+                        continue
+                    rate = capacity if method == "RateFIFO" else 0.0
+                    await runtime.configure(cell, method, rate)
+                    sent = await replay(runtime, expanded, cell, speed, seconds)
+                    row = summarize(method, rho, capacity, sent, list(runtime.dispatcher.applied), seconds)
+                    row.update({"seed": seed, "copies": copies, "correlated": correlated, "cell": cell, "speed": speed})
+                    rows.append(row)
+                    write_json(summary_path, {**runtime.meta(), "rows": rows})
+                    print(row, flush=True)
+                    cell += 1
+    finally:
+        await runtime.stop()
 
 
 def main() -> None:

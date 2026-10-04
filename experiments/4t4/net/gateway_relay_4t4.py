@@ -57,11 +57,16 @@ Mechanisms (set per cell via a config frame; passthrough = all off):
               gate, but they are not routing candidates and do not consume
               or occupy those N slots.
   --global-topk K: retain only the K highest-coverage distinct prefixes in
-              the unsent cross-instance queue.
-  --adaptive: utility gate: drop an upsert when the ack-measured EWMA
-              delivery delay Dq or the gateway's pre-link queue exceeds its
-              congestion threshold, and
+              the unsent cross-instance queue. Congestion shrinks K by 4.
+              Instance id is not a special case: a short prefix is trimmed
+              whether or not the router can place on that instance.
+  --adaptive: utility gate: drop an upsert when congestion is sustained.
+              Delay congestion is EWMA delivery delay Dq above --gate.
+              Queue congestion is the pre-link queue staying at or above
+              --adaptive-queue-gate for --congestion-hold seconds, so one
+              send burst cannot open the gate by itself. The drop test is
               U = exp(-(age+Dq)/tau)*coverage - lambda*FRAME <= 0.
+              With lambda=16 and a 64-byte frame the bar is 1024 tokens.
   --max-inflight: optional shared application-layer frame window.  It is
               applied to every policy equally, preserving an unsent gateway
               queue where semantic selection can still replace stale updates
@@ -117,9 +122,13 @@ class Relay:
         self.rate_last = time.monotonic()
         self.queue: deque[bytes] = deque()
         self.pqueue: deque[bytes] = deque()
+        # Latest unsent K_UP for a (instance, digest). Lookup replaces a scan
+        # of the whole FIFO, which stalled Static on unique noise.
+        self.queued_up: dict[tuple[int, int], bytes] = {}
         self.replicas: dict[int, set[int]] = defaultdict(set)
         self.recent: dict[int, float] = {}
         self.ewma_dq = 0.0
+        self.queue_high_since: float | None = None
         self.drops: Counter[str] = Counter()
         self.forwarded = 0
         self.maxq = 0
@@ -150,6 +159,8 @@ class Relay:
     def emit_update(self, stage: str, kind: int, instance: int, cell: int, seq: int,
                     coverage: int, digest: int, t_send: float, *, selected: bool,
                     reason: str = "", score: float | None = None) -> None:
+        if getattr(self.args, "quiet", False):
+            return
         now = time.time()
         print(json.dumps({
             "event": "update", "stage": stage, "cell": cell, "update_id": seq,
@@ -226,17 +237,31 @@ class Relay:
             writer.close()
 
     def congested(self) -> bool:
-        return self.adaptive and (
-            self.ewma_dq > self.args.gate
-            or len(self.queue) >= self.args.adaptive_queue_gate
-        )
+        """True only after sustained delay or a queue that stays high.
+
+        A single enqueue burst can push len(queue) past the gate for a few
+        milliseconds and then drain. That is not the overload the utility
+        gate is meant to see.
+        """
+        if not self.adaptive:
+            return False
+        if self.ewma_dq > self.args.gate:
+            return True
+        now = time.monotonic()
+        if len(self.queue) >= self.args.adaptive_queue_gate:
+            if self.queue_high_since is None:
+                self.queue_high_since = now
+            hold = float(getattr(self.args, "congestion_hold", 0.2))
+            return now - self.queue_high_since >= hold
+        self.queue_high_since = None
+        return False
 
     def low_utility(self, coverage: int, t_send: float) -> bool:
         if not self.congested():
             return False
-        age = time.time() - t_send
-        utility = (2.718281828459045 ** (-(age + self.ewma_dq) / self.args.tau)) * coverage - self.args.util_lambda * FRAME
-        return utility <= 0
+        age = max(0.0, time.time() - t_send)
+        decay = 2.718281828459045 ** (-(age + self.ewma_dq) / self.args.tau)
+        return decay * coverage - self.args.util_lambda * FRAME <= 0
 
     def enqueue(self, data: bytes, kind: int, instance: int, seq: int, coverage: int, digest: int, t_send: float) -> None:
         _kind, _instance, cell, _seq, _coverage, _digest, _t = HDR.unpack(data[:32])
@@ -248,13 +273,7 @@ class Relay:
             return
         if kind == K_UP:
             if self.merge:
-                for queued in list(self.queue):
-                    qkind, qinst, qcell, qseq, qcov, qdig, qt = HDR.unpack(queued[:32])
-                    if qkind == K_UP and qinst == instance and qdig == digest:
-                        self.queue.remove(queued)
-                        self.drops["superseded"] += 1
-                        self.emit_update("suppressed", qkind, qinst, qcell, qseq, qcov, qdig, qt,
-                                         selected=False, reason="superseded")
+                self._supersede_queued_up(instance, digest)
             if self.low_utility(coverage, t_send):
                 self.drops["low_utility"] += 1
                 self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
@@ -269,14 +288,13 @@ class Relay:
                     return
                 replicas.add(instance)
         if kind == K_TOMB and self.merge:
-            for queued in list(self.queue):
-                qkind, qinst, qcell, qseq, qcov, qdig, qt = HDR.unpack(queued[:32])
-                if qkind == K_UP and qinst == instance and qdig == digest:
-                    self.queue.remove(queued)
-                    self.drops["superseded"] += 1
-                    self.emit_update("suppressed", qkind, qinst, qcell, qseq, qcov, qdig, qt,
-                                     selected=False, reason="superseded")
-        (self.pqueue if (kind == K_TOMB and self.priority) else self.queue).append(data)
+            self._supersede_queued_up(instance, digest)
+        if kind == K_TOMB and self.priority:
+            self.pqueue.append(data)
+        else:
+            self.queue.append(data)
+            if kind == K_UP:
+                self.queued_up[(instance, digest)] = data
         self.emit_update("enqueued", kind, instance, cell, seq, coverage, digest, t_send,
                          selected=True, score=score)
         if kind == K_UP and self.global_topk:
@@ -307,6 +325,7 @@ class Relay:
         for queued in self.queue:
             qkind, qinst, qcell, qseq, qcoverage, qdigest, qsent = HDR.unpack(queued[:32])
             if qkind == K_UP and qdigest not in keep:
+                self._forget_queued_up(queued)
                 self.drops["global_topk"] += 1
                 self.drops["low_utility"] += 1
                 self.replicas[qdigest].discard(qinst)
@@ -316,13 +335,39 @@ class Relay:
                 retained.append(queued)
         self.queue = retained
 
+    def _supersede_queued_up(self, instance: int, digest: int) -> None:
+        prev = self.queued_up.pop((instance, digest), None)
+        if prev is None:
+            return
+        self.queue.remove(prev)
+        qkind, qinst, qcell, qseq, qcov, qdig, qt = HDR.unpack(prev[:32])
+        self.drops["superseded"] += 1
+        self.emit_update("suppressed", qkind, qinst, qcell, qseq, qcov, qdig, qt,
+                         selected=False, reason="superseded")
+
+    def _forget_queued_up(self, data: bytes) -> None:
+        kind, instance, _cell, _seq, _coverage, digest, _sent = HDR.unpack(data[:32])
+        if kind == K_UP and self.queued_up.get((instance, digest)) is data:
+            del self.queued_up[(instance, digest)]
+
+    def _requeue_front(self, data: bytes) -> None:
+        kind, instance, _cell, _seq, _coverage, digest, _sent = HDR.unpack(data[:32])
+        if kind == K_TOMB and self.priority:
+            self.pqueue.appendleft(data)
+            return
+        self.queue.appendleft(data)
+        if kind == K_UP and (instance, digest) not in self.queued_up:
+            self.queued_up[(instance, digest)] = data
+
     def do_reset(self, cell: int) -> None:
         self.queue.clear()
         self.pqueue.clear()
+        self.queued_up.clear()
         self.replicas.clear()
         self.recent.clear()
         self.inflight_event.set()
         self.ewma_dq = 0.0
+        self.queue_high_since = None
         self.drops.clear()
         self.forwarded = 0
         self.maxq = 0
@@ -398,11 +443,13 @@ class Relay:
                     ),
                 )
                 self.queue.remove(data)
+                self._forget_queued_up(data)
             else:
                 data = self.queue.popleft()
+                self._forget_queued_up(data)
             if self.down_writer is None:
                 # Dispatcher endpoint not connected yet: requeue and wait.
-                (self.pqueue if HDR.unpack(data[:32])[0] == K_TOMB and self.priority else self.queue).appendleft(data)
+                self._requeue_front(data)
                 await asyncio.sleep(0.2)
                 continue
             kind, instance, cell, seq, coverage, digest, t_send = HDR.unpack(data[:32])
@@ -416,7 +463,7 @@ class Relay:
                 self.down_writer.write(data)
                 await self.down_writer.drain()
             except (ConnectionResetError, BrokenPipeError, OSError):
-                (self.pqueue if kind == K_TOMB and self.priority else self.queue).appendleft(data)
+                self._requeue_front(data)
                 await asyncio.sleep(0.2)
                 continue
             self.forwarded += 1
@@ -484,6 +531,10 @@ def main() -> None:
     parser.add_argument("--gate", type=float, default=2.0)
     parser.add_argument("--adaptive-queue-gate", type=int, default=8,
                         help="queued upserts that trigger proactive adaptive admission")
+    parser.add_argument("--congestion-hold", type=float, default=0.2,
+                        help="seconds the pre-link queue must stay above the gate before adaptive admission treats it as congestion")
+    parser.add_argument("--quiet", action="store_true",
+                        help="do not print a JSON line per frame; counters and the 2s tick remain")
     args = parser.parse_args()
     asyncio.run(amain(args))
 

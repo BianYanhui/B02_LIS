@@ -113,34 +113,37 @@ async def one_point(runtime: PathRuntime, rate: int, seconds: float, rep: int, c
     }
 
 
-async def run_capacity(rates: list[int], reps: int, seconds: float, out_dir: Path) -> dict:
+async def run_capacity(rates: list[int], reps: int, seconds: float, out_dir: Path, stop_at_unstable: bool = True) -> dict:
     prepare_fixed_gateway()
     runtime = PathRuntime()
     await runtime.start()
-    rows = []
-    cell = 1
-    for rate in rates:
-        point_rows = []
-        for rep in range(reps):
-            row = await one_point(runtime, rate, seconds, rep, cell)
-            cell += 1
-            point_rows.append(row)
-            rows.append(row)
-            print(row, flush=True)
-        if not all(row["stable"] for row in point_rows):
-            break
-    stable_rates = sorted({row["rate_target"] for row in rows if row["stable"]})
-    capacity = max(stable_rates) if stable_rates else 0
-    summary = {
-        **runtime.meta(),
-        "experiment": "capacity",
-        "capacity_events_per_s": capacity,
-        "rule": "largest offered rate with gap<=1%, deficit slope<=1% of rate, and P95 lag not rising",
-        "rows": rows,
-    }
-    out_dir.mkdir(parents=True, exist_ok=True)
-    write_json(out_dir / "capacity_summary.json", summary)
-    return summary
+    try:
+        rows = []
+        cell = 1
+        for rate in rates:
+            point_rows = []
+            for rep in range(reps):
+                row = await one_point(runtime, rate, seconds, rep, cell)
+                cell += 1
+                point_rows.append(row)
+                rows.append(row)
+                print(row, flush=True)
+            if stop_at_unstable and not all(row["stable"] for row in point_rows):
+                break
+        stable_rates = sorted({row["rate_target"] for row in rows if row["stable"]})
+        capacity = max(stable_rates) if stable_rates else 0
+        summary = {
+            **runtime.meta(),
+            "experiment": "capacity",
+            "capacity_events_per_s": capacity,
+            "rule": "largest offered rate with gap<=1%, deficit slope<=1% of rate, and P95 lag not rising",
+            "rows": rows,
+        }
+        out_dir.mkdir(parents=True, exist_ok=True)
+        write_json(out_dir / "capacity_summary.json", summary)
+        return summary
+    finally:
+        await runtime.stop()
 
 
 def main() -> None:
@@ -150,9 +153,10 @@ def main() -> None:
     parser.add_argument("--reps", type=int, default=3)
     parser.add_argument("--seconds", type=float, default=120.0)
     parser.add_argument("--out-dir", type=Path, default=OUT / "capacity")
+    parser.add_argument("--all-rates", action="store_true", help="keep measuring after the first unstable rate")
     args = parser.parse_args()
     rates = [int(item) for item in args.rates.split(",") if item]
-    asyncio.run(run_capacity(rates, args.reps, args.seconds, args.out_dir))
+    asyncio.run(run_capacity(rates, args.reps, args.seconds, args.out_dir, stop_at_unstable=not args.all_rates))
 
 
 if __name__ == "__main__":

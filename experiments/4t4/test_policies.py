@@ -115,12 +115,48 @@ def main() -> None:
 
     r = relay()
     configure(r, gw.MODE_ADAPTIVE, merge=True, priority=True, adaptive=True, dedup=2)
-    r.ewma_dq = 10.0
-    frame, sent = up(1, coverage=1)
-    r.enqueue(frame, gw.K_UP, 0, 1, 1, 7, sent)
-    rows.append({"policy": "Adaptive", "check": "congestion-aware low-utility admission activates",
-                 "status": "PASS" if r.drops["low_utility"] == 1 else "FAIL",
-                 "detail": json.dumps({"low_utility": r.drops["low_utility"]})})
+    r.ewma_dq = 3.0
+    frame, sent = up(1, coverage=256)
+    r.enqueue(frame, gw.K_UP, 0, 1, 256, 7, sent)
+    rows.append({"policy": "Adaptive", "check": "congestion drops a short prefix below 1024 tokens",
+                 "status": "PASS" if r.drops["low_utility"] == 1 and len(r.queue) == 0 else "FAIL",
+                 "detail": json.dumps({"low_utility": r.drops["low_utility"], "queue": len(r.queue)})})
+
+    r = relay()
+    configure(r, gw.MODE_ADAPTIVE, merge=True, priority=True, adaptive=True, dedup=2)
+    r.ewma_dq = 3.0
+    frame, sent = up(1, coverage=4096)
+    r.enqueue(frame, gw.K_UP, 0, 1, 4096, 7, sent)
+    rows.append({"policy": "Adaptive", "check": "a fresh 4096-token prefix survives moderate delay",
+                 "status": "PASS" if r.drops["low_utility"] == 0 and len(r.queue) == 1 else "FAIL",
+                 "detail": json.dumps({"low_utility": r.drops["low_utility"], "queue": len(r.queue)})})
+
+    r = relay()
+    configure(r, gw.MODE_ADAPTIVE, merge=True, priority=True, adaptive=True, dedup=2)
+    r.ewma_dq = 0.0
+    for seq in range(8):
+        frame, sent = up(seq, digest=seq)
+        r.queue.append(frame)
+    immediate = r.congested()
+    r.queue_high_since = time.monotonic() - 1.0
+    held = r.congested()
+    rows.append({"policy": "Adaptive", "check": "queue congestion requires the hold window",
+                 "status": "PASS" if immediate is False and held is True else "FAIL",
+                 "detail": json.dumps({"immediate": immediate, "held": held})})
+
+    r = relay()
+    configure(r, gw.MODE_ADAPTIVE, merge=True, priority=True, adaptive=True, dedup=2)
+    r.global_topk = 4
+    r.ewma_dq = 3.0
+    for seq in range(4):
+        frame, sent = up(seq, owner=0, digest=100 + seq, coverage=2048)
+        r.enqueue(frame, gw.K_UP, 0, seq, 2048, 100 + seq, sent)
+    frame, sent = up(50, owner=16, digest=7, coverage=4096)
+    r.enqueue(frame, gw.K_UP, 16, 50, 4096, 7, sent)
+    queued = [gw.HDR.unpack(item[:32]) for item in r.queue]
+    rows.append({"policy": "Adaptive", "check": "congested top-k keeps the longest prefix on any instance",
+                 "status": "PASS" if len(queued) == 1 and queued[0][4] == 4096 else "FAIL",
+                 "detail": json.dumps({"queued_coverage": [item[4] for item in queued], "global_topk": r.drops["global_topk"]})})
 
     # FullSync's absence of a semantic transformation is checked separately
     # from the individual mechanisms above.
@@ -132,6 +168,22 @@ def main() -> None:
     rows.append({"policy": "FullSync", "check": "all events remain FIFO without suppression",
                  "status": "PASS" if len(r.queue) == 3 and not r.drops else "FAIL",
                  "detail": json.dumps({"queue": len(r.queue), "drops": dict(r.drops)})})
+
+    r = relay()
+    configure(r, gw.MODE_STATIC, merge=True, priority=True, dedup=2)
+    started = time.perf_counter()
+    for seq in range(1, 8001):
+        frame, sent = up(seq, owner=16 + (seq % 4), digest=seq, coverage=256)
+        r.enqueue(frame, gw.K_UP, 16 + (seq % 4), seq, 256, seq, sent)
+    elapsed = time.perf_counter() - started
+    frame, sent = up(90001, owner=17, digest=1, coverage=256)
+    r.enqueue(frame, gw.K_UP, 17, 90001, 256, 1, sent)
+    sent = time.time()
+    r.enqueue(gw.frame(gw.K_TOMB, 17, 17, 90002, 0, 1, sent), gw.K_TOMB, 17, 90002, 0, 1, sent)
+    still = [gw.HDR.unpack(item[:32])[5] for item in r.queue]
+    rows.append({"policy": "StaticSemantic", "check": "unique digests enqueue without a queue scan, repeats collapse",
+                 "status": "PASS" if elapsed < 1.0 and len(r.queue) == 7999 and r.drops["superseded"] == 2 and 1 not in still else "FAIL",
+                 "detail": json.dumps({"elapsed_s": round(elapsed, 3), "queue": len(r.queue), "superseded": r.drops["superseded"]})})
 
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)

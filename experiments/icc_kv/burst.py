@@ -47,36 +47,39 @@ async def run_burst(trace: Path, capacity: float, multipliers: list[float], meth
     prepare_fixed_gateway()
     runtime = PathRuntime()
     await runtime.start()
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / "burst_summary.json"
-    rows: list[dict] = json.loads(path.read_text()).get("rows", []) if path.exists() else []
-    done = {(row["seed"], row["multiplier"], row["method"]) for row in rows}
-    cell = 1 + len(rows)
-    base = 0.65 * capacity
-    for seed in range(seeds):
-        for multiplier in multipliers:
-            for method in methods:
-                if (seed, multiplier, method) in done:
-                    continue
-                rate = capacity if method == "RateFIFO" else 0.0
-                await runtime.configure(cell, method, rate)
-                sent = 0
-                seq = 1
-                for _cycle in range(5):
-                    sent += await offer(runtime, events, cell, base, 25.0, seq + sent)
-                    sent += await offer(runtime, events, cell, base * multiplier, 5.0, seq + sent)
-                before = len(runtime.dispatcher.applied)
-                await asyncio.sleep(5.0)
-                row = summarize(method, base * (25 + 5 * multiplier) / 30 / capacity, capacity, sent, list(runtime.dispatcher.applied), 150.0)
-                row.update({
-                    "seed": seed, "multiplier": multiplier, "cell": cell,
-                    "applied_after_tail": len(runtime.dispatcher.applied),
-                    "applied_at_burst_end": before,
-                })
-                rows.append(row)
-                write_json(path, {**runtime.meta(), "rows": rows})
-                print(row, flush=True)
-                cell += 1
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / "burst_summary.json"
+        rows: list[dict] = json.loads(path.read_text()).get("rows", []) if path.exists() else []
+        done = {(row["seed"], row["multiplier"], row["method"]) for row in rows}
+        cell = 1 + len(rows)
+        base = 0.65 * capacity
+        for seed in range(seeds):
+            for multiplier in multipliers:
+                for method in methods:
+                    if (seed, multiplier, method) in done:
+                        continue
+                    rate = capacity if method == "RateFIFO" else 0.0
+                    await runtime.configure(cell, method, rate)
+                    sent = 0
+                    seq = 1
+                    for _cycle in range(5):
+                        sent += await offer(runtime, events, cell, base, 25.0, seq + sent)
+                        sent += await offer(runtime, events, cell, base * multiplier, 5.0, seq + sent)
+                    before = len(runtime.dispatcher.applied)
+                    await asyncio.sleep(5.0)
+                    row = summarize(method, base * (25 + 5 * multiplier) / 30 / capacity, capacity, sent, list(runtime.dispatcher.applied), 150.0)
+                    row.update({
+                        "seed": seed, "multiplier": multiplier, "cell": cell,
+                        "applied_after_tail": len(runtime.dispatcher.applied),
+                        "applied_at_burst_end": before,
+                    })
+                    rows.append(row)
+                    write_json(path, {**runtime.meta(), "rows": rows})
+                    print(row, flush=True)
+                    cell += 1
+    finally:
+        await runtime.stop()
 
 
 def main() -> None:
