@@ -79,6 +79,10 @@ def stage(name: str, fn) -> None:
 
 
 def main() -> None:
+    raise SystemExit(
+        "overnight.py is retired: it replays the 64-prefix trace and restarts vLLM. "
+        "Use python -m experiments.icc_kv.full_queue."
+    )
     log("overnight queue starting")
     capacity = wait_for_capacity()
     trace = OUT / "trace" / "events.csv"

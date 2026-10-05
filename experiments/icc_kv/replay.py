@@ -1,13 +1,15 @@
-"""Experiments 2–3: replay one recorded trace at a fixed capacity C.
+"""Experiment 2: fixed capacity, unique short noise, a few long prefixes.
 
-Offered rate is rho * C. The HTB ceiling and Gateway CPU quota stay at the
-values used to measure C. Copies of the trace differ by worker id; correlated
-mode keeps the original timing, independent mode shifts each copy.
+Offered noise rate is rho * C. Each noise digest is new and coverage is 256,
+so semantic merge cannot collapse it. Long prefixes use the same digest
+strings and 4096-token coverage as the end-to-end requests, and they go out
+the foreground connection. The recorded 64-prefix trace is not the load.
 """
 from __future__ import annotations
 
 import asyncio
 import csv
+import hashlib
 import json
 import random
 import time
@@ -104,34 +106,92 @@ def summarize(method: str, rho: float, capacity: float, sent: int, applied: list
     }
 
 
-async def run_scale(trace: Path, capacity: float, rhos: list[float], methods: list[str], copies: int, correlated: bool, seeds: int, seconds: float, out_dir: Path) -> None:
-    events = load_events(trace)
+def useful_digest(slot: int) -> int:
+    return int.from_bytes(hashlib.blake2b(f"U{slot:04d}".encode(), digest_size=8).digest(), "big")
+
+
+async def offer_long(runtime: PathRuntime, cell: int, seconds: float, seq0: int, per_s: float = 2.0) -> int:
+    """Steady 4096-token updates on the foreground connection. Same digests as end-to-end requests."""
+    from experiments.icc_kv.e2e import USEFUL_COVERAGE, USEFUL_POOL
+
+    sent = 0
+    started = time.perf_counter()
+    while time.perf_counter() - started < seconds:
+        target = started + sent / per_s
+        delay = target - time.perf_counter()
+        if delay > 0:
+            await asyncio.sleep(delay)
+            if time.perf_counter() - started >= seconds:
+                break
+        slot = sent % USEFUL_POOL
+        await runtime.send_foreground(
+            K_UP, slot % 4, cell, seq0 + sent, USEFUL_COVERAGE, useful_digest(slot), time.time(),
+        )
+        sent += 1
+    return sent
+
+
+def long_lag(applied: list) -> tuple[float, float, int]:
+    from experiments.icc_kv.e2e import USEFUL_COVERAGE
+
+    lags = sorted(max(0.0, row.applied_at - row.generated_at) for row in applied if row.coverage >= USEFUL_COVERAGE)
+    if not lags:
+        return 0.0, 0.0, 0
+
+    def pct(p: float) -> float:
+        return lags[min(len(lags) - 1, round(p / 100 * (len(lags) - 1)))]
+
+    return pct(50), pct(95), len(lags)
+
+
+async def run_scale(capacity: float, rhos: list[float], methods: list[str], seeds: int, seconds: float, out_dir: Path) -> None:
+    from experiments.icc_kv.e2e import NOISE_COVERAGE, USEFUL_COVERAGE, offer_noise
+
     prepare_fixed_gateway()
     runtime = PathRuntime()
     await runtime.start()
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
         summary_path = out_dir / "scale_summary.json"
-        rows: list[dict] = []
-        if summary_path.exists():
-            rows = json.loads(summary_path.read_text()).get("rows", [])
-        done = {(row["seed"], row["rho"], row["method"], row["correlated"]) for row in rows}
+        rows: list[dict] = json.loads(summary_path.read_text()).get("rows", []) if summary_path.exists() else []
+        done = {(row["seed"], row["rho"], row["method"]) for row in rows}
         cell = 1 + len(rows)
         for seed in range(seeds):
-            expanded = expand(events, copies, correlated, seed)
             for rho in rhos:
-                span_s = max(1e-3, (int(expanded[-1]["timestamp_ns"]) - int(expanded[0]["timestamp_ns"])) / 1e9)
-                natural = len(expanded) / span_s
-                target = rho * capacity
-                speed = target / natural if natural else 1.0
                 for method in methods:
-                    if (seed, rho, method, correlated) in done:
+                    if (seed, rho, method) in done:
                         continue
                     rate = capacity if method == "RateFIFO" else 0.0
                     await runtime.configure(cell, method, rate)
-                    sent = await replay(runtime, expanded, cell, speed, seconds)
-                    row = summarize(method, rho, capacity, sent, list(runtime.dispatcher.applied), seconds)
-                    row.update({"seed": seed, "copies": copies, "correlated": correlated, "cell": cell, "speed": speed})
+                    noise_seq = 1_000_000_000 + seed * 100_000_000_000 + int(rho * 1000) * 1_000_000
+                    noise_sent, long_sent = await asyncio.gather(
+                        offer_noise(runtime, cell, rho * capacity, seconds, noise_seq),
+                        offer_long(runtime, cell, seconds, 1 + seed * 1_000_000),
+                    )
+                    with runtime.dispatcher.lock:
+                        frames = runtime.dispatcher.frames
+                        foreground = runtime.dispatcher.foreground_frames
+                        applied = list(runtime.dispatcher.applied)
+                    lag_p50, lag_p95, long_applied = long_lag(applied)
+                    row = {
+                        "seed": seed,
+                        "rho": rho,
+                        "method": method,
+                        "cell": cell,
+                        "seconds": seconds,
+                        "workload": "unique_noise",
+                        "noise_coverage": NOISE_COVERAGE,
+                        "useful_coverage": USEFUL_COVERAGE,
+                        "noise_sent": noise_sent,
+                        "noise_applied": max(0, frames - foreground),
+                        "long_sent": long_sent,
+                        "long_applied": long_applied,
+                        "long_lag_p50_s": lag_p50,
+                        "long_lag_p95_s": lag_p95,
+                        "capacity_events_per_s": capacity,
+                        "offered_noise_per_s": noise_sent / seconds if seconds else 0.0,
+                        **(await runtime.fetch_stats()),
+                    }
                     rows.append(row)
                     write_json(summary_path, {**runtime.meta(), "rows": rows})
                     print(row, flush=True)
@@ -143,21 +203,18 @@ async def run_scale(trace: Path, capacity: float, rhos: list[float], methods: li
 def main() -> None:
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--trace", type=Path, default=OUT / "trace" / "events.csv")
     parser.add_argument("--capacity", type=float, required=True)
-    parser.add_argument("--rhos", default="0.5,0.8,1.0,1.2")
+    parser.add_argument("--rhos", default="0.5,0.9,1.2,1.5,2.0")
     parser.add_argument("--methods", default=",".join(METHODS))
-    parser.add_argument("--copies", type=int, default=4)
-    parser.add_argument("--correlated", action="store_true")
     parser.add_argument("--seeds", type=int, default=5)
-    parser.add_argument("--seconds", type=float, default=180.0)
+    parser.add_argument("--seconds", type=float, default=120.0)
     parser.add_argument("--out-dir", type=Path, default=OUT / "scale")
     args = parser.parse_args()
     asyncio.run(run_scale(
-        args.trace, args.capacity,
-        [float(item) for item in args.rhos.split(",")],
+        args.capacity,
+        [float(item) for item in args.rhos.split(",") if item],
         [item for item in args.methods.split(",") if item],
-        args.copies, args.correlated, args.seeds, args.seconds, args.out_dir,
+        args.seeds, args.seconds, args.out_dir,
     ))
 
 

@@ -28,58 +28,44 @@
 
 ## 可变交接
 
-更新时间：2026-09-30 12:11（UTC+8）。没有实验在跑。ultrahigh 已结束。用户没说「继续」就不要开新的长实验。
+更新时间：2026-10-06 00:28（UTC+8）。全系列已跑完。没有实验进程。不要重跑，不要动 vLLM，不要启动 `overnight.py`。
 
 ### 正在做的事
 
-ICC 固定容量实验。C=8000 那一轮的容量、两种扩展、突发、端到端、消融都已完成。随后重选 C，并只把 2 倍负载跑完。12:11 核对：没有 `experiments.icc_kv` 进程，pid `2275150` 不在，9711 没有在听。
+用户要了结果汇总，并要一份可下载的表。正式数字已收进 `/home/byh/B02/ICC_KV_实验结果_20261005.zip`（2.3 MB），同源文件在 `analysis/icc_kv_export/`。四个工作簿：`01_说明.xlsx`、`02_端到端.xlsx`、`03_控制面.xlsx`、`04_消融.xlsx`。说明页写了结论、指标定义和不宜写进论文的说法。均值是 5 个 seed 的算术平均。
+
+磁盘上留下的原始结果只有 C=13000、唯一短噪声这一代：
+
+1. `analysis/icc_kv/e2e_full/`：120 格摘要加 120 个逐请求 CSV。成功请求 41996，失败 4。
+2. `analysis/icc_kv/scale_c13000/scale_summary.json`：100 行，`workload=unique_noise`。
+3. `analysis/icc_kv/burst_c13000/burst_summary.json`：20 行，`workload=unique_noise_burst`。
+4. `analysis/icc_kv/ablation_c13000/`：40 格摘要加 40 个逐请求 CSV。成功请求 13995，失败 5。
+5. `capacity_cscan.log`、`e2e_full.log`、`full_queue.log`。
+
+已删掉的是另一代结果，不要再找：C=8000 的 `e2e`、`ablation`、`burst`、`scale_independent`、`scale_correlated`、`capacity`；修正前的 `e2e_c13000` 和 `e2e_noise`；被正式矩阵盖过的冒烟 `e2e_noise2`；中途退出的 `e2e_r2`；`e2e_ultrahigh_smoke`；64 前缀 `trace/`。
 
 ### 当前状态
 
-工作状态：已完成，停着。
-
-C 的重扫日志是 `/home/byh/B02/analysis/icc_kv/capacity_cscan.log`，没有 summary json。日志末尾：
-
-- 13000：3/3 全部送达，P95 约 4–11 毫秒，`stable` 为 true。
-- 14000：3/3 缺口约 13%、15%、17%，P95 约 13 秒、37 秒、37 秒，`stable` 为 false。
-
-C 取 13000。1.2 倍是 15600，已经高于 14000。旧文件 `/home/byh/B02/analysis/icc_kv/capacity/capacity_summary.json` 里的 `capacity_events_per_s = 8000` 不要再拿来乘 ρ。
-
-`/home/byh/B02/analysis/icc_kv/e2e_c13000/e2e_summary.json` 共 29 行，容量都是 13000。其中 ultrahigh 20/20（5 个 seed × FullSync、StaticSemantic、Adaptive、Ideal，每格 500 条请求，`background_rho = 2.0`）。另外 9 行是更早停掉的 near、high 各 4 行，以及 seed 0 的 xhigh FullSync 1 行。日志：`/home/byh/B02/analysis/icc_kv/e2e_ultrahigh.log`。
-
-ultrahigh 的错放率全是 0。宽松假阴性：FullSync 在 seed 0–4 为 0.008、0.060、0.016、0.012、0.018；Adaptive 为 0.860、0.878、0.870、0.880、0.876。seed 0 的 FullSync prefill 是 232.8，同 seed 另外三种方法是 370.7，TTFT 分别是 970 ms 和 1026 ms。seed 1–4 四种方法的 prefill 完全相同。2 倍没有让 Adaptive 的视图好过 FullSync。
-
-更早的 C=8000 结果仍在：
-
-- 容量 8000：`/home/byh/B02/analysis/icc_kv/capacity/capacity_summary.json`，18 行。
-- 独立扩展 80/80、相关扩展 80/80、突发 40/40。
-- 端到端 60/60：`/home/byh/B02/analysis/icc_kv/e2e/e2e_summary.json`。
-- 消融 40/40：`/home/byh/B02/analysis/icc_kv/ablation/e2e_summary.json`。错放率和 coverage regret 最大值都是 0。
-
-机器：vLLM 仍空转，pid 8000=`1375061`、8001=`1375062`、8002=`1375063`、8003=`1375064`，从 2026-09-28 08:52 UTC 起。四张 T4 显存约 6.2–6.7 GiB / 15 GiB，利用率 0%。网关容器 `4af2176a7ea1`（`b02-gateway4t4`，Up 10 hours）听 `127.0.0.1:9710`。背景容器 `bc278c4e1e1f`（`b02-bgserver4t4`，Up 10 hours）。没人要求就不要停这些进程。
-
-已经定下来的结论：
-
-- 8000 不能当 C。C 要让 1.2 倍出现明显排队，且不低于 13000。测出来的点是 13000 稳、14000 不稳。
-- 严格错放只在派到不同 worker 且理想覆盖大于 0 时计数。宽松假阴性是真值覆盖不低于 512、视图最高覆盖仍低于 512。先看严格；严格为 0 时用宽松。
-- 到 2 倍为止，Adaptive 的宽松假阴性高于 FullSync。原因是网关丢掉了前景更新，不是 FullSync 的队列把视图拖过期。错放率仍是 0，因为空视图默认 worker 0，真值也写在刚选中的 worker 上。seed 1–4 的 prefill 不随方法变。
-- 因此 near、high、xhigh、burst 不用为了找 Adaptive 的视图优势再跑。2 倍已经是这套负载里最有机会的一档，没有出现。
+没有 icc_kv 进程。队列 2026-10-05 07:42 以 exit 0 结束。2 倍端到端均值：Ideal 假阴性 0、prefill 241、服务端 TTFT 987 ms；Adaptive 0.7%、262、956 ms，队列 17；FullSync 3.3%、323、1058 ms；Static 5.0%、351、1105 ms。0.5–1.2 倍挤在一起。控制面 2 倍 Adaptive 长前缀 P95 0.036 秒，FullSync 0.99 秒，Static 1.15 秒。消融里 Adaptive 与 AdaptiveNoPriority 的 prefill 都是 266。
 
 ### 下一步
 
-用户说「继续」时，不要重跑 C=8000 的队列，不要把五档矩阵自动续上，也不要再启动 `python -m experiments.icc_kv.overnight`。等用户指定下一件事。在那之前不要改放置逻辑，也不要开新的长实验。
+2026-10-06 用户转来一份对照 Word 方案的总评，B−（6/10）。用现有表核对后，这条总评成立，不要把它当成过分苛刻。核对数字：假阳性全部为 0；错放里 91.3% 的 coverage regret 是 0；0.9× 上 Adaptive 的 prefill 比 Ideal 高 18.7 token，5 个 seed 都没有更好；2 倍命中请求的客户端 TTFT，Adaptive 比 Ideal 低约 120 ms，同时 prefill 更高。控制面 FullSync 在 1.2×（15600/s）仍全部送达、长前缀 P95 约 2 ms，2× 实际送达约 20337/s；端到端 0.9× 队列已经到数万。所以 13000 不是两条路径共用的有效容量。
+
+论文只能写过载和突发下相对 FullSync、Static 的队列、长前缀 lag、prefill 和超过 2 秒。不能写 Word 那条完整因果链、错放改善、接近 Ideal、0.9× 收益、unsafe reuse 为 0、真实 trace 或按 K 扩展。用户问过这些缺口能不能补。结论：能补，不是整套设计报废。统一 C、补 delivery lag、错放改成 regret>0、开环请求和绑核，都是测量问题。假阳性为 0 是因为 16×4096 小于单卡 104544，`ShadowCache` 不会淘汰，墓碑发不出来；`enqueue` 里 K_TOMB 走优先级队列，不经过 `low_utility`。补失效要在现有长短分工上加淘汰，不能退回 64 前缀 trace。owner validation 的拒绝计数目前没有。0.9× 没有收益可能补完仍然成立，不能调参把它做成正结果。用户还没要求开补跑。
 
 ### 已经定下来的约束
 
-- Gateway：docker `b02-gateway4t4`，`--cpus 1 --cpuset-cpus 0`，`--max-queue 4096`，tau 30，util_lambda 16，gate 2，adaptive queue gate 8。Dispatcher 绑 CPU 1。HTB 天花板固定 1 Gbit，不按 ρ 改 C。
-- 背景 reporter 的 worker id 用 `worker_id + 16`。`choose` 只扫 worker 0–3。Ideal 对前景更新本地生效，不送进链路。
-- 不要把 4 张 GPU 写成大规模系统。不要把 0.73–3.04 updates/s 和 84.5×10³ updates/s 写成同一个瓶颈。
-- Python：`/home/byh/B02/poc/.venv/bin/python`。原始结果目录 `analysis/icc_kv/` 已在 `.gitignore`。
+- C=13000。ultrahigh 是 2.0 倍 = 26000/s，xhigh 是 1.5 倍 = 19500/s。HTB 天花板 1 Gbit，不按 ρ 改。Gateway `--cpus 1 --cpuset-cpus 0 --quiet`。tau 30，util-lambda 16，gate 2，adaptive-queue-gate 8，congestion-hold 0.2。没有 `--util-relative`。
+- 背景噪声 coverage 256，digest 为 `blake2b(noise-{seq})`。请求 digest 字符串 `U0000`–`U0015`，coverage 4096。缓存盐 `icc-noise-{run_id}-{cell}`。
+- `cac8270` 的背景副本上限豁免还在。top-k 对所有 instance 生效。
+- 不要把 4 张 GPU 写成大规模系统。不要把 0.73–3.04 updates/s 和 84.5×10³ updates/s 写成同一个瓶颈。错放率不是 Adaptive 的收益指标。失效优先在这组消融里没有拉开差距。
+- Python：`/home/byh/B02/poc/.venv/bin/python`。`analysis/icc_kv/` 在 `.gitignore`。
 
 ### Git
 
-分支 `main`。昨晚的交接已推送：`e7e159d`（2026-09-30 03:49 UTC，Update the handoff after the 2x load run finished）。再往前是 `b343f0e`。
+HEAD 是 `61864db`，本地 `main` 比 `origin/main` 超前 1，还没推送。用户没说就不要再 commit，不要 amend，不要推送。
 
-未提交、这次不要加进去：`experiments/icc_kv/runtime.py`（`PathRuntime.stop()`）、`replay.py`、`burst.py`、`capacity.py`（`--all-rates`，扫完不稳定档也继续）、`e2e.py`（`high`/`xhigh`/`ultrahigh` 负载，burst 基线 0.9，严格错放和宽松假阴性/假阳性同时记录）。用户没说就不要 commit 这些，不要 amend。
+未提交：`handsoff.md`，`experiments/icc_kv/burst.py`，`experiments/icc_kv/replay.py`，`experiments/icc_kv/overnight.py`，`experiments/icc_kv/full_queue.py`。压缩包和 `analysis/icc_kv_export/` 是这次整理出来的，也不要提交。
 
-不要提交、不要推送：`Bare_Demo_of_IEEEtran_cls_for_IEEE_Journals.pdf`、`analysis/icc_kv/`、未跟踪的 `analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`。
+不要提交、不要推送：`Bare_Demo_of_IEEEtran_cls_for_IEEE_Journals.pdf`、`analysis/icc_kv/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`。
