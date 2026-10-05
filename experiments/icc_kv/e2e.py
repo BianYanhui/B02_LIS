@@ -11,6 +11,7 @@ cost of unpacking the background stream.
 from __future__ import annotations
 
 import asyncio
+import os
 import contextlib
 import csv
 import hashlib
@@ -120,7 +121,7 @@ class ControlPlane:
     def configure(self, cell: int, method: str, rate: float) -> None:
         self._submit(self.runtime.configure(cell, method, rate))
 
-    def start_background(self, cell: int, scenario: str, rho: float, capacity: float) -> None:
+    def start_background(self, cell: int, scenario: str, rho: float, capacity: float, workers: int = 4) -> None:
         async def launch() -> None:
             assert self._bg_stop is not None
             self._bg_stop = asyncio.Event()
@@ -135,7 +136,7 @@ class ControlPlane:
                         level, window = rho * capacity * 5, 5.0
                     else:
                         level, window = rho * capacity, 5.0
-                    sent = await offer_noise(self.runtime, cell, level, window, bg_seq)
+                    sent = await offer_noise(self.runtime, cell, level, window, bg_seq, workers)
                     bg_seq += sent
 
             self._bg = asyncio.create_task(background())
@@ -166,6 +167,9 @@ class ControlPlane:
     def clear_local(self, worker: int, digest: int) -> None:
         self.runtime.dispatcher.clear_local(worker, digest)
 
+    def view_timing(self, worker: int, digest: int, now: float) -> tuple[float, float]:
+        return self.runtime.dispatcher.view_timing(worker, digest, now)
+
     def applied(self) -> list:
         dispatcher = self.runtime.dispatcher
         with dispatcher.lock:
@@ -193,7 +197,7 @@ def noise_digest(seq: int) -> int:
     return int.from_bytes(hashlib.blake2b(f"noise-{seq}".encode(), digest_size=8).digest(), "big")
 
 
-async def offer_noise(runtime: PathRuntime, cell: int, rate: float, seconds: float, seq0: int) -> int:
+async def offer_noise(runtime: PathRuntime, cell: int, rate: float, seconds: float, seq0: int, workers: int = 4) -> int:
     """Pace unique short prefixes. Each digest is new, so semantic merge cannot collapse the flood."""
     count = max(1, int(rate * seconds))
     batch = max(1, int(rate / 200)) if rate >= 200 else 1
@@ -209,7 +213,7 @@ async def offer_noise(runtime: PathRuntime, cell: int, rate: float, seconds: flo
         for offset in range(step):
             seq = seq0 + sent + offset
             await runtime.send_event(
-                K_UP, 16 + (seq % 4), cell, seq, NOISE_COVERAGE, noise_digest(seq), now,
+                K_UP, 16 + (seq % max(workers, 1)), cell, seq, NOISE_COVERAGE, noise_digest(seq), now,
             )
         sent += step
         if sent % 400 == 0:
@@ -268,7 +272,12 @@ async def run_e2e(
     trace: Path, capacity: float, scenarios: list[str], methods: list[str],
     seeds: int, requests_per_run: int, concurrency: int, kv_tokens: int, out_dir: Path,
     open_loop: bool = True, arrival_rate: float = 1.25, invalidate_every: int = 8,
+    noise_workers: int = 4,
 ) -> None:
+    try:
+        os.sched_setaffinity(0, {2})
+    except OSError:
+        pass
     formal = load_formal()
     prepare_fixed_gateway()
     control = ControlPlane()
@@ -301,7 +310,7 @@ async def run_e2e(
                         control.configure(cell_id, method, rate)
                     else:
                         control.configure(cell_id, "FullSync", 0.0)
-                    control.start_background(cell_id, scenario, rho, capacity)
+                    control.start_background(cell_id, scenario, rho, capacity, noise_workers)
                     shadows = [formal.ShadowCache(kv_tokens) for _ in range(4)]
                     truth: dict[tuple[int, int], int] = {}
                     placement = Placement()
@@ -376,6 +385,7 @@ async def run_e2e(
                                 truth_cov = max((truth.get((worker, digest), 0) for worker in range(4)), default=0)
                                 view_cov_max = max((tested.get((worker, digest), 0) for worker in range(4)), default=0)
                                 view_cov = tested.get((routed, digest), 0)
+                                delivery_lag_s, state_age_s = control.view_timing(routed, digest, time.time())
                                 decision = {
                                     "slot": slot,
                                     "digest": digest,
@@ -388,6 +398,8 @@ async def run_e2e(
                                     "loose_false_positive": int(view_cov >= 512 and view_cov > routed_truth),
                                     "coverage_shortfall": int(routed_truth < ideal_cov),
                                     "sched_delay_ms": sched_delay_ms,
+                                    "delivery_lag_s": delivery_lag_s,
+                                    "state_age_s": state_age_s,
                                 }
                             response = await formal.one_request(
                                 session, formal.URLS[decision["routed"]],
@@ -439,6 +451,9 @@ async def run_e2e(
                                     "loose_false_negative": decision["loose_false_negative"],
                                     "loose_false_positive": decision["loose_false_positive"],
                                     "stale_cache_hit": int(cached >= 512 and decision["routed_truth"] == 0 and decision["version"] > 0),
+                                    "delivery_lag_s": decision["delivery_lag_s"],
+                                    "state_age_s": decision["state_age_s"],
+                                    "cache_hit": int(decision["coverage_shortfall"] == 0 and decision["loose_false_negative"] == 0 and max(0, int(response["input_tokens"] or 0) - cached) < 800),
                                 })
 
                     probe_task = asyncio.create_task(probe())
@@ -488,6 +503,8 @@ async def run_e2e(
                     def mean(values: list[float]) -> float:
                         return sum(values) / len(values) if values else 0.0
 
+                    stats = control.stats()
+                    elapsed = max(time.perf_counter() - started, 1e-6)
                     summary = {
                         "seed": seed,
                         "scenario": scenario,
@@ -497,7 +514,7 @@ async def run_e2e(
                         "cache_salt": salt,
                         "requests": len(records),
                         "failed_requests": failed,
-                        "elapsed_s": round(time.perf_counter() - started, 1),
+                        "elapsed_s": round(elapsed, 1),
                         "ttft_mean_ms": mean(ttfts),
                         "ttft_p95_ms": pct(ordered, 95),
                         "e2e_ttft_mean_ms": mean(e2e_ttfts),
@@ -517,6 +534,10 @@ async def run_e2e(
                         "wrong_placement_rate": mean([row["wrong_placement"] for row in records]),
                         "coverage_wrong_rate": mean([row["coverage_wrong"] for row in records]),
                         "stale_cache_hits": stale_cache_hits,
+                        "hit_service_ttft_ms": mean([row["ttft_ms"] for row in records if row["cache_hit"]]),
+                        "hit_requests": sum(row["cache_hit"] for row in records),
+                        "fn_delivery_lag_p95_s": _pct([row["delivery_lag_s"] for row in records if row["loose_false_negative"] and row["delivery_lag_s"] >= 0], 95),
+                        "hit_delivery_lag_p95_s": _pct([row["delivery_lag_s"] for row in records if row["cache_hit"] and row["delivery_lag_s"] >= 0], 95),
                         "coverage_shortfall_rate": mean([row["coverage_shortfall"] for row in records]),
                         "coverage_regret_mean": mean([row["coverage_regret"] for row in records]),
                         "loose_false_negative_rate": mean([row["loose_false_negative"] for row in records]),
@@ -533,7 +554,9 @@ async def run_e2e(
                         "useful_pool": USEFUL_POOL,
                         "useful_coverage": USEFUL_COVERAGE,
                         "noise_coverage": NOISE_COVERAGE,
-                        **control.stats(),
+                        "noise_workers": noise_workers,
+                        "forwarded_per_s": (stats.get("relay_forwarded") or 0) / elapsed,
+                        **stats,
                     }
                     rows.append(summary)
                     write_json(path, {**control.runtime.meta(), "rows": rows})
@@ -563,6 +586,7 @@ def main() -> None:
     parser.add_argument("--closed-loop", action="store_true")
     parser.add_argument("--arrival-rate", type=float, default=1.25)
     parser.add_argument("--invalidate-every", type=int, default=8)
+    parser.add_argument("--noise-workers", type=int, default=4)
     parser.add_argument("--out-dir", type=Path, default=OUT / "e2e")
     args = parser.parse_args()
     asyncio.run(run_e2e(
@@ -573,6 +597,7 @@ def main() -> None:
         open_loop=not args.closed_loop,
         arrival_rate=args.arrival_rate,
         invalidate_every=args.invalidate_every,
+        noise_workers=args.noise_workers,
     ))
 
 

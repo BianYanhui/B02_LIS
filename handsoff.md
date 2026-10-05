@@ -28,7 +28,7 @@
 
 ## 可变交接
 
-更新时间：2026-10-06 00:52（UTC+8）。补强代码已写完，2 倍 smoke 已通过。没有实验进程。不要开正式矩阵，不要动 vLLM，不要启动 `overnight.py`。
+更新时间：2026-10-06 01:08（UTC+8）。评语五条里，容量分路径、视图延迟、命中 TTFT、失效和 K 都已进代码。2 倍端到端 smoke 正向。没有实验进程。不要开正式矩阵，不要动 vLLM，不要启动 `overnight.py`。
 
 ### 正在做的事
 
@@ -57,6 +57,8 @@
 2026-10-06 的 smoke 在 `/tmp/icc_strengthen_smoke`，只作方向，不是论文数字：1 个 seed、40 条请求、开环每秒 1 条、ultrahigh。Ideal / Adaptive / FullSync 都完成，失败 0。Adaptive 的 prefill 2494 与 Ideal 相同，FullSync 3007。假阴性 0、0.05、0.225。覆盖错放 0、0.025、0.225。失效 P95 延迟：Adaptive 0.16 秒，FullSync 28.9 秒。队列 17 对 42.9 万。Adaptive 的 `stale_cache_hits` 是 0，FullSync 是 1。服务端 TTFT 三者都在 7.5–8.0 秒，开环排队等待是几十秒，这格不要拿 TTFT 当收益。
 
 用户要求看过 smoke 再点头。点头之前不要开正式实验，也不要把这 40 条写进 `e2e_full`。
+
+2026-10-06 01:08 又补了分路径排空、命中请求的服务时间和视图延迟、噪声 reporter 数量。探测在 `experiments/icc_kv/path_capacity.py`。smoke 在 `/tmp/icc_strengthen2`，仍不是论文数字。控制面 12 秒把 18464/s 全部送达，队列只有 221，所以 13000 不是这条路径的膝点。端到端 FullSync 在请求进行时大约送到 15657/s。2 倍、24 条请求：Adaptive prefill 2939、假阴性 0、覆盖错放 0、失效 P95 0.024 秒、队列 16；FullSync 是 3279、0.167、0.125、20.9 秒、65 万。AdaptiveNoPriority 的 prefill 与 Adaptive 几乎相同，失效 P95 0.072 秒。K=32 时 Adaptive 队列仍是 16。命中请求的服务 TTFT 仍是 Adaptive 快于 Ideal，这一格不能写 TTFT 因果。0.9 倍没有重跑。
 
 ### 已经定下来的约束
 

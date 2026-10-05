@@ -172,7 +172,7 @@ def long_lag(applied: list) -> tuple[float, float, int]:
     return pct(50), pct(95), len(lags)
 
 
-async def run_scale(capacity: float, rhos: list[float], methods: list[str], seeds: int, seconds: float, out_dir: Path) -> None:
+async def run_scale(capacity: float, rhos: list[float], methods: list[str], seeds: int, seconds: float, out_dir: Path, workers: int = 4) -> None:
     from experiments.icc_kv.e2e import NOISE_COVERAGE, USEFUL_COVERAGE, offer_noise
 
     prepare_fixed_gateway()
@@ -182,18 +182,18 @@ async def run_scale(capacity: float, rhos: list[float], methods: list[str], seed
         out_dir.mkdir(parents=True, exist_ok=True)
         summary_path = out_dir / "scale_summary.json"
         rows: list[dict] = json.loads(summary_path.read_text()).get("rows", []) if summary_path.exists() else []
-        done = {(row["seed"], row["rho"], row["method"]) for row in rows}
+        done = {(row["seed"], row["rho"], row["method"], row.get("noise_workers", 4)) for row in rows}
         cell = 1 + len(rows)
         for seed in range(seeds):
             for rho in rhos:
                 for method in methods:
-                    if (seed, rho, method) in done:
+                    if (seed, rho, method, workers) in done:
                         continue
                     rate = capacity if method == "RateFIFO" else 0.0
                     await runtime.configure(cell, method, rate)
                     noise_seq = 1_000_000_000 + seed * 100_000_000_000 + int(rho * 1000) * 1_000_000
                     noise_sent, long_counts = await asyncio.gather(
-                        offer_noise(runtime, cell, rho * capacity, seconds, noise_seq),
+                        offer_noise(runtime, cell, rho * capacity, seconds, noise_seq, workers),
                         offer_long(runtime, cell, seconds, 1 + seed * 1_000_000),
                     )
                     long_sent, invalidate_sent = long_counts
@@ -210,6 +210,7 @@ async def run_scale(capacity: float, rhos: list[float], methods: list[str], seed
                         "cell": cell,
                         "seconds": seconds,
                         "workload": "unique_noise",
+                        "noise_workers": workers,
                         "noise_coverage": NOISE_COVERAGE,
                         "useful_coverage": USEFUL_COVERAGE,
                         "noise_sent": noise_sent,
@@ -242,13 +243,14 @@ def main() -> None:
     parser.add_argument("--methods", default=",".join(METHODS))
     parser.add_argument("--seeds", type=int, default=5)
     parser.add_argument("--seconds", type=float, default=120.0)
+    parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--out-dir", type=Path, default=OUT / "scale")
     args = parser.parse_args()
     asyncio.run(run_scale(
         args.capacity,
         [float(item) for item in args.rhos.split(",") if item],
         [item for item in args.methods.split(",") if item],
-        args.seeds, args.seconds, args.out_dir,
+        args.seeds, args.seconds, args.out_dir, args.workers,
     ))
 
 

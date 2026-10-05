@@ -101,6 +101,8 @@ class Dispatcher:
     cell: int
     applied: list[Applied] = field(default_factory=list)
     tested: dict[tuple[int, int], int] = field(default_factory=dict)
+    generated_at_map: dict[tuple[int, int], float] = field(default_factory=dict)
+    delivered_at_map: dict[tuple[int, int], float] = field(default_factory=dict)
     ground: dict[tuple[int, int], tuple[int, bool]] = field(default_factory=dict)
     resets: int = 0
     frames: int = 0
@@ -119,9 +121,13 @@ class Dispatcher:
                 self.applied.append(Applied(seq, worker, name, digest, coverage, generated_at, now))
             if kind == K_UP:
                 self.tested[(worker, digest)] = coverage
+                self.generated_at_map[(worker, digest)] = generated_at
+                self.delivered_at_map[(worker, digest)] = now
                 self.ground[(worker, digest)] = (coverage, True)
             else:
                 self.tested.pop((worker, digest), None)
+                self.generated_at_map.pop((worker, digest), None)
+                self.delivered_at_map.pop((worker, digest), None)
                 self.ground[(worker, digest)] = (0, False)
 
     def snapshot(self) -> dict[tuple[int, int], int]:
@@ -129,12 +135,26 @@ class Dispatcher:
             return dict(self.tested)
 
     def set_local(self, worker: int, digest: int, coverage: int) -> None:
+        now = time.time()
         with self.lock:
             self.tested[(worker, digest)] = coverage
+            self.generated_at_map[(worker, digest)] = now
+            self.delivered_at_map[(worker, digest)] = now
 
     def clear_local(self, worker: int, digest: int) -> None:
         with self.lock:
             self.tested.pop((worker, digest), None)
+            self.generated_at_map.pop((worker, digest), None)
+            self.delivered_at_map.pop((worker, digest), None)
+
+    def view_timing(self, worker: int, digest: int, now: float) -> tuple[float, float]:
+        """Delivery lag of the view entry, and how long ago it was applied. -1 if absent."""
+        with self.lock:
+            generated = self.generated_at_map.get((worker, digest))
+            delivered = self.delivered_at_map.get((worker, digest))
+        if generated is None or delivered is None:
+            return -1.0, -1.0
+        return max(0.0, delivered - generated), max(0.0, now - delivered)
 
 
 class PathRuntime:
