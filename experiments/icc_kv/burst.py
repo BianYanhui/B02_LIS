@@ -39,7 +39,7 @@ async def offer_burst_noise(runtime: PathRuntime, cell: int, capacity: float, se
 
 async def run_burst(capacity: float, methods: list[str], seeds: int, out_dir: Path) -> None:
     from experiments.icc_kv.e2e import NOISE_COVERAGE, USEFUL_COVERAGE
-    from experiments.icc_kv.replay import long_lag, offer_long
+    from experiments.icc_kv.replay import kind_lag, long_lag, offer_long
 
     prepare_fixed_gateway()
     runtime = PathRuntime()
@@ -58,15 +58,17 @@ async def run_burst(capacity: float, methods: list[str], seeds: int, out_dir: Pa
                 rate = capacity if method == "RateFIFO" else 0.0
                 await runtime.configure(cell, method, rate)
                 noise_seq = 1_000_000_000 + seed * 100_000_000_000
-                noise_sent, long_sent = await asyncio.gather(
+                noise_sent, long_counts = await asyncio.gather(
                     offer_burst_noise(runtime, cell, capacity, noise_seq),
                     offer_long(runtime, cell, seconds, 1 + seed * 1_000_000),
                 )
+                long_sent, invalidate_sent = long_counts
                 with runtime.dispatcher.lock:
                     frames = runtime.dispatcher.frames
                     foreground = runtime.dispatcher.foreground_frames
                     applied = list(runtime.dispatcher.applied)
                 lag_p50, lag_p95, long_applied = long_lag(applied)
+                inv_p50, inv_p95, inv_applied = kind_lag(applied, "invalidate")
                 row = {
                     "seed": seed,
                     "method": method,
@@ -83,6 +85,10 @@ async def run_burst(capacity: float, methods: list[str], seeds: int, out_dir: Pa
                     "long_applied": long_applied,
                     "long_lag_p50_s": lag_p50,
                     "long_lag_p95_s": lag_p95,
+                    "invalidate_sent": invalidate_sent,
+                    "invalidate_applied": inv_applied,
+                    "invalidate_lag_p50_s": inv_p50,
+                    "invalidate_lag_p95_s": inv_p95,
                     "capacity_events_per_s": capacity,
                     **(await runtime.fetch_stats()),
                 }

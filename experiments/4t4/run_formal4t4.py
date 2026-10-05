@@ -309,6 +309,11 @@ class ShadowCache:
             evicted.append(victim)
         return evicted
 
+    def drop(self, digest: str) -> None:
+        tokens = self.entries.pop(digest, None)
+        if tokens is not None:
+            self.total -= tokens
+
     def reset(self) -> list[str]:
         """Mirror a test-only physical owner cache reset."""
         evicted = list(self.entries)

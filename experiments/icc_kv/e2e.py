@@ -163,6 +163,14 @@ class ControlPlane:
     def set_local(self, worker: int, digest: int, coverage: int) -> None:
         self.runtime.dispatcher.set_local(worker, digest, coverage)
 
+    def clear_local(self, worker: int, digest: int) -> None:
+        self.runtime.dispatcher.clear_local(worker, digest)
+
+    def applied(self) -> list:
+        dispatcher = self.runtime.dispatcher
+        with dispatcher.lock:
+            return list(dispatcher.applied)
+
     def stats(self) -> dict:
         try:
             return self._submit(self.runtime.fetch_stats())
@@ -245,9 +253,21 @@ async def reset_prefix_caches(session: aiohttp.ClientSession, urls: list[str]) -
                 raise RuntimeError(f"reset_prefix_cache {url} -> {response.status} {body}")
 
 
+def _pct(values: list[float], p: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    return ordered[min(len(ordered) - 1, round(p / 100 * (len(ordered) - 1)))]
+
+
+def _mean(values: list[float]) -> float:
+    return sum(values) / len(values) if values else 0.0
+
+
 async def run_e2e(
     trace: Path, capacity: float, scenarios: list[str], methods: list[str],
     seeds: int, requests_per_run: int, concurrency: int, kv_tokens: int, out_dir: Path,
+    open_loop: bool = True, arrival_rate: float = 1.25, invalidate_every: int = 8,
 ) -> None:
     formal = load_formal()
     prepare_fixed_gateway()
@@ -285,7 +305,6 @@ async def run_e2e(
                     shadows = [formal.ShadowCache(kv_tokens) for _ in range(4)]
                     truth: dict[tuple[int, int], int] = {}
                     placement = Placement()
-                    seq = 1
                     rng = random.Random(seed)
                     planned = []
                     for request_id in range(requests_per_run):
@@ -293,8 +312,31 @@ async def run_e2e(
                         planned.append((request_id, slot))
                     records = []
                     failed = 0
+                    tombs_sent = 0
+                    stale_cache_hits = 0
                     loop_lags: list[float] = []
                     stop_probe = asyncio.Event()
+                    versions = [0] * USEFUL_POOL
+                    digest_text = [f"U{slot:04d}" for slot in range(USEFUL_POOL)]
+                    digests = [formal.digest64(text) for text in digest_text]
+                    seq_box = [1]
+                    state_lock = asyncio.Lock()
+                    inflight = asyncio.Semaphore(concurrency)
+
+                    def invalidate_slot(slot: int) -> None:
+                        nonlocal tombs_sent
+                        versions[slot] += 1
+                        digest = digests[slot]
+                        for worker in range(4):
+                            if truth.pop((worker, digest), None) is None:
+                                continue
+                            shadows[worker].drop(digest_text[slot])
+                            if method == "Ideal":
+                                control.clear_local(worker, digest)
+                            else:
+                                control.emit(K_TOMB, worker, cell_id, seq_box[0], 0, digest)
+                                seq_box[0] += 1
+                            tombs_sent += 1
 
                     async def probe() -> None:
                         while not stop_probe.is_set():
@@ -304,84 +346,120 @@ async def run_e2e(
                             except asyncio.TimeoutError:
                                 loop_lags.append((time.perf_counter() - mark - 0.05) * 1000)
 
+                    async def serve(request_id: int, slot: int, due: float | None) -> None:
+                        nonlocal failed, stale_cache_hits
+                        if due is not None:
+                            delay = due - time.perf_counter()
+                            if delay > 0:
+                                await asyncio.sleep(delay)
+                        wait_started = time.perf_counter()
+                        async with inflight:
+                            sched_delay_ms = (time.perf_counter() - wait_started) * 1000
+                            async with state_lock:
+                                if invalidate_every and request_id and request_id % invalidate_every == 0:
+                                    installed = [
+                                        candidate for candidate in range(USEFUL_POOL)
+                                        if any(truth.get((worker, digests[candidate]), 0) >= USEFUL_COVERAGE for worker in range(4))
+                                    ]
+                                    if slot in installed:
+                                        invalidate_slot(slot)
+                                    elif installed:
+                                        invalidate_slot(installed[0])
+                                tested = control.view()
+                                digest = digests[slot]
+                                version = versions[slot]
+                                ideal, ideal_cov = placement.select(truth, digest)
+                                routed, _view_best = placement.select(tested, digest)
+                                placement.rr += 1
+                                placement.loads[routed] += 1
+                                routed_truth = truth.get((routed, digest), 0)
+                                truth_cov = max((truth.get((worker, digest), 0) for worker in range(4)), default=0)
+                                view_cov_max = max((tested.get((worker, digest), 0) for worker in range(4)), default=0)
+                                view_cov = tested.get((routed, digest), 0)
+                                decision = {
+                                    "slot": slot,
+                                    "digest": digest,
+                                    "version": version,
+                                    "ideal": ideal,
+                                    "ideal_cov": ideal_cov,
+                                    "routed": routed,
+                                    "routed_truth": routed_truth,
+                                    "loose_false_negative": int(truth_cov >= 512 and view_cov_max < 512),
+                                    "loose_false_positive": int(view_cov >= 512 and view_cov > routed_truth),
+                                    "coverage_shortfall": int(routed_truth < ideal_cov),
+                                    "sched_delay_ms": sched_delay_ms,
+                                }
+                            response = await formal.one_request(
+                                session, formal.URLS[decision["routed"]],
+                                formal.prompt_for(formal.TraceRequest(
+                                    request_id=request_id, phase=0, lineage_id=slot, step=0,
+                                    tenant=f"tenant-{slot % 8}", digest=digest_text[slot],
+                                    coverage_tokens=USEFUL_COVERAGE, workload="reuse_intensive", discard=False,
+                                )),
+                                f"{salt}-v{decision['version']}", 4, 2,
+                            )
+                            async with state_lock:
+                                routed = decision["routed"]
+                                placement.loads[routed] -= 1
+                                if not response["ok"]:
+                                    failed += 1
+                                    return
+                                cached = int(response["vllm_cached_tokens"] or 0)
+                                regret = max(0, decision["ideal_cov"] - decision["routed_truth"])
+                                if cached >= 512 and decision["routed_truth"] == 0 and decision["version"] > 0:
+                                    stale_cache_hits += 1
+                                evicted = shadows[routed].insert(digest_text[slot], USEFUL_COVERAGE)
+                                truth[(routed, decision["digest"])] = USEFUL_COVERAGE
+                                if method == "Ideal":
+                                    control.set_local(routed, decision["digest"], USEFUL_COVERAGE)
+                                else:
+                                    control.emit(K_UP, routed, cell_id, seq_box[0], USEFUL_COVERAGE, decision["digest"])
+                                    seq_box[0] += 1
+                                    for victim in evicted:
+                                        victim_digest = formal.digest64(victim)
+                                        truth.pop((routed, victim_digest), None)
+                                        shadows[routed].drop(victim)
+                                        control.emit(K_TOMB, routed, cell_id, seq_box[0], 0, victim_digest)
+                                        seq_box[0] += 1
+                                        tombs_sent += 1
+                                records.append({
+                                    "request_id": request_id,
+                                    "ttft_ms": response["ttft_ms"],
+                                    "sched_delay_ms": decision["sched_delay_ms"],
+                                    "e2e_ttft_ms": response["ttft_ms"] + decision["sched_delay_ms"],
+                                    "reused_tokens": cached,
+                                    "prefill_tokens": max(0, int(response["input_tokens"] or 0) - cached),
+                                    "routed": routed,
+                                    "ideal": decision["ideal"],
+                                    "version": decision["version"],
+                                    "wrong_placement": int(routed != decision["ideal"] and decision["ideal_cov"] > 0),
+                                    "coverage_wrong": int(regret > 0),
+                                    "coverage_regret": regret,
+                                    "coverage_shortfall": decision["coverage_shortfall"],
+                                    "loose_false_negative": decision["loose_false_negative"],
+                                    "loose_false_positive": decision["loose_false_positive"],
+                                    "stale_cache_hit": int(cached >= 512 and decision["routed_truth"] == 0 and decision["version"] > 0),
+                                })
+
                     probe_task = asyncio.create_task(probe())
                     try:
                         async with aiohttp.ClientSession() as session:
                             before = await metric_totals(session, formal.URLS)
                             await reset_prefix_caches(session, formal.URLS)
-                            for offset in range(0, len(planned), concurrency):
-                                tested = control.view()
-                                decisions = []
-                                for request_id, slot in planned[offset:offset + concurrency]:
-                                    digest_s = f"U{slot:04d}"
-                                    digest = formal.digest64(digest_s)
-                                    coverage = USEFUL_COVERAGE
-                                    ideal, ideal_cov = placement.select(truth, digest)
-                                    routed, _view_best = placement.select(tested, digest)
-                                    placement.rr += 1
-                                    placement.loads[routed] += 1
-                                    truth_cov = max((truth.get((worker, digest), 0) for worker in range(4)), default=0)
-                                    view_cov_max = max((tested.get((worker, digest), 0) for worker in range(4)), default=0)
-                                    view_cov = tested.get((routed, digest), 0)
-                                    decisions.append({
-                                        "request_id": request_id,
-                                        "slot": slot,
-                                        "digest_s": digest_s,
-                                        "digest": digest,
-                                        "coverage": coverage,
-                                        "ideal": ideal,
-                                        "ideal_cov": ideal_cov,
-                                        "routed": routed,
-                                        "loose_false_negative": int(truth_cov >= 512 and view_cov_max < 512),
-                                        "loose_false_positive": int(view_cov >= 512 and view_cov > truth.get((routed, digest), 0)),
-                                        "coverage_shortfall": int(truth.get((routed, digest), 0) < ideal_cov),
-                                    })
-                                responses = await asyncio.gather(*[
-                                    formal.one_request(
-                                        session, formal.URLS[item["routed"]],
-                                        formal.prompt_for(formal.TraceRequest(
-                                            request_id=item["request_id"], phase=0, lineage_id=item["slot"], step=0,
-                                            tenant=f"tenant-{item['slot'] % 8}", digest=item["digest_s"],
-                                            coverage_tokens=item["coverage"], workload="reuse_intensive", discard=False,
-                                        )),
-                                        salt, 4, 2,
-                                    )
-                                    for item in decisions
+                            origin = time.perf_counter()
+                            if open_loop:
+                                await asyncio.gather(*[
+                                    serve(request_id, slot, origin + request_id / max(arrival_rate, 1e-6))
+                                    for request_id, slot in planned
                                 ])
-                                for item, response in zip(decisions, responses):
-                                    routed = item["routed"]
-                                    digest = item["digest"]
-                                    coverage = item["coverage"]
-                                    placement.loads[routed] -= 1
-                                    if not response["ok"]:
-                                        failed += 1
-                                        continue
-                                    regret = max(0, item["ideal_cov"] - truth.get((routed, digest), 0))
-                                    evicted = shadows[routed].insert(item["digest_s"], coverage)
-                                    truth[(routed, digest)] = coverage
-                                    if method == "Ideal":
-                                        control.set_local(routed, digest, coverage)
-                                    else:
-                                        control.emit(K_UP, routed, cell_id, seq, coverage, digest)
-                                        seq += 1
-                                        for victim in evicted:
-                                            victim_digest = formal.digest64(victim)
-                                            truth.pop((routed, victim_digest), None)
-                                            control.emit(K_TOMB, routed, cell_id, seq, 0, victim_digest)
-                                            seq += 1
-                                    records.append({
-                                        "ttft_ms": response["ttft_ms"],
-                                        "reused_tokens": int(response["vllm_cached_tokens"] or 0),
-                                        "prefill_tokens": max(0, int(response["input_tokens"] or 0) - int(response["vllm_cached_tokens"] or 0)),
-                                        "routed": routed,
-                                        "ideal": item["ideal"],
-                                        "wrong_placement": int(routed != item["ideal"] and item["ideal_cov"] > 0),
-                                        "coverage_regret": regret,
-                                        "coverage_shortfall": item["coverage_shortfall"],
-                                        "loose_false_negative": item["loose_false_negative"],
-                                        "loose_false_positive": item["loose_false_positive"],
-                                    })
+                            else:
+                                for offset in range(0, len(planned), concurrency):
+                                    await asyncio.gather(*[
+                                        serve(request_id, slot, None)
+                                        for request_id, slot in planned[offset:offset + concurrency]
+                                    ])
                             after = await metric_totals(session, formal.URLS)
+                            records.sort(key=lambda row: row["request_id"])
                     finally:
                         stop_probe.set()
                         probe_task.cancel()
@@ -394,7 +472,11 @@ async def run_e2e(
                     sum_delta = sum(after[index][0] - before[index][0] for index in range(4))
                     count_delta = sum(after[index][1] - before[index][1] for index in range(4))
                     frames, foreground_frames = control.frame_counts()
+                    applied = control.applied()
+                    update_lags = [max(0.0, row.applied_at - row.generated_at) for row in applied if row.coverage >= USEFUL_COVERAGE]
+                    invalidate_lags = [max(0.0, row.applied_at - row.generated_at) for row in applied if row.kind == "invalidate"]
                     ttfts = [row["ttft_ms"] for row in records]
+                    e2e_ttfts = [row["e2e_ttft_ms"] for row in records]
                     ordered = sorted(ttfts)
                     lags = sorted(loop_lags)
 
@@ -418,12 +500,23 @@ async def run_e2e(
                         "elapsed_s": round(time.perf_counter() - started, 1),
                         "ttft_mean_ms": mean(ttfts),
                         "ttft_p95_ms": pct(ordered, 95),
+                        "e2e_ttft_mean_ms": mean(e2e_ttfts),
+                        "sched_delay_mean_ms": mean([row["sched_delay_ms"] for row in records]),
                         "server_ttft_mean_ms": (sum_delta / count_delta * 1000) if count_delta > 0 else 0.0,
+                        "foreground_lag_p50_s": _pct(update_lags, 50),
+                        "foreground_lag_p95_s": _pct(update_lags, 95),
+                        "foreground_applied": len(update_lags),
+                        "invalidate_lag_p50_s": _pct(invalidate_lags, 50),
+                        "invalidate_lag_p95_s": _pct(invalidate_lags, 95),
+                        "invalidate_applied": len(invalidate_lags),
+                        "tombs_sent": tombs_sent,
                         "loop_lag_p95_ms": pct(lags, 95),
                         "slo_violation_2s": sum(value > 2000 for value in ttfts) / len(ttfts) if ttfts else 0.0,
                         "prefill_tokens_mean": mean([row["prefill_tokens"] for row in records]),
                         "reused_tokens_mean": mean([row["reused_tokens"] for row in records]),
                         "wrong_placement_rate": mean([row["wrong_placement"] for row in records]),
+                        "coverage_wrong_rate": mean([row["coverage_wrong"] for row in records]),
+                        "stale_cache_hits": stale_cache_hits,
                         "coverage_shortfall_rate": mean([row["coverage_shortfall"] for row in records]),
                         "coverage_regret_mean": mean([row["coverage_regret"] for row in records]),
                         "loose_false_negative_rate": mean([row["loose_false_negative"] for row in records]),
@@ -434,6 +527,9 @@ async def run_e2e(
                         "capacity_events_per_s": capacity,
                         "background_rho": rho,
                         "concurrency": concurrency,
+                        "open_loop": open_loop,
+                        "arrival_rate": arrival_rate if open_loop else 0.0,
+                        "invalidate_every": invalidate_every,
                         "useful_pool": USEFUL_POOL,
                         "useful_coverage": USEFUL_COVERAGE,
                         "noise_coverage": NOISE_COVERAGE,
@@ -464,6 +560,9 @@ def main() -> None:
     parser.add_argument("--requests", type=int, default=500)
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--kv-cache-tokens", type=int, default=104544)
+    parser.add_argument("--closed-loop", action="store_true")
+    parser.add_argument("--arrival-rate", type=float, default=1.25)
+    parser.add_argument("--invalidate-every", type=int, default=8)
     parser.add_argument("--out-dir", type=Path, default=OUT / "e2e")
     args = parser.parse_args()
     asyncio.run(run_e2e(
@@ -471,6 +570,9 @@ def main() -> None:
         [item for item in args.scenarios.split(",") if item],
         [item for item in args.methods.split(",") if item],
         args.seeds, args.requests, args.concurrency, args.kv_cache_tokens, args.out_dir,
+        open_loop=not args.closed_loop,
+        arrival_rate=args.arrival_rate,
+        invalidate_every=args.invalidate_every,
     ))
 
 

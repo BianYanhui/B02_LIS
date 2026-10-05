@@ -110,25 +110,53 @@ def useful_digest(slot: int) -> int:
     return int.from_bytes(hashlib.blake2b(f"U{slot:04d}".encode(), digest_size=8).digest(), "big")
 
 
-async def offer_long(runtime: PathRuntime, cell: int, seconds: float, seq0: int, per_s: float = 2.0) -> int:
-    """Steady 4096-token updates on the foreground connection. Same digests as end-to-end requests."""
+async def offer_long(runtime: PathRuntime, cell: int, seconds: float, seq0: int, per_s: float = 2.0) -> tuple[int, int]:
+    """Steady 4096-token updates on the foreground connection.
+
+    Every eighth update is preceded by a tomb for that same prefix, so invalidate
+    lag can be compared with update lag. The digest strings stay U0000–U0015.
+    """
     from experiments.icc_kv.e2e import USEFUL_COVERAGE, USEFUL_POOL
 
-    sent = 0
+    updates = 0
+    tombs = 0
+    seq = seq0
     started = time.perf_counter()
     while time.perf_counter() - started < seconds:
-        target = started + sent / per_s
+        target = started + (updates + tombs) / per_s
         delay = target - time.perf_counter()
         if delay > 0:
             await asyncio.sleep(delay)
             if time.perf_counter() - started >= seconds:
                 break
-        slot = sent % USEFUL_POOL
+        slot = updates % USEFUL_POOL
+        if updates > 0 and updates % 8 == 0:
+            await runtime.send_foreground(
+                K_TOMB, slot % 4, cell, seq, 0, useful_digest(slot), time.time(),
+            )
+            seq += 1
+            tombs += 1
         await runtime.send_foreground(
-            K_UP, slot % 4, cell, seq0 + sent, USEFUL_COVERAGE, useful_digest(slot), time.time(),
+            K_UP, slot % 4, cell, seq, USEFUL_COVERAGE, useful_digest(slot), time.time(),
         )
-        sent += 1
-    return sent
+        seq += 1
+        updates += 1
+    return updates, tombs
+
+
+def kind_lag(applied: list, kind: str) -> tuple[float, float, int]:
+    lags = sorted(
+        max(0.0, row.applied_at - row.generated_at)
+        for row in applied
+        if getattr(row, "kind", "") == kind
+    )
+    if not lags:
+        return 0.0, 0.0, 0
+
+    def pct(p: float) -> float:
+        return lags[min(len(lags) - 1, round(p / 100 * (len(lags) - 1)))]
+
+    return pct(50), pct(95), len(lags)
 
 
 def long_lag(applied: list) -> tuple[float, float, int]:
@@ -164,15 +192,17 @@ async def run_scale(capacity: float, rhos: list[float], methods: list[str], seed
                     rate = capacity if method == "RateFIFO" else 0.0
                     await runtime.configure(cell, method, rate)
                     noise_seq = 1_000_000_000 + seed * 100_000_000_000 + int(rho * 1000) * 1_000_000
-                    noise_sent, long_sent = await asyncio.gather(
+                    noise_sent, long_counts = await asyncio.gather(
                         offer_noise(runtime, cell, rho * capacity, seconds, noise_seq),
                         offer_long(runtime, cell, seconds, 1 + seed * 1_000_000),
                     )
+                    long_sent, invalidate_sent = long_counts
                     with runtime.dispatcher.lock:
                         frames = runtime.dispatcher.frames
                         foreground = runtime.dispatcher.foreground_frames
                         applied = list(runtime.dispatcher.applied)
                     lag_p50, lag_p95, long_applied = long_lag(applied)
+                    inv_p50, inv_p95, inv_applied = kind_lag(applied, "invalidate")
                     row = {
                         "seed": seed,
                         "rho": rho,
@@ -188,6 +218,10 @@ async def run_scale(capacity: float, rhos: list[float], methods: list[str], seed
                         "long_applied": long_applied,
                         "long_lag_p50_s": lag_p50,
                         "long_lag_p95_s": lag_p95,
+                        "invalidate_sent": invalidate_sent,
+                        "invalidate_applied": inv_applied,
+                        "invalidate_lag_p50_s": inv_p50,
+                        "invalidate_lag_p95_s": inv_p95,
                         "capacity_events_per_s": capacity,
                         "offered_noise_per_s": noise_sent / seconds if seconds else 0.0,
                         **(await runtime.fetch_stats()),

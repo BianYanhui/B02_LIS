@@ -132,6 +132,10 @@ class Dispatcher:
         with self.lock:
             self.tested[(worker, digest)] = coverage
 
+    def clear_local(self, worker: int, digest: int) -> None:
+        with self.lock:
+            self.tested.pop((worker, digest), None)
+
 
 class PathRuntime:
     def __init__(self) -> None:

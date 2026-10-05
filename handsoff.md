@@ -28,7 +28,7 @@
 
 ## 可变交接
 
-更新时间：2026-10-06 00:28（UTC+8）。全系列已跑完。没有实验进程。不要重跑，不要动 vLLM，不要启动 `overnight.py`。
+更新时间：2026-10-06 00:52（UTC+8）。补强代码已写完，2 倍 smoke 已通过。没有实验进程。不要开正式矩阵，不要动 vLLM，不要启动 `overnight.py`。
 
 ### 正在做的事
 
@@ -52,7 +52,11 @@
 
 2026-10-06 用户转来一份对照 Word 方案的总评，B−（6/10）。用现有表核对后，这条总评成立，不要把它当成过分苛刻。核对数字：假阳性全部为 0；错放里 91.3% 的 coverage regret 是 0；0.9× 上 Adaptive 的 prefill 比 Ideal 高 18.7 token，5 个 seed 都没有更好；2 倍命中请求的客户端 TTFT，Adaptive 比 Ideal 低约 120 ms，同时 prefill 更高。控制面 FullSync 在 1.2×（15600/s）仍全部送达、长前缀 P95 约 2 ms，2× 实际送达约 20337/s；端到端 0.9× 队列已经到数万。所以 13000 不是两条路径共用的有效容量。
 
-论文只能写过载和突发下相对 FullSync、Static 的队列、长前缀 lag、prefill 和超过 2 秒。不能写 Word 那条完整因果链、错放改善、接近 Ideal、0.9× 收益、unsafe reuse 为 0、真实 trace 或按 K 扩展。用户问过这些缺口能不能补。结论：能补，不是整套设计报废。统一 C、补 delivery lag、错放改成 regret>0、开环请求和绑核，都是测量问题。假阳性为 0 是因为 16×4096 小于单卡 104544，`ShadowCache` 不会淘汰，墓碑发不出来；`enqueue` 里 K_TOMB 走优先级队列，不经过 `low_utility`。补失效要在现有长短分工上加淘汰，不能退回 64 前缀 trace。owner validation 的拒绝计数目前没有。0.9× 没有收益可能补完仍然成立，不能调参把它做成正结果。用户还没要求开补跑。
+论文只能写过载和突发下相对 FullSync、Static 的队列、长前缀 lag、prefill 和超过 2 秒。不能写 Word 那条完整因果链、错放改善、接近 Ideal、0.9× 收益、unsafe reuse 为 0、真实 trace 或按 K 扩展。用户问过这些缺口能不能补。结论：能补，不是整套设计报废。统一 C、补 delivery lag、错放改成 regret>0、开环请求和绑核，都是测量问题。假阳性为 0 是因为 16×4096 小于单卡 104544，`ShadowCache` 不会淘汰，墓碑发不出来；`enqueue` 里 K_TOMB 走优先级队列，不经过 `low_utility`。补失效要在现有长短分工上加淘汰，不能退回 64 前缀 trace。owner validation 的拒绝计数目前没有。0.9× 没有收益可能补完仍然成立，不能调参把它做成正结果。补强已经进代码，默认开环、每 8 条请求淘汰一条已安装的长前缀、摘要里有前景延迟、失效延迟、`coverage_wrong_rate` 和 `stale_cache_hits`。墓碑仍走优先级队列。没有改 tau、效用系数或 HTB。
+
+2026-10-06 的 smoke 在 `/tmp/icc_strengthen_smoke`，只作方向，不是论文数字：1 个 seed、40 条请求、开环每秒 1 条、ultrahigh。Ideal / Adaptive / FullSync 都完成，失败 0。Adaptive 的 prefill 2494 与 Ideal 相同，FullSync 3007。假阴性 0、0.05、0.225。覆盖错放 0、0.025、0.225。失效 P95 延迟：Adaptive 0.16 秒，FullSync 28.9 秒。队列 17 对 42.9 万。Adaptive 的 `stale_cache_hits` 是 0，FullSync 是 1。服务端 TTFT 三者都在 7.5–8.0 秒，开环排队等待是几十秒，这格不要拿 TTFT 当收益。
+
+用户要求看过 smoke 再点头。点头之前不要开正式实验，也不要把这 40 条写进 `e2e_full`。
 
 ### 已经定下来的约束
 
