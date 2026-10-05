@@ -4,9 +4,8 @@ Background events use worker ids 16 and above. Adaptive only sees ordinary
 frames, so it cannot tell a real completion from a replayed one. Ideal applies
 the real worker's update to the local view immediately and does not send it.
 
-The dispatcher and the background sender run on their own thread. The request
-thread only chooses a worker and waits on vLLM, so client TTFT is not the
-cost of unpacking the background stream.
+The dispatcher process keeps only the routable view. Noise senders are
+separate processes. The request process places a request and waits on vLLM.
 """
 from __future__ import annotations
 
@@ -25,7 +24,11 @@ from pathlib import Path
 
 import aiohttp
 
-from experiments.icc_kv.runtime import OUT, ROOT, PathRuntime, prepare_fixed_gateway, write_json
+from experiments.icc_kv.runtime import (
+    OUT, ROOT, PathRuntime, cpus_for_vllm, gateway_pid, pin_listeners,
+    prepare_fixed_gateway, process_cpu_seconds, restore_affinity, write_json,
+)
+from experiments.icc_kv.split_path import SplitControl
 from experiments.icc_kv.wire import K_TOMB, K_UP
 
 # Request prefixes are long enough to clear the 1024-token admission bar.
@@ -272,17 +275,20 @@ async def run_e2e(
     trace: Path, capacity: float, scenarios: list[str], methods: list[str],
     seeds: int, requests_per_run: int, concurrency: int, kv_tokens: int, out_dir: Path,
     open_loop: bool = True, arrival_rate: float = 1.25, invalidate_every: int = 8,
-    noise_workers: int = 4,
+    noise_workers: int = 4, noise_senders: int = 4, warmup_requests: int = 0,
 ) -> None:
-    try:
-        os.sched_setaffinity(0, {2})
-    except OSError:
-        pass
     formal = load_formal()
     prepare_fixed_gateway()
-    control = ControlPlane()
-    control.start()
+    control = SplitControl(senders=noise_senders)
+    pinned: list[tuple[int, set[int]]] = []
     try:
+        control.start()
+        try:
+            os.sched_setaffinity(0, {2})
+        except OSError:
+            pass
+        pinned = pin_listeners([8000, 8001, 8002, 8003], cpus_for_vllm())
+        gateway = gateway_pid()
         await formal.check_endpoints()
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / "e2e_summary.json"
@@ -306,11 +312,17 @@ async def run_e2e(
                     cell_id = cell
                     salt = f"icc-noise-{run_id}-{cell_id}"
                     started = time.perf_counter()
-                    if method != "Ideal":
-                        control.configure(cell_id, method, rate)
-                    else:
-                        control.configure(cell_id, "FullSync", 0.0)
-                    control.start_background(cell_id, scenario, rho, capacity, noise_workers)
+                    control.begin_cell()
+                    control.configure(cell_id, method, rate)
+                    control.begin_noise({
+                        "cell": cell_id,
+                        "level": rho * capacity,
+                        "seconds": 0,
+                        "scenario": scenario,
+                        "coverage": NOISE_COVERAGE,
+                        "seq0": 100_000_000,
+                        "workers": noise_workers,
+                    })
                     shadows = [formal.ShadowCache(kv_tokens) for _ in range(4)]
                     truth: dict[tuple[int, int], int] = {}
                     placement = Placement()
@@ -321,9 +333,9 @@ async def run_e2e(
                         planned.append((request_id, slot))
                     records = []
                     failed = 0
-                    tombs_sent = 0
                     stale_cache_hits = 0
                     loop_lags: list[float] = []
+                    view_sizes: list[int] = []
                     stop_probe = asyncio.Event()
                     versions = [0] * USEFUL_POOL
                     digest_text = [f"U{slot:04d}" for slot in range(USEFUL_POOL)]
@@ -331,21 +343,31 @@ async def run_e2e(
                     seq_box = [1]
                     state_lock = asyncio.Lock()
                     inflight = asyncio.Semaphore(concurrency)
+                    pending_emits: list[tuple] = []
+                    installed_at: dict[tuple[int, int], float] = {}
+                    tomb_at: dict[tuple[int, int], float] = {}
+
+                    def flush_emits() -> None:
+                        batch = pending_emits[:]
+                        pending_emits.clear()
+                        for kind, worker, seq, coverage, digest in batch:
+                            control.emit(kind, worker, cell_id, seq, coverage, digest)
 
                     def invalidate_slot(slot: int) -> None:
-                        nonlocal tombs_sent
                         versions[slot] += 1
                         digest = digests[slot]
+                        now = time.time()
                         for worker in range(4):
                             if truth.pop((worker, digest), None) is None:
                                 continue
+                            installed_at.pop((worker, digest), None)
+                            tomb_at[(worker, digest)] = now
                             shadows[worker].drop(digest_text[slot])
                             if method == "Ideal":
                                 control.clear_local(worker, digest)
                             else:
-                                control.emit(K_TOMB, worker, cell_id, seq_box[0], 0, digest)
+                                pending_emits.append((K_TOMB, worker, seq_box[0], 0, digest))
                                 seq_box[0] += 1
-                            tombs_sent += 1
 
                     async def probe() -> None:
                         while not stop_probe.is_set():
@@ -374,7 +396,8 @@ async def run_e2e(
                                         invalidate_slot(slot)
                                     elif installed:
                                         invalidate_slot(installed[0])
-                                tested = control.view()
+                                tested, generated_map, delivered_map = control.placement_state()
+                                view_sizes.append(len(tested))
                                 digest = digests[slot]
                                 version = versions[slot]
                                 ideal, ideal_cov = placement.select(truth, digest)
@@ -385,7 +408,26 @@ async def run_e2e(
                                 truth_cov = max((truth.get((worker, digest), 0) for worker in range(4)), default=0)
                                 view_cov_max = max((tested.get((worker, digest), 0) for worker in range(4)), default=0)
                                 view_cov = tested.get((routed, digest), 0)
-                                delivery_lag_s, state_age_s = control.view_timing(routed, digest, time.time())
+                                now_wall = time.time()
+                                generated_at = generated_map.get((routed, digest))
+                                delivered_at = delivered_map.get((routed, digest))
+                                if generated_at is None or delivered_at is None:
+                                    delivery_lag_s, state_age_s = -1.0, -1.0
+                                else:
+                                    delivery_lag_s = max(0.0, delivered_at - generated_at)
+                                    state_age_s = max(0.0, now_wall - delivered_at)
+                                missing_ages = [
+                                    now_wall - installed_at[(worker, digest)]
+                                    for worker in range(4)
+                                    if truth.get((worker, digest), 0) >= 512 and (worker, digest) in installed_at
+                                ]
+                                missing_age_s = max(missing_ages) if truth_cov >= 512 and view_cov_max < 512 and missing_ages else -1.0
+                                pending_ages = [
+                                    now_wall - tomb_at[(worker, digest)]
+                                    for worker in range(4)
+                                    if (worker, digest) in tomb_at and tested.get((worker, digest), 0) >= 512
+                                ]
+                                tomb_pending_s = max(pending_ages) if pending_ages else -1.0
                                 decision = {
                                     "slot": slot,
                                     "digest": digest,
@@ -400,7 +442,11 @@ async def run_e2e(
                                     "sched_delay_ms": sched_delay_ms,
                                     "delivery_lag_s": delivery_lag_s,
                                     "state_age_s": state_age_s,
+                                    "missing_age_s": missing_age_s,
+                                    "tomb_pending_s": tomb_pending_s,
+                                    "decision_s": time.perf_counter() - origin,
                                 }
+                            flush_emits()
                             response = await formal.one_request(
                                 session, formal.URLS[decision["routed"]],
                                 formal.prompt_for(formal.TraceRequest(
@@ -422,25 +468,33 @@ async def run_e2e(
                                     stale_cache_hits += 1
                                 evicted = shadows[routed].insert(digest_text[slot], USEFUL_COVERAGE)
                                 truth[(routed, decision["digest"])] = USEFUL_COVERAGE
+                                installed_at[(routed, decision["digest"])] = time.time()
+                                tomb_at.pop((routed, decision["digest"]), None)
                                 if method == "Ideal":
                                     control.set_local(routed, decision["digest"], USEFUL_COVERAGE)
                                 else:
-                                    control.emit(K_UP, routed, cell_id, seq_box[0], USEFUL_COVERAGE, decision["digest"])
+                                    pending_emits.append((K_UP, routed, seq_box[0], USEFUL_COVERAGE, decision["digest"]))
                                     seq_box[0] += 1
-                                    for victim in evicted:
-                                        victim_digest = formal.digest64(victim)
-                                        truth.pop((routed, victim_digest), None)
-                                        shadows[routed].drop(victim)
-                                        control.emit(K_TOMB, routed, cell_id, seq_box[0], 0, victim_digest)
+                                for victim in evicted:
+                                    victim_digest = formal.digest64(victim)
+                                    truth.pop((routed, victim_digest), None)
+                                    installed_at.pop((routed, victim_digest), None)
+                                    shadows[routed].drop(victim)
+                                    if method == "Ideal":
+                                        control.clear_local(routed, victim_digest)
+                                    else:
+                                        pending_emits.append((K_TOMB, routed, seq_box[0], 0, victim_digest))
                                         seq_box[0] += 1
-                                        tombs_sent += 1
+                                prefill = max(0, int(response["input_tokens"] or 0) - cached)
                                 records.append({
                                     "request_id": request_id,
+                                    "warmup": int(request_id < warmup_requests),
+                                    "decision_s": decision["decision_s"],
                                     "ttft_ms": response["ttft_ms"],
                                     "sched_delay_ms": decision["sched_delay_ms"],
                                     "e2e_ttft_ms": response["ttft_ms"] + decision["sched_delay_ms"],
                                     "reused_tokens": cached,
-                                    "prefill_tokens": max(0, int(response["input_tokens"] or 0) - cached),
+                                    "prefill_tokens": prefill,
                                     "routed": routed,
                                     "ideal": decision["ideal"],
                                     "version": decision["version"],
@@ -453,8 +507,11 @@ async def run_e2e(
                                     "stale_cache_hit": int(cached >= 512 and decision["routed_truth"] == 0 and decision["version"] > 0),
                                     "delivery_lag_s": decision["delivery_lag_s"],
                                     "state_age_s": decision["state_age_s"],
-                                    "cache_hit": int(decision["coverage_shortfall"] == 0 and decision["loose_false_negative"] == 0 and max(0, int(response["input_tokens"] or 0) - cached) < 800),
+                                    "missing_age_s": decision["missing_age_s"],
+                                    "tomb_pending_s": decision["tomb_pending_s"],
+                                    "cache_hit": int(decision["coverage_shortfall"] == 0 and decision["loose_false_negative"] == 0 and prefill < 800),
                                 })
+                            flush_emits()
 
                     probe_task = asyncio.create_task(probe())
                     try:
@@ -462,6 +519,8 @@ async def run_e2e(
                             before = await metric_totals(session, formal.URLS)
                             await reset_prefix_caches(session, formal.URLS)
                             origin = time.perf_counter()
+                            cpu_mark = process_cpu_seconds(gateway)
+                            cpu_t0 = time.perf_counter()
                             if open_loop:
                                 await asyncio.gather(*[
                                     serve(request_id, slot, origin + request_id / max(arrival_rate, 1e-6))
@@ -475,23 +534,48 @@ async def run_e2e(
                                     ])
                             after = await metric_totals(session, formal.URLS)
                             records.sort(key=lambda row: row["request_id"])
+                            gateway_cpu = (process_cpu_seconds(gateway) - cpu_mark) / max(time.perf_counter() - cpu_t0, 1e-6)
                     finally:
                         stop_probe.set()
                         probe_task.cancel()
                         with contextlib.suppress(asyncio.CancelledError):
                             await probe_task
-                        control.stop_background()
+                        noise_sent = control.end_noise()
+                    stats = {}
+                    previous_received = -1
+                    for _settle in range(12):
+                        stats = control.stats()
+                        got = int(stats.get("relay_received") or 0)
+                        if got == previous_received:
+                            break
+                        previous_received = got
+                        await asyncio.sleep(0.4)
                     counts = [0, 0, 0, 0]
-                    for row in records:
+                    scored = [row for row in records if not row["warmup"]]
+                    for row in scored:
                         counts[row["routed"]] += 1
                     sum_delta = sum(after[index][0] - before[index][0] for index in range(4))
                     count_delta = sum(after[index][1] - before[index][1] for index in range(4))
-                    frames, foreground_frames = control.frame_counts()
-                    applied = control.applied()
+                    counted = control.counts()
+                    applied = counted["applied"]
+                    frames = counted["frames"]
+                    foreground_frames = counted["foreground"]
                     update_lags = [max(0.0, row.applied_at - row.generated_at) for row in applied if row.coverage >= USEFUL_COVERAGE]
                     invalidate_lags = [max(0.0, row.applied_at - row.generated_at) for row in applied if row.kind == "invalidate"]
-                    ttfts = [row["ttft_ms"] for row in records]
-                    e2e_ttfts = [row["e2e_ttft_ms"] for row in records]
+                    applied_seqs = {row.seq for row in applied}
+                    censored_up: list[float] = []
+                    censored_inv: list[float] = []
+                    closed = time.time()
+                    for seq, kind, coverage, generated in control.sent_fg:
+                        if seq in applied_seqs:
+                            continue
+                        lag = max(0.0, closed - generated)
+                        if kind == "invalidate":
+                            censored_inv.append(lag)
+                        elif coverage >= USEFUL_COVERAGE:
+                            censored_up.append(lag)
+                    ttfts = [row["ttft_ms"] for row in scored]
+                    e2e_ttfts = [row["e2e_ttft_ms"] for row in scored]
                     ordered = sorted(ttfts)
                     lags = sorted(loop_lags)
 
@@ -503,8 +587,22 @@ async def run_e2e(
                     def mean(values: list[float]) -> float:
                         return sum(values) / len(values) if values else 0.0
 
-                    stats = control.stats()
                     elapsed = max(time.perf_counter() - started, 1e-6)
+                    drop_keys = (
+                        "relay_drop_rate_limit", "relay_drop_superseded", "relay_drop_replica_cap",
+                        "relay_drop_low_utility", "relay_drop_queue_drop", "relay_drop_expired",
+                    )
+                    forwarded = int(stats.get("relay_forwarded") or 0)
+                    received = int(stats.get("relay_received") or 0)
+                    queued = int(stats.get("relay_queued") or 0)
+                    drops = sum(int(stats.get(key) or 0) for key in drop_keys)
+                    sent_total = noise_sent + control.fg_up + control.fg_tomb
+                    accounted = forwarded + drops + queued
+
+                    def gap(left: int, right: int) -> float:
+                        den = max(left, right)
+                        return abs(left - right) / den if den else 0.0
+
                     summary = {
                         "seed": seed,
                         "scenario": scenario,
@@ -513,38 +611,59 @@ async def run_e2e(
                         "cell": cell,
                         "cache_salt": salt,
                         "requests": len(records),
+                        "scored_requests": len(scored),
+                        "warmup_requests": warmup_requests,
                         "failed_requests": failed,
                         "elapsed_s": round(elapsed, 1),
                         "ttft_mean_ms": mean(ttfts),
                         "ttft_p95_ms": pct(ordered, 95),
                         "e2e_ttft_mean_ms": mean(e2e_ttfts),
-                        "sched_delay_mean_ms": mean([row["sched_delay_ms"] for row in records]),
+                        "sched_delay_mean_ms": mean([row["sched_delay_ms"] for row in scored]),
                         "server_ttft_mean_ms": (sum_delta / count_delta * 1000) if count_delta > 0 else 0.0,
                         "foreground_lag_p50_s": _pct(update_lags, 50),
                         "foreground_lag_p95_s": _pct(update_lags, 95),
+                        "foreground_censored_lag_p95_s": _pct(update_lags + censored_up, 95),
+                        "foreground_undelivered": len(censored_up),
                         "foreground_applied": len(update_lags),
+                        "foreground_up_sent": control.fg_up,
                         "invalidate_lag_p50_s": _pct(invalidate_lags, 50),
                         "invalidate_lag_p95_s": _pct(invalidate_lags, 95),
+                        "invalidate_censored_lag_p95_s": _pct(invalidate_lags + censored_inv, 95),
+                        "invalidate_undelivered": len(censored_inv),
                         "invalidate_applied": len(invalidate_lags),
-                        "tombs_sent": tombs_sent,
+                        "tombs_sent": control.fg_tomb,
                         "loop_lag_p95_ms": pct(lags, 95),
                         "slo_violation_2s": sum(value > 2000 for value in ttfts) / len(ttfts) if ttfts else 0.0,
-                        "prefill_tokens_mean": mean([row["prefill_tokens"] for row in records]),
-                        "reused_tokens_mean": mean([row["reused_tokens"] for row in records]),
-                        "wrong_placement_rate": mean([row["wrong_placement"] for row in records]),
-                        "coverage_wrong_rate": mean([row["coverage_wrong"] for row in records]),
+                        "prefill_tokens_mean": mean([row["prefill_tokens"] for row in scored]),
+                        "reused_tokens_mean": mean([row["reused_tokens"] for row in scored]),
+                        "wrong_placement_rate": mean([row["wrong_placement"] for row in scored]),
+                        "coverage_wrong_rate": mean([row["coverage_wrong"] for row in scored]),
                         "stale_cache_hits": stale_cache_hits,
-                        "hit_service_ttft_ms": mean([row["ttft_ms"] for row in records if row["cache_hit"]]),
-                        "hit_requests": sum(row["cache_hit"] for row in records),
-                        "fn_delivery_lag_p95_s": _pct([row["delivery_lag_s"] for row in records if row["loose_false_negative"] and row["delivery_lag_s"] >= 0], 95),
-                        "hit_delivery_lag_p95_s": _pct([row["delivery_lag_s"] for row in records if row["cache_hit"] and row["delivery_lag_s"] >= 0], 95),
-                        "coverage_shortfall_rate": mean([row["coverage_shortfall"] for row in records]),
-                        "coverage_regret_mean": mean([row["coverage_regret"] for row in records]),
-                        "loose_false_negative_rate": mean([row["loose_false_negative"] for row in records]),
-                        "loose_false_positive_rate": mean([row["loose_false_positive"] for row in records]),
+                        "hit_service_ttft_ms": mean([row["ttft_ms"] for row in scored if row["cache_hit"]]),
+                        "hit_requests": sum(row["cache_hit"] for row in scored),
+                        "fn_delivery_lag_p95_s": _pct([row["delivery_lag_s"] for row in scored if row["loose_false_negative"] and row["delivery_lag_s"] >= 0], 95),
+                        "hit_delivery_lag_p95_s": _pct([row["delivery_lag_s"] for row in scored if row["cache_hit"] and row["delivery_lag_s"] >= 0], 95),
+                        "missing_age_p95_s": _pct([row["missing_age_s"] for row in scored if row["missing_age_s"] >= 0], 95),
+                        "tomb_pending_p95_s": _pct([row["tomb_pending_s"] for row in scored if row["tomb_pending_s"] >= 0], 95),
+                        "coverage_shortfall_rate": mean([row["coverage_shortfall"] for row in scored]),
+                        "coverage_regret_mean": mean([row["coverage_regret"] for row in scored]),
+                        "loose_false_negative_rate": mean([row["loose_false_negative"] for row in scored]),
+                        "loose_false_positive_rate": mean([row["loose_false_positive"] for row in scored]),
                         "placement_counts": counts,
                         "dispatcher_frames": frames,
                         "foreground_frames": foreground_frames,
+                        "noise_frames": counted["noise"],
+                        "routable_view_max": max(view_sizes) if view_sizes else 0,
+                        "noise_sent": noise_sent,
+                        "ledger_sent": sent_total,
+                        "ledger_received": received,
+                        "ledger_accounted": accounted,
+                        "ledger_ingress_gap": gap(sent_total, received),
+                        "ledger_balance_gap": gap(received, accounted),
+                        "offered_noise_per_s": noise_sent / elapsed,
+                        "measured_rho": (noise_sent / elapsed / capacity) if capacity else 0.0,
+                        "gateway_cpu": gateway_cpu,
+                        "vllm_pinned": len(pinned),
                         "capacity_events_per_s": capacity,
                         "background_rho": rho,
                         "concurrency": concurrency,
@@ -555,11 +674,12 @@ async def run_e2e(
                         "useful_coverage": USEFUL_COVERAGE,
                         "noise_coverage": NOISE_COVERAGE,
                         "noise_workers": noise_workers,
-                        "forwarded_per_s": (stats.get("relay_forwarded") or 0) / elapsed,
+                        "noise_senders": noise_senders,
+                        "forwarded_per_s": forwarded / elapsed,
                         **stats,
                     }
                     rows.append(summary)
-                    write_json(path, {**control.runtime.meta(), "rows": rows})
+                    write_json(path, {**control.meta(), "rows": rows})
                     if records:
                         csv_path = out_dir / f"requests_{scenario}_{method}_seed{seed}.csv"
                         with csv_path.open("w", newline="") as handle:
@@ -570,6 +690,7 @@ async def run_e2e(
                     cell += 1
     finally:
         control.stop()
+        restore_affinity(pinned)
 
 
 def main() -> None:
@@ -587,6 +708,8 @@ def main() -> None:
     parser.add_argument("--arrival-rate", type=float, default=1.25)
     parser.add_argument("--invalidate-every", type=int, default=8)
     parser.add_argument("--noise-workers", type=int, default=4)
+    parser.add_argument("--noise-senders", type=int, default=4)
+    parser.add_argument("--warmup-requests", type=int, default=0)
     parser.add_argument("--out-dir", type=Path, default=OUT / "e2e")
     args = parser.parse_args()
     asyncio.run(run_e2e(
@@ -598,6 +721,8 @@ def main() -> None:
         arrival_rate=args.arrival_rate,
         invalidate_every=args.invalidate_every,
         noise_workers=args.noise_workers,
+        noise_senders=args.noise_senders,
+        warmup_requests=args.warmup_requests,
     ))
 
 

@@ -25,14 +25,12 @@ def main() -> None:
     tr.add_argument("--kv-cache-tokens", type=int, default=104544)
     tr.add_argument("--out-dir", type=Path, default=OUT / "trace")
     sc = sub.add_parser("scale")
-    sc.add_argument("--trace", type=Path, default=OUT / "trace" / "events.csv")
     sc.add_argument("--capacity", type=float, required=True)
-    sc.add_argument("--rhos", default="0.5,0.8,1.0,1.2")
+    sc.add_argument("--rhos", default="0.5,0.9,1.2,1.5,2.0")
     sc.add_argument("--methods", default="FullSync,RateFIFO,StaticSemantic,Adaptive")
-    sc.add_argument("--copies", type=int, default=4)
-    sc.add_argument("--correlated", action="store_true")
     sc.add_argument("--seeds", type=int, default=5)
-    sc.add_argument("--seconds", type=float, default=180.0)
+    sc.add_argument("--seconds", type=float, default=120.0)
+    sc.add_argument("--workers", type=int, default=4)
     sc.add_argument("--out-dir", type=Path, default=OUT / "scale")
     args = parser.parse_args()
     if args.cmd == "capacity":
@@ -42,10 +40,10 @@ def main() -> None:
         asyncio.run(collect(args.out_dir, args.seconds, args.max_requests, args.kv_cache_tokens))
     else:
         asyncio.run(run_scale(
-            args.trace, args.capacity,
-            [float(item) for item in args.rhos.split(",")],
+            args.capacity,
+            [float(item) for item in args.rhos.split(",") if item],
             [item for item in args.methods.split(",") if item],
-            args.copies, args.correlated, args.seeds, args.seconds, args.out_dir,
+            args.seeds, args.seconds, args.out_dir, args.workers,
         ))
 
 

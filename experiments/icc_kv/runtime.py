@@ -9,6 +9,7 @@ import asyncio
 import contextlib
 import json
 import os
+import re
 import socket
 import subprocess
 import threading
@@ -30,6 +31,9 @@ DISPATCH_PORT = 9711
 FIXED_LINK_BIT_S = 1_000_000_000
 MAX_QUEUE = 4096
 MAX_INFLIGHT = 0
+# Harness noise uses worker ids at or above this value. Those frames are
+# counted and are not part of the placement view.
+ROUTABLE_BELOW = 16
 
 
 def sh(args: list[str]) -> str:
@@ -107,32 +111,37 @@ class Dispatcher:
     resets: int = 0
     frames: int = 0
     foreground_frames: int = 0
+    noise_frames: int = 0
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def on_frame(self, kind: int, worker: int, seq: int, coverage: int, digest: int, generated_at: float, now: float) -> None:
         with self.lock:
             self.frames += 1
-            if worker < 16:
-                self.foreground_frames += 1
-                if kind == K_UP:
-                    name = "update"
-                else:
-                    name = "invalidate"
-                self.applied.append(Applied(seq, worker, name, digest, coverage, generated_at, now))
+            if worker >= ROUTABLE_BELOW:
+                self.noise_frames += 1
+                return
+            self.foreground_frames += 1
             if kind == K_UP:
+                name = "update"
                 self.tested[(worker, digest)] = coverage
                 self.generated_at_map[(worker, digest)] = generated_at
                 self.delivered_at_map[(worker, digest)] = now
                 self.ground[(worker, digest)] = (coverage, True)
             else:
+                name = "invalidate"
                 self.tested.pop((worker, digest), None)
                 self.generated_at_map.pop((worker, digest), None)
                 self.delivered_at_map.pop((worker, digest), None)
                 self.ground[(worker, digest)] = (0, False)
+            self.applied.append(Applied(seq, worker, name, digest, coverage, generated_at, now))
 
     def snapshot(self) -> dict[tuple[int, int], int]:
         with self.lock:
             return dict(self.tested)
+
+    def placement_maps(self) -> tuple[dict[tuple[int, int], int], dict[tuple[int, int], float], dict[tuple[int, int], float]]:
+        with self.lock:
+            return dict(self.tested), dict(self.generated_at_map), dict(self.delivered_at_map)
 
     def set_local(self, worker: int, digest: int, coverage: int) -> None:
         now = time.time()
@@ -243,7 +252,7 @@ class PathRuntime:
         try:
             while True:
                 data = await reader.readexactly(FRAME)
-                kind, _i, cell, _seq, _c, _d, _t = HDR.unpack(data[:32])
+                kind, _i, cell, seq, coverage, _d, _t = HDR.unpack(data[:32])
                 if kind == K_RESET_DONE and cell == self.dispatcher.cell:
                     self.dispatcher.resets += 1
                 elif kind == K_STATS:
@@ -257,6 +266,8 @@ class PathRuntime:
                         "relay_drop_queue_drop": queue_drop,
                         "relay_drop_expired": expired,
                         "relay_max_queue": maxq,
+                        "relay_queued": int(seq),
+                        "relay_received": int(coverage),
                     }
                     self._stats_wait.set()
         except (asyncio.IncompleteReadError, ConnectionResetError):
@@ -264,6 +275,7 @@ class PathRuntime:
 
     async def _on_down(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         self._down_writers.add(writer)
+        pending = 0
         try:
             while True:
                 data = await reader.readexactly(FRAME)
@@ -272,10 +284,16 @@ class PathRuntime:
                 if kind in (K_UP, K_TOMB) and cell == self.dispatcher.cell:
                     self.dispatcher.on_frame(kind, worker, seq, coverage, digest, generated_at, now)
                     writer.write(frame(K_ACK, 0, cell, seq, 0, 0, now))
-                    await writer.drain()
+                    pending += 1
+                    if pending >= 32:
+                        await writer.drain()
+                        pending = 0
         except (asyncio.IncompleteReadError, ConnectionResetError, asyncio.CancelledError):
             return
         finally:
+            if pending:
+                with contextlib.suppress(Exception):
+                    await writer.drain()
             self._down_writers.discard(writer)
             writer.close()
 
@@ -337,10 +355,65 @@ class PathRuntime:
             "gateway_cpuset": "0",
             "dispatcher_cpuset": "1",
             "max_queue": MAX_QUEUE,
+            "max_queue_enforced": False,
             "max_inflight": MAX_INFLIGHT,
+            "request_cpuset": "2",
+            "noise_cpuset": "3+",
             "frame_bytes": FRAME,
             "wire_bytes": 104,
         }
+
+
+def gateway_pid() -> int:
+    return int(sh(["docker", "inspect", "-f", "{{.State.Pid}}", "b02-gateway4t4"]).strip())
+
+
+def process_cpu_seconds(pid: int) -> float:
+    raw = Path(f"/proc/{pid}/stat").read_text()
+    rest = raw.rsplit(")", 1)[1].split()
+    ticks = os.sysconf(os.sysconf_names["SC_CLK_TCK"])
+    return (int(rest[11]) + int(rest[12])) / ticks
+
+
+def cpus_for_vllm() -> set[int]:
+    """Leave cores 0–15 for the gateway, dispatcher, client, and noise senders."""
+    rest = set(range(os.cpu_count() or 1)) - set(range(16))
+    return rest or set(range(os.cpu_count() or 1))
+
+
+def pin_listeners(ports: list[int], allowed: set[int]) -> list[tuple[int, set[int]]]:
+    try:
+        text = sh(["ss", "-ltnp"])
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+    saved: list[tuple[int, set[int]]] = []
+    seen: set[int] = set()
+    for line in text.splitlines():
+        if not any(re.search(rf":{port}\b", line) for port in ports):
+            continue
+        for match in re.finditer(r"pid=(\d+)", line):
+            pid = int(match.group(1))
+            if pid in seen:
+                continue
+            seen.add(pid)
+            try:
+                previous = os.sched_getaffinity(pid)
+                os.sched_setaffinity(pid, allowed)
+            except OSError:
+                continue
+            saved.append((pid, previous))
+    return saved
+
+
+def restore_affinity(saved: list[tuple[int, set[int]]]) -> None:
+    wide = set(range(os.cpu_count() or 1))
+    for pid, cpus in saved:
+        # A one-core mask is the control process, not a placement the servers had.
+        target = wide if len(cpus) < 4 else cpus
+        try:
+            os.sched_setaffinity(pid, target)
+        except OSError:
+            pass
 
 
 def write_json(path: Path, payload: dict) -> None:

@@ -1,8 +1,9 @@
-"""Finish the ICC matrix after the running 4-GPU end-to-end job.
+"""Overload matrix runner.
 
-Scale and burst use the same unique short noise and 4096-token prefixes as
-the end-to-end run. Ablation uses that end-to-end path at ultrahigh and burst.
-Does not start overnight.py and does not restart vLLM. Capacity stays 13000.
+Writes a new directory and does not resume e2e_full, scale_c13000,
+burst_c13000, or ablation_c13000. Does not start until --confirm is passed.
+Capacity is an argument: pass the measured drain, not a leftover nominal
+value. This file does not launch a run by being imported.
 """
 from __future__ import annotations
 
@@ -13,92 +14,82 @@ from pathlib import Path
 ROOT = Path("/home/byh/B02")
 PY = ROOT / "poc/.venv/bin/python"
 OUT = ROOT / "analysis/icc_kv"
-E2E_PID = OUT / "e2e_full.pid"
-E2E_SUMMARY = OUT / "e2e_full" / "e2e_summary.json"
-LOG = OUT / "full_queue.log"
-C = "13000"
 
 
-def log(message: str) -> None:
-    OUT.mkdir(parents=True, exist_ok=True)
+def git_commit() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], text=True,
+        ).strip()
+    except subprocess.CalledProcessError:
+        return "unknown"
+
+
+def log(path: Path, message: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}"
     print(line, flush=True)
-    with LOG.open("a") as handle:
+    with path.open("a") as handle:
         handle.write(line + "\n")
 
 
-def pid_alive(pid: int) -> bool:
-    cmdline = Path(f"/proc/{pid}/cmdline")
-    if not cmdline.exists():
-        return False
-    text = cmdline.read_bytes().replace(b"\x00", b" ").decode(errors="replace")
-    return "experiments.icc_kv.e2e" in text and "e2e_full" in text
-
-
-def wait_for_e2e() -> None:
-    pid = int(E2E_PID.read_text().strip())
-    log(f"waiting for e2e_full pid {pid}")
-    while pid_alive(pid):
-        time.sleep(60)
-    log(f"e2e_full pid {pid} has exited")
-
-
-def run_stage(name: str, args: list[str]) -> None:
-    log(f"start {name}: {' '.join(args)}")
-    completed = subprocess.run(args, cwd=ROOT, check=False)
-    log(f"done {name}: exit {completed.returncode}")
-
-
-def e2e_args(scenarios: str, methods: str, out_dir: Path) -> list[str]:
-    return [
-        str(PY), "-u", "-m", "experiments.icc_kv.e2e",
-        "--capacity", C,
-        "--scenarios", scenarios,
-        "--methods", methods,
-        "--seeds", "5",
-        "--requests", "350",
+def main() -> None:
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--confirm", action="store_true")
+    parser.add_argument("--capacity", type=float)
+    parser.add_argument("--requests", type=int, default=500)
+    parser.add_argument("--warmup-requests", type=int, default=50)
+    parser.add_argument("--seeds", type=int, default=5)
+    parser.add_argument("--arrival-rate", type=float, default=1.25)
+    parser.add_argument("--invalidate-every", type=int, default=8)
+    parser.add_argument("--noise-workers", type=int, default=4)
+    parser.add_argument("--noise-senders", type=int, default=4)
+    args = parser.parse_args()
+    if not args.confirm or args.capacity is None:
+        raise SystemExit(
+            "overload runner is idle. Pass --confirm and --capacity measured "
+            "for this path. It will not resume the old result directories."
+        )
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    out = OUT / f"overload_{stamp}_{git_commit()}"
+    log_path = out / "runner.log"
+    common = [
+        "--capacity", str(args.capacity),
+        "--seeds", str(args.seeds),
+        "--requests", str(args.requests),
+        "--warmup-requests", str(args.warmup_requests),
+        "--arrival-rate", str(args.arrival_rate),
+        "--invalidate-every", str(args.invalidate_every),
+        "--noise-workers", str(args.noise_workers),
+        "--noise-senders", str(args.noise_senders),
         "--concurrency", "4",
         "--kv-cache-tokens", "104544",
-        "--out-dir", str(out_dir),
     ]
 
+    def stage(name: str, argv: list[str]) -> None:
+        log(log_path, f"start {name}: {' '.join(argv)}")
+        completed = subprocess.run(argv, cwd=ROOT, check=False)
+        log(log_path, f"done {name}: exit {completed.returncode}")
+        if completed.returncode != 0:
+            raise SystemExit(completed.returncode)
 
-def main() -> None:
-    log("full queue starting; C=13000; noise workload; vLLM is left running")
-    wait_for_e2e()
-    run_stage("e2e-resume", e2e_args(
-        "near,high,xhigh,ultrahigh,burst",
-        "FullSync,StaticSemantic,Adaptive,Ideal",
-        OUT / "e2e_full",
-    ))
-    run_stage("e2e-normal", e2e_args(
-        "normal",
-        "FullSync,StaticSemantic,Adaptive,Ideal",
-        OUT / "e2e_full",
-    ))
-    scale_methods = "FullSync,RateFIFO,StaticSemantic,Adaptive"
-    run_stage("scale", [
-        str(PY), "-u", "-m", "experiments.icc_kv.replay",
-        "--capacity", C,
-        "--rhos", "0.5,0.9,1.2,1.5,2.0",
-        "--methods", scale_methods,
-        "--seeds", "5",
-        "--seconds", "120",
-        "--out-dir", str(OUT / "scale_c13000"),
+    log(log_path, f"overload runner writing {out}")
+    stage("e2e", [
+        str(PY), "-u", "-m", "experiments.icc_kv.e2e",
+        "--scenarios", "xhigh,ultrahigh,burst",
+        "--methods", "FullSync,StaticSemantic,Adaptive,Ideal,RateFIFO",
+        "--out-dir", str(out / "e2e"),
+        *common,
     ])
-    run_stage("burst", [
-        str(PY), "-u", "-m", "experiments.icc_kv.burst",
-        "--capacity", C,
-        "--methods", scale_methods,
-        "--seeds", "5",
-        "--out-dir", str(OUT / "burst_c13000"),
+    stage("ablation", [
+        str(PY), "-u", "-m", "experiments.icc_kv.e2e",
+        "--scenarios", "ultrahigh,burst",
+        "--methods", "FullSync,StaticSemantic,AdaptiveNoPriority,Adaptive",
+        "--out-dir", str(out / "ablation"),
+        *common,
     ])
-    run_stage("ablation", e2e_args(
-        "ultrahigh,burst",
-        "FullSync,StaticSemantic,AdaptiveNoPriority,Adaptive",
-        OUT / "ablation_c13000",
-    ))
-    log("full queue finished")
+    log(log_path, "overload runner finished")
 
 
 if __name__ == "__main__":

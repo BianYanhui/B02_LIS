@@ -50,12 +50,12 @@ Mechanisms (set per cell via a config frame; passthrough = all off):
   Adaptive: StaticSemantic plus congestion-aware utility admission and a
             dynamically tightened global coverage set.
   --priority: tombstones go to a priority lane released first (non-preemptive).
-  --dedup N:  replica cap: at most N routable instances may hold
-              queued-or-forwarded upserts per digest (drop excess).
-              Instance ids at or above BACKGROUND_INSTANCE are harness
-              background load. They still enter the queue and the utility
-              gate, but they are not routing candidates and do not consume
-              or occupy those N slots.
+  --dedup N:  replica cap: at most N instances may hold queued-or-forwarded
+              upserts per digest (drop excess). Instance id is not an
+              exemption. The replica map forgets single-holder digests once
+              it passes 65536 entries, so a stream of unique noise cannot
+              grow it without a drop decision. A digest held by two or more
+              instances stays, and the cap still binds.
   --global-topk K: retain only the K highest-coverage distinct prefixes in
               the unsent cross-instance queue. Congestion shrinks K by 4.
               Instance id is not a special case: a short prefix is trimmed
@@ -131,6 +131,7 @@ class Relay:
         self.queue_high_since: float | None = None
         self.drops: Counter[str] = Counter()
         self.forwarded = 0
+        self.received = 0
         self.maxq = 0
         self.current_cell = -1
         self.down_writer: asyncio.StreamWriter | None = None
@@ -263,8 +264,32 @@ class Relay:
         decay = 2.718281828459045 ** (-(age + self.ewma_dq) / self.args.tau)
         return decay * coverage - self.args.util_lambda * FRAME <= 0
 
+    def _admit_replica(self, instance: int, digest: int) -> bool:
+        """True when this instance may hold the digest. Every instance id counts.
+
+        Single-holder digests are forgotten past 65536 keys. Unique noise
+        never reaches a cap of 2, and a digest that already has two holders
+        is kept, so the cap still applies to prefixes the router can place.
+        """
+        if not self.dedup:
+            return True
+        replicas = self.replicas[digest]
+        if instance not in replicas and len(replicas) >= self.dedup:
+            return False
+        replicas.add(instance)
+        if len(self.replicas) <= 65536:
+            return True
+        for old in list(self.replicas):
+            if old == digest or len(self.replicas[old]) > 1:
+                continue
+            del self.replicas[old]
+            if len(self.replicas) <= 65536:
+                break
+        return True
+
     def enqueue(self, data: bytes, kind: int, instance: int, seq: int, coverage: int, digest: int, t_send: float) -> None:
         _kind, _instance, cell, _seq, _coverage, _digest, _t = HDR.unpack(data[:32])
+        self.received += 1
         score = self.score(coverage, t_send) if self.agecov else None
         if not self.consume_rate_token():
             self.drops["rate_limit"] += 1
@@ -279,21 +304,18 @@ class Relay:
                 self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
                                  selected=False, reason="low_utility")
                 return
-            if self.dedup and instance < BACKGROUND_INSTANCE:
-                replicas = self.replicas[digest]
-                if instance not in replicas and len(replicas) >= self.dedup:
-                    self.drops["replica_cap"] += 1
-                    self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
-                                     selected=False, reason="duplicate_holder")
-                    return
-                replicas.add(instance)
+            if not self._admit_replica(instance, digest):
+                self.drops["replica_cap"] += 1
+                self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
+                                 selected=False, reason="duplicate_holder")
+                return
         if kind == K_TOMB and self.merge:
             self._supersede_queued_up(instance, digest)
         if kind == K_TOMB and self.priority:
             self.pqueue.append(data)
         else:
             self.queue.append(data)
-            if kind == K_UP:
+            if kind == K_UP and self.merge:
                 self.queued_up[(instance, digest)] = data
         self.emit_update("enqueued", kind, instance, cell, seq, coverage, digest, t_send,
                          selected=True, score=score)
@@ -356,7 +378,7 @@ class Relay:
             self.pqueue.appendleft(data)
             return
         self.queue.appendleft(data)
-        if kind == K_UP and (instance, digest) not in self.queued_up:
+        if kind == K_UP and self.merge and (instance, digest) not in self.queued_up:
             self.queued_up[(instance, digest)] = data
 
     def do_reset(self, cell: int) -> None:
@@ -370,6 +392,7 @@ class Relay:
         self.queue_high_since = None
         self.drops.clear()
         self.forwarded = 0
+        self.received = 0
         self.maxq = 0
         self.rate_tokens = float(self.rate_burst_frames)
         self.rate_last = time.monotonic()
@@ -489,7 +512,12 @@ class Relay:
             self.maxq,
         )
         if reply_writer is not None:
-            reply_writer.write(frame(K_STATS, 0, self.current_cell, 0, 0, 0, time.time(), payload))
+            # The 32-byte stats payload is full. Residual queue and received
+            # frames ride in the header: seq is the queue, coverage is received.
+            queued_now = len(self.queue) + len(self.pqueue)
+            reply_writer.write(frame(
+                K_STATS, 0, self.current_cell, queued_now, self.received, 0, time.time(), payload,
+            ))
             await reply_writer.drain()
         print(json.dumps({
             "event": "cell_stats", "cell": self.current_cell, "forwarded": self.forwarded,
