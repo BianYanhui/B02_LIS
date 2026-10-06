@@ -26,7 +26,7 @@ import aiohttp
 
 from experiments.icc_kv.runtime import (
     OUT, ROOT, PathRuntime, cpus_for_vllm, gateway_pid, pin_listeners,
-    prepare_fixed_gateway, process_cpu_seconds, restore_affinity, write_json,
+    prepare_fixed_gateway, process_cpu_seconds, reapply_affinity, restore_affinity, write_json,
 )
 from experiments.icc_kv.split_path import SplitControl
 from experiments.icc_kv.wire import K_TOMB, K_UP
@@ -271,23 +271,67 @@ def _mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
+async def calibrate_gpu_arrival(concurrency: int, gpu_rho: float, requests: int = 16) -> float:
+    """Arrival rate that keeps the GPUs near gpu_rho with no control-plane noise.
+
+    Sequential requests measure service time. The open-loop rate is then
+    gpu_rho times the concurrency, divided by that service time.
+    """
+    formal = load_formal()
+    await formal.check_endpoints()
+    samples: list[float] = []
+    async with aiohttp.ClientSession() as session:
+        await reset_prefix_caches(session, formal.URLS)
+        for request_id in range(requests):
+            slot = request_id % USEFUL_POOL
+            started = time.perf_counter()
+            response = await formal.one_request(
+                session, formal.URLS[slot % 4],
+                formal.prompt_for(formal.TraceRequest(
+                    request_id=request_id, phase=0, lineage_id=slot, step=0,
+                    tenant=f"tenant-{slot % 8}", digest=f"U{slot:04d}",
+                    coverage_tokens=USEFUL_COVERAGE, workload="reuse_intensive", discard=False,
+                )),
+                f"icc-gpu-cal-{slot}", 4, 2,
+            )
+            if response["ok"]:
+                samples.append(time.perf_counter() - started)
+    scored = samples[min(4, len(samples)):] or samples
+    service = sum(scored) / len(scored)
+    arrival = gpu_rho * concurrency / max(service, 1e-3)
+    print({
+        "gpu_calibration": True,
+        "service_s": round(service, 3),
+        "gpu_rho": gpu_rho,
+        "concurrency": concurrency,
+        "arrival_rate": round(arrival, 4),
+        "samples": len(scored),
+    }, flush=True)
+    return arrival
+
+
 async def run_e2e(
     trace: Path, capacity: float, scenarios: list[str], methods: list[str],
     seeds: int, requests_per_run: int, concurrency: int, kv_tokens: int, out_dir: Path,
     open_loop: bool = True, arrival_rate: float = 1.25, invalidate_every: int = 8,
     noise_workers: int = 4, noise_senders: int = 4, warmup_requests: int = 0,
+    gpu_rho: float = 0.0,
 ) -> None:
     formal = load_formal()
     prepare_fixed_gateway()
     control = SplitControl(senders=noise_senders)
     pinned: list[tuple[int, set[int]]] = []
+    vllm_roots: list[int] = []
     try:
         control.start()
         try:
             os.sched_setaffinity(0, {2})
         except OSError:
             pass
-        pinned = pin_listeners([8000, 8001, 8002, 8003], cpus_for_vllm())
+        vllm_allowed = cpus_for_vllm()
+        pinned, vllm_roots = pin_listeners([8000, 8001, 8002, 8003], vllm_allowed)
+        if gpu_rho > 0:
+            arrival_rate = await calibrate_gpu_arrival(concurrency, gpu_rho)
         gateway = gateway_pid()
         await formal.check_endpoints()
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -307,390 +351,416 @@ async def run_e2e(
                 for method in order:
                     if (seed, scenario, method) in done:
                         continue
-                    rho = rhos[scenario]
-                    rate = capacity if method == "RateFIFO" else 0.0
-                    cell_id = cell
-                    salt = f"icc-noise-{run_id}-{cell_id}"
-                    started = time.perf_counter()
-                    control.begin_cell()
-                    control.configure(cell_id, method, rate)
-                    control.begin_noise({
-                        "cell": cell_id,
-                        "level": rho * capacity,
-                        "seconds": 0,
-                        "scenario": scenario,
-                        "coverage": NOISE_COVERAGE,
-                        "seq0": 100_000_000,
-                        "workers": noise_workers,
-                    })
-                    shadows = [formal.ShadowCache(kv_tokens) for _ in range(4)]
-                    truth: dict[tuple[int, int], int] = {}
-                    placement = Placement()
-                    rng = random.Random(seed)
-                    planned = []
-                    for request_id in range(requests_per_run):
-                        slot = bisect.bisect_left(cdf, rng.random())
-                        planned.append((request_id, slot))
-                    records = []
-                    failed = 0
-                    stale_cache_hits = 0
-                    loop_lags: list[float] = []
-                    view_sizes: list[int] = []
-                    stop_probe = asyncio.Event()
-                    versions = [0] * USEFUL_POOL
-                    digest_text = [f"U{slot:04d}" for slot in range(USEFUL_POOL)]
-                    digests = [formal.digest64(text) for text in digest_text]
-                    seq_box = [1]
-                    state_lock = asyncio.Lock()
-                    inflight = asyncio.Semaphore(concurrency)
-                    pending_emits: list[tuple] = []
-                    installed_at: dict[tuple[int, int], float] = {}
-                    tomb_at: dict[tuple[int, int], float] = {}
-
-                    def flush_emits() -> None:
-                        batch = pending_emits[:]
-                        pending_emits.clear()
-                        for kind, worker, seq, coverage, digest in batch:
-                            control.emit(kind, worker, cell_id, seq, coverage, digest)
-
-                    def invalidate_slot(slot: int) -> None:
-                        versions[slot] += 1
-                        digest = digests[slot]
-                        now = time.time()
-                        for worker in range(4):
-                            if truth.pop((worker, digest), None) is None:
-                                continue
-                            installed_at.pop((worker, digest), None)
-                            tomb_at[(worker, digest)] = now
-                            shadows[worker].drop(digest_text[slot])
-                            if method == "Ideal":
-                                control.clear_local(worker, digest)
-                            else:
-                                pending_emits.append((K_TOMB, worker, seq_box[0], 0, digest))
-                                seq_box[0] += 1
-
-                    async def probe() -> None:
-                        while not stop_probe.is_set():
-                            mark = time.perf_counter()
-                            try:
-                                await asyncio.wait_for(stop_probe.wait(), timeout=0.05)
-                            except asyncio.TimeoutError:
-                                loop_lags.append((time.perf_counter() - mark - 0.05) * 1000)
-
-                    async def serve(request_id: int, slot: int, due: float | None) -> None:
-                        nonlocal failed, stale_cache_hits
-                        if due is not None:
-                            delay = due - time.perf_counter()
-                            if delay > 0:
-                                await asyncio.sleep(delay)
-                        wait_started = time.perf_counter()
-                        async with inflight:
-                            sched_delay_ms = (time.perf_counter() - wait_started) * 1000
-                            async with state_lock:
-                                if invalidate_every and request_id and request_id % invalidate_every == 0:
-                                    installed = [
-                                        candidate for candidate in range(USEFUL_POOL)
-                                        if any(truth.get((worker, digests[candidate]), 0) >= USEFUL_COVERAGE for worker in range(4))
-                                    ]
-                                    if slot in installed:
-                                        invalidate_slot(slot)
-                                    elif installed:
-                                        invalidate_slot(installed[0])
-                                tested, generated_map, delivered_map = control.placement_state()
-                                view_sizes.append(len(tested))
-                                digest = digests[slot]
-                                version = versions[slot]
-                                ideal, ideal_cov = placement.select(truth, digest)
-                                routed, _view_best = placement.select(tested, digest)
-                                placement.rr += 1
-                                placement.loads[routed] += 1
-                                routed_truth = truth.get((routed, digest), 0)
-                                truth_cov = max((truth.get((worker, digest), 0) for worker in range(4)), default=0)
-                                view_cov_max = max((tested.get((worker, digest), 0) for worker in range(4)), default=0)
-                                view_cov = tested.get((routed, digest), 0)
-                                now_wall = time.time()
-                                generated_at = generated_map.get((routed, digest))
-                                delivered_at = delivered_map.get((routed, digest))
-                                if generated_at is None or delivered_at is None:
-                                    delivery_lag_s, state_age_s = -1.0, -1.0
-                                else:
-                                    delivery_lag_s = max(0.0, delivered_at - generated_at)
-                                    state_age_s = max(0.0, now_wall - delivered_at)
-                                missing_ages = [
-                                    now_wall - installed_at[(worker, digest)]
-                                    for worker in range(4)
-                                    if truth.get((worker, digest), 0) >= 512 and (worker, digest) in installed_at
-                                ]
-                                missing_age_s = max(missing_ages) if truth_cov >= 512 and view_cov_max < 512 and missing_ages else -1.0
-                                pending_ages = [
-                                    now_wall - tomb_at[(worker, digest)]
-                                    for worker in range(4)
-                                    if (worker, digest) in tomb_at and tested.get((worker, digest), 0) >= 512
-                                ]
-                                tomb_pending_s = max(pending_ages) if pending_ages else -1.0
-                                decision = {
-                                    "slot": slot,
-                                    "digest": digest,
-                                    "version": version,
-                                    "ideal": ideal,
-                                    "ideal_cov": ideal_cov,
-                                    "routed": routed,
-                                    "routed_truth": routed_truth,
-                                    "loose_false_negative": int(truth_cov >= 512 and view_cov_max < 512),
-                                    "loose_false_positive": int(view_cov >= 512 and view_cov > routed_truth),
-                                    "coverage_shortfall": int(routed_truth < ideal_cov),
-                                    "sched_delay_ms": sched_delay_ms,
-                                    "delivery_lag_s": delivery_lag_s,
-                                    "state_age_s": state_age_s,
-                                    "missing_age_s": missing_age_s,
-                                    "tomb_pending_s": tomb_pending_s,
-                                    "decision_s": time.perf_counter() - origin,
-                                }
-                            flush_emits()
-                            response = await formal.one_request(
-                                session, formal.URLS[decision["routed"]],
-                                formal.prompt_for(formal.TraceRequest(
-                                    request_id=request_id, phase=0, lineage_id=slot, step=0,
-                                    tenant=f"tenant-{slot % 8}", digest=digest_text[slot],
-                                    coverage_tokens=USEFUL_COVERAGE, workload="reuse_intensive", discard=False,
-                                )),
-                                f"{salt}-v{decision['version']}", 4, 2,
-                            )
-                            async with state_lock:
-                                routed = decision["routed"]
-                                placement.loads[routed] -= 1
-                                if not response["ok"]:
-                                    failed += 1
-                                    return
-                                cached = int(response["vllm_cached_tokens"] or 0)
-                                regret = max(0, decision["ideal_cov"] - decision["routed_truth"])
-                                if cached >= 512 and decision["routed_truth"] == 0 and decision["version"] > 0:
-                                    stale_cache_hits += 1
-                                evicted = shadows[routed].insert(digest_text[slot], USEFUL_COVERAGE)
-                                truth[(routed, decision["digest"])] = USEFUL_COVERAGE
-                                installed_at[(routed, decision["digest"])] = time.time()
-                                tomb_at.pop((routed, decision["digest"]), None)
-                                if method == "Ideal":
-                                    control.set_local(routed, decision["digest"], USEFUL_COVERAGE)
-                                else:
-                                    pending_emits.append((K_UP, routed, seq_box[0], USEFUL_COVERAGE, decision["digest"]))
-                                    seq_box[0] += 1
-                                for victim in evicted:
-                                    victim_digest = formal.digest64(victim)
-                                    truth.pop((routed, victim_digest), None)
-                                    installed_at.pop((routed, victim_digest), None)
-                                    shadows[routed].drop(victim)
-                                    if method == "Ideal":
-                                        control.clear_local(routed, victim_digest)
-                                    else:
-                                        pending_emits.append((K_TOMB, routed, seq_box[0], 0, victim_digest))
-                                        seq_box[0] += 1
-                                prefill = max(0, int(response["input_tokens"] or 0) - cached)
-                                records.append({
-                                    "request_id": request_id,
-                                    "warmup": int(request_id < warmup_requests),
-                                    "decision_s": decision["decision_s"],
-                                    "ttft_ms": response["ttft_ms"],
-                                    "sched_delay_ms": decision["sched_delay_ms"],
-                                    "e2e_ttft_ms": response["ttft_ms"] + decision["sched_delay_ms"],
-                                    "reused_tokens": cached,
-                                    "prefill_tokens": prefill,
-                                    "routed": routed,
-                                    "ideal": decision["ideal"],
-                                    "version": decision["version"],
-                                    "wrong_placement": int(routed != decision["ideal"] and decision["ideal_cov"] > 0),
-                                    "coverage_wrong": int(regret > 0),
-                                    "coverage_regret": regret,
-                                    "coverage_shortfall": decision["coverage_shortfall"],
-                                    "loose_false_negative": decision["loose_false_negative"],
-                                    "loose_false_positive": decision["loose_false_positive"],
-                                    "stale_cache_hit": int(cached >= 512 and decision["routed_truth"] == 0 and decision["version"] > 0),
-                                    "delivery_lag_s": decision["delivery_lag_s"],
-                                    "state_age_s": decision["state_age_s"],
-                                    "missing_age_s": decision["missing_age_s"],
-                                    "tomb_pending_s": decision["tomb_pending_s"],
-                                    "cache_hit": int(decision["coverage_shortfall"] == 0 and decision["loose_false_negative"] == 0 and prefill < 800),
-                                })
-                            flush_emits()
-
-                    probe_task = asyncio.create_task(probe())
                     try:
-                        async with aiohttp.ClientSession() as session:
-                            before = await metric_totals(session, formal.URLS)
-                            await reset_prefix_caches(session, formal.URLS)
-                            origin = time.perf_counter()
-                            cpu_mark = process_cpu_seconds(gateway)
-                            cpu_t0 = time.perf_counter()
-                            if open_loop:
-                                await asyncio.gather(*[
-                                    serve(request_id, slot, origin + request_id / max(arrival_rate, 1e-6))
-                                    for request_id, slot in planned
-                                ])
-                            else:
-                                for offset in range(0, len(planned), concurrency):
+                        rho = rhos[scenario]
+                        rate = capacity if method == "RateFIFO" else 0.0
+                        cell_id = cell
+                        salt = f"icc-noise-{run_id}-{cell_id}"
+                        started = time.perf_counter()
+                        reapply_affinity(vllm_roots, vllm_allowed)
+                        control.begin_cell()
+                        control.configure(cell_id, method, rate)
+                        control.begin_noise({
+                            "cell": cell_id,
+                            "level": rho * capacity,
+                            "seconds": 0,
+                            "scenario": scenario,
+                            "coverage": NOISE_COVERAGE,
+                            "seq0": 100_000_000,
+                            "workers": noise_workers,
+                        })
+                        shadows = [formal.ShadowCache(kv_tokens) for _ in range(4)]
+                        truth: dict[tuple[int, int], int] = {}
+                        placement = Placement()
+                        rng = random.Random(seed)
+                        planned = []
+                        for request_id in range(requests_per_run):
+                            slot = bisect.bisect_left(cdf, rng.random())
+                            planned.append((request_id, slot))
+                        records = []
+                        failed = 0
+                        stale_cache_hits = 0
+                        loop_lags: list[float] = []
+                        view_sizes: list[int] = []
+                        stop_probe = asyncio.Event()
+                        versions = [0] * USEFUL_POOL
+                        digest_text = [f"U{slot:04d}" for slot in range(USEFUL_POOL)]
+                        digests = [formal.digest64(text) for text in digest_text]
+                        seq_box = [1]
+                        state_lock = asyncio.Lock()
+                        inflight = asyncio.Semaphore(concurrency)
+                        pending_emits: list[tuple] = []
+                        fresh_tombs: set[tuple[int, int]] = set()
+                        installed_at: dict[tuple[int, int], float] = {}
+                        tomb_at: dict[tuple[int, int], float] = {}
+
+                        def flush_emits() -> None:
+                            batch = pending_emits[:]
+                            pending_emits.clear()
+                            for kind, worker, seq, coverage, digest in batch:
+                                control.emit(kind, worker, cell_id, seq, coverage, digest)
+
+                        def invalidate_slot(slot: int) -> None:
+                            versions[slot] += 1
+                            digest = digests[slot]
+                            now = time.time()
+                            for worker in range(4):
+                                if truth.pop((worker, digest), None) is None:
+                                    continue
+                                installed_at.pop((worker, digest), None)
+                                tomb_at[(worker, digest)] = now
+                                shadows[worker].drop(digest_text[slot])
+                                fresh_tombs.add((worker, digest))
+                                if method == "Ideal":
+                                    control.clear_local(worker, digest)
+                                else:
+                                    pending_emits.append((K_TOMB, worker, seq_box[0], 0, digest))
+                                    seq_box[0] += 1
+
+                        async def probe() -> None:
+                            while not stop_probe.is_set():
+                                mark = time.perf_counter()
+                                try:
+                                    await asyncio.wait_for(stop_probe.wait(), timeout=0.05)
+                                except asyncio.TimeoutError:
+                                    loop_lags.append((time.perf_counter() - mark - 0.05) * 1000)
+
+                        async def serve(request_id: int, slot: int, due: float | None) -> None:
+                            nonlocal failed, stale_cache_hits
+                            if due is not None:
+                                delay = due - time.perf_counter()
+                                if delay > 0:
+                                    await asyncio.sleep(delay)
+                            wait_started = time.perf_counter()
+                            async with inflight:
+                                sched_delay_ms = (time.perf_counter() - wait_started) * 1000
+                                async with state_lock:
+                                    fresh_tombs.clear()
+                                    if invalidate_every and request_id and request_id % invalidate_every == 0:
+                                        installed = [
+                                            candidate for candidate in range(USEFUL_POOL)
+                                            if any(truth.get((worker, digests[candidate]), 0) >= USEFUL_COVERAGE for worker in range(4))
+                                        ]
+                                        if slot in installed:
+                                            invalidate_slot(slot)
+                                        elif installed:
+                                            invalidate_slot(installed[0])
+                                    # The tomb has to leave before the view is read. Otherwise
+                                    # every non-Ideal method records a false positive on the
+                                    # request that just invalidated its own prefix.
+                                    flush_emits()
+                                    if control.ideal:
+                                        tested, generated_map, delivered_map = control.placement_state()
+                                    else:
+                                        tested, generated_map, delivered_map = await asyncio.to_thread(control.placement_state)
+                                    view_sizes.append(len(tested))
+                                    digest = digests[slot]
+                                    version = versions[slot]
+                                    ideal, ideal_cov = placement.select(truth, digest)
+                                    routed, _view_best = placement.select(tested, digest)
+                                    placement.rr += 1
+                                    placement.loads[routed] += 1
+                                    routed_truth = truth.get((routed, digest), 0)
+                                    truth_cov = max((truth.get((worker, digest), 0) for worker in range(4)), default=0)
+                                    view_cov_max = max((tested.get((worker, digest), 0) for worker in range(4)), default=0)
+                                    view_cov = tested.get((routed, digest), 0)
+                                    now_wall = time.time()
+                                    generated_at = generated_map.get((routed, digest))
+                                    delivered_at = delivered_map.get((routed, digest))
+                                    if generated_at is None or delivered_at is None:
+                                        delivery_lag_s, state_age_s = -1.0, -1.0
+                                    else:
+                                        delivery_lag_s = max(0.0, delivered_at - generated_at)
+                                        state_age_s = max(0.0, now_wall - delivered_at)
+                                    missing_ages = [
+                                        now_wall - installed_at[(worker, digest)]
+                                        for worker in range(4)
+                                        if truth.get((worker, digest), 0) >= 512 and (worker, digest) in installed_at
+                                    ]
+                                    missing_age_s = max(missing_ages) if truth_cov >= 512 and view_cov_max < 512 and missing_ages else -1.0
+                                    pending_ages = [
+                                        now_wall - tomb_at[(worker, digest)]
+                                        for worker in range(4)
+                                        if (worker, digest) in tomb_at and tested.get((worker, digest), 0) >= 512
+                                    ]
+                                    tomb_pending_s = max(pending_ages) if pending_ages else -1.0
+                                    decision = {
+                                        "slot": slot,
+                                        "digest": digest,
+                                        "version": version,
+                                        "ideal": ideal,
+                                        "ideal_cov": ideal_cov,
+                                        "routed": routed,
+                                        "routed_truth": routed_truth,
+                                        "loose_false_negative": int(truth_cov >= 512 and view_cov_max < 512),
+                                        "loose_false_positive": int(
+                                            view_cov >= 512 and view_cov > routed_truth and (routed, digest) not in fresh_tombs
+                                        ),
+                                        "coverage_shortfall": int(routed_truth < ideal_cov),
+                                        "sched_delay_ms": sched_delay_ms,
+                                        "delivery_lag_s": delivery_lag_s,
+                                        "state_age_s": state_age_s,
+                                        "missing_age_s": missing_age_s,
+                                        "tomb_pending_s": tomb_pending_s,
+                                        "decision_s": time.perf_counter() - origin,
+                                    }
+                                flush_emits()
+                                response = await formal.one_request(
+                                    session, formal.URLS[decision["routed"]],
+                                    formal.prompt_for(formal.TraceRequest(
+                                        request_id=request_id, phase=0, lineage_id=slot, step=0,
+                                        tenant=f"tenant-{slot % 8}", digest=digest_text[slot],
+                                        coverage_tokens=USEFUL_COVERAGE, workload="reuse_intensive", discard=False,
+                                    )),
+                                    f"{salt}-v{decision['version']}", 4, 2,
+                                )
+                                async with state_lock:
+                                    routed = decision["routed"]
+                                    placement.loads[routed] -= 1
+                                    if not response["ok"]:
+                                        failed += 1
+                                        return
+                                    cached = int(response["vllm_cached_tokens"] or 0)
+                                    regret = max(0, decision["ideal_cov"] - decision["routed_truth"])
+                                    if cached >= 512 and decision["routed_truth"] == 0 and decision["version"] > 0:
+                                        stale_cache_hits += 1
+                                    evicted = shadows[routed].insert(digest_text[slot], USEFUL_COVERAGE)
+                                    truth[(routed, decision["digest"])] = USEFUL_COVERAGE
+                                    installed_at[(routed, decision["digest"])] = time.time()
+                                    tomb_at.pop((routed, decision["digest"]), None)
+                                    if method == "Ideal":
+                                        control.set_local(routed, decision["digest"], USEFUL_COVERAGE)
+                                    else:
+                                        pending_emits.append((K_UP, routed, seq_box[0], USEFUL_COVERAGE, decision["digest"]))
+                                        seq_box[0] += 1
+                                    for victim in evicted:
+                                        victim_digest = formal.digest64(victim)
+                                        truth.pop((routed, victim_digest), None)
+                                        installed_at.pop((routed, victim_digest), None)
+                                        shadows[routed].drop(victim)
+                                        if method == "Ideal":
+                                            control.clear_local(routed, victim_digest)
+                                        else:
+                                            pending_emits.append((K_TOMB, routed, seq_box[0], 0, victim_digest))
+                                            seq_box[0] += 1
+                                    prefill = max(0, int(response["input_tokens"] or 0) - cached)
+                                    records.append({
+                                        "request_id": request_id,
+                                        "warmup": int(request_id < warmup_requests),
+                                        "decision_s": decision["decision_s"],
+                                        "ttft_ms": response["ttft_ms"],
+                                        "sched_delay_ms": decision["sched_delay_ms"],
+                                        "e2e_ttft_ms": response["ttft_ms"] + decision["sched_delay_ms"],
+                                        "reused_tokens": cached,
+                                        "prefill_tokens": prefill,
+                                        "routed": routed,
+                                        "ideal": decision["ideal"],
+                                        "version": decision["version"],
+                                        "wrong_placement": int(routed != decision["ideal"] and decision["ideal_cov"] > 0),
+                                        "coverage_wrong": int(regret > 0),
+                                        "coverage_regret": regret,
+                                        "coverage_shortfall": decision["coverage_shortfall"],
+                                        "loose_false_negative": decision["loose_false_negative"],
+                                        "loose_false_positive": decision["loose_false_positive"],
+                                        "stale_cache_hit": int(cached >= 512 and decision["routed_truth"] == 0 and decision["version"] > 0),
+                                        "delivery_lag_s": decision["delivery_lag_s"],
+                                        "state_age_s": decision["state_age_s"],
+                                        "missing_age_s": decision["missing_age_s"],
+                                        "tomb_pending_s": decision["tomb_pending_s"],
+                                        "cache_hit": int(decision["coverage_shortfall"] == 0 and decision["loose_false_negative"] == 0 and prefill < 800),
+                                    })
+                                flush_emits()
+
+                        probe_task = asyncio.create_task(probe())
+                        try:
+                            async with aiohttp.ClientSession() as session:
+                                before = await metric_totals(session, formal.URLS)
+                                await reset_prefix_caches(session, formal.URLS)
+                                origin = time.perf_counter()
+                                cpu_mark = process_cpu_seconds(gateway)
+                                cpu_t0 = time.perf_counter()
+                                if open_loop:
                                     await asyncio.gather(*[
-                                        serve(request_id, slot, None)
-                                        for request_id, slot in planned[offset:offset + concurrency]
+                                        serve(request_id, slot, origin + request_id / max(arrival_rate, 1e-6))
+                                        for request_id, slot in planned
                                     ])
-                            after = await metric_totals(session, formal.URLS)
-                            records.sort(key=lambda row: row["request_id"])
-                            gateway_cpu = (process_cpu_seconds(gateway) - cpu_mark) / max(time.perf_counter() - cpu_t0, 1e-6)
-                    finally:
-                        stop_probe.set()
-                        probe_task.cancel()
-                        with contextlib.suppress(asyncio.CancelledError):
-                            await probe_task
-                        noise_sent = control.end_noise()
-                    stats = {}
-                    previous_received = -1
-                    for _settle in range(12):
-                        stats = control.stats()
-                        got = int(stats.get("relay_received") or 0)
-                        if got == previous_received:
-                            break
-                        previous_received = got
-                        await asyncio.sleep(0.4)
-                    counts = [0, 0, 0, 0]
-                    scored = [row for row in records if not row["warmup"]]
-                    for row in scored:
-                        counts[row["routed"]] += 1
-                    sum_delta = sum(after[index][0] - before[index][0] for index in range(4))
-                    count_delta = sum(after[index][1] - before[index][1] for index in range(4))
-                    counted = control.counts()
-                    applied = counted["applied"]
-                    frames = counted["frames"]
-                    foreground_frames = counted["foreground"]
-                    update_lags = [max(0.0, row.applied_at - row.generated_at) for row in applied if row.coverage >= USEFUL_COVERAGE]
-                    invalidate_lags = [max(0.0, row.applied_at - row.generated_at) for row in applied if row.kind == "invalidate"]
-                    applied_seqs = {row.seq for row in applied}
-                    censored_up: list[float] = []
-                    censored_inv: list[float] = []
-                    closed = time.time()
-                    for seq, kind, coverage, generated in control.sent_fg:
-                        if seq in applied_seqs:
-                            continue
-                        lag = max(0.0, closed - generated)
-                        if kind == "invalidate":
-                            censored_inv.append(lag)
-                        elif coverage >= USEFUL_COVERAGE:
-                            censored_up.append(lag)
-                    ttfts = [row["ttft_ms"] for row in scored]
-                    e2e_ttfts = [row["e2e_ttft_ms"] for row in scored]
-                    ordered = sorted(ttfts)
-                    lags = sorted(loop_lags)
+                                else:
+                                    for offset in range(0, len(planned), concurrency):
+                                        await asyncio.gather(*[
+                                            serve(request_id, slot, None)
+                                            for request_id, slot in planned[offset:offset + concurrency]
+                                        ])
+                                after = await metric_totals(session, formal.URLS)
+                                records.sort(key=lambda row: row["request_id"])
+                                gateway_cpu = (process_cpu_seconds(gateway) - cpu_mark) / max(time.perf_counter() - cpu_t0, 1e-6)
+                        finally:
+                            stop_probe.set()
+                            probe_task.cancel()
+                            with contextlib.suppress(asyncio.CancelledError):
+                                await probe_task
+                            noise_sent = control.end_noise()
+                        stats = {}
+                        previous_received = -1
+                        for _settle in range(12):
+                            stats = control.stats()
+                            got = int(stats.get("relay_received") or 0)
+                            if got == previous_received:
+                                break
+                            previous_received = got
+                            await asyncio.sleep(0.4)
+                        counts = [0, 0, 0, 0]
+                        scored = [row for row in records if not row["warmup"]]
+                        for row in scored:
+                            counts[row["routed"]] += 1
+                        sum_delta = sum(after[index][0] - before[index][0] for index in range(4))
+                        count_delta = sum(after[index][1] - before[index][1] for index in range(4))
+                        counted = control.counts()
+                        applied = counted["applied"]
+                        frames = counted["frames"]
+                        foreground_frames = counted["foreground"]
+                        update_lags = [max(0.0, row.applied_at - row.generated_at) for row in applied if row.coverage >= USEFUL_COVERAGE]
+                        invalidate_lags = [max(0.0, row.applied_at - row.generated_at) for row in applied if row.kind == "invalidate"]
+                        applied_seqs = {row.seq for row in applied}
+                        censored_up: list[float] = []
+                        censored_inv: list[float] = []
+                        closed = time.time()
+                        for seq, kind, coverage, generated in control.sent_fg:
+                            if seq in applied_seqs:
+                                continue
+                            lag = max(0.0, closed - generated)
+                            if kind == "invalidate":
+                                censored_inv.append(lag)
+                            elif coverage >= USEFUL_COVERAGE:
+                                censored_up.append(lag)
+                        ttfts = [row["ttft_ms"] for row in scored]
+                        e2e_ttfts = [row["e2e_ttft_ms"] for row in scored]
+                        ordered = sorted(ttfts)
+                        lags = sorted(loop_lags)
 
-                    def pct(values: list[float], p: float) -> float:
-                        if not values:
-                            return 0.0
-                        return values[min(len(values) - 1, round(p / 100 * (len(values) - 1)))]
+                        def pct(values: list[float], p: float) -> float:
+                            if not values:
+                                return 0.0
+                            return values[min(len(values) - 1, round(p / 100 * (len(values) - 1)))]
 
-                    def mean(values: list[float]) -> float:
-                        return sum(values) / len(values) if values else 0.0
+                        def mean(values: list[float]) -> float:
+                            return sum(values) / len(values) if values else 0.0
 
-                    elapsed = max(time.perf_counter() - started, 1e-6)
-                    drop_keys = (
-                        "relay_drop_rate_limit", "relay_drop_superseded", "relay_drop_replica_cap",
-                        "relay_drop_low_utility", "relay_drop_queue_drop", "relay_drop_expired",
-                    )
-                    forwarded = int(stats.get("relay_forwarded") or 0)
-                    received = int(stats.get("relay_received") or 0)
-                    queued = int(stats.get("relay_queued") or 0)
-                    drops = sum(int(stats.get(key) or 0) for key in drop_keys)
-                    sent_total = noise_sent + control.fg_up + control.fg_tomb
-                    accounted = forwarded + drops + queued
+                        elapsed = max(time.perf_counter() - started, 1e-6)
+                        drop_keys = (
+                            "relay_drop_rate_limit", "relay_drop_superseded", "relay_drop_replica_cap",
+                            "relay_drop_low_utility", "relay_drop_queue_drop", "relay_drop_expired",
+                        )
+                        forwarded = int(stats.get("relay_forwarded") or 0)
+                        received = int(stats.get("relay_received") or 0)
+                        queued = int(stats.get("relay_queued") or 0)
+                        drops = sum(int(stats.get(key) or 0) for key in drop_keys)
+                        sent_total = noise_sent + control.fg_up + control.fg_tomb
+                        accounted = forwarded + drops + queued
 
-                    def gap(left: int, right: int) -> float:
-                        den = max(left, right)
-                        return abs(left - right) / den if den else 0.0
+                        def gap(left: int, right: int) -> float:
+                            den = max(left, right)
+                            return abs(left - right) / den if den else 0.0
 
-                    summary = {
-                        "seed": seed,
-                        "scenario": scenario,
-                        "method": method,
-                        "method_order": order,
-                        "cell": cell,
-                        "cache_salt": salt,
-                        "requests": len(records),
-                        "scored_requests": len(scored),
-                        "warmup_requests": warmup_requests,
-                        "failed_requests": failed,
-                        "elapsed_s": round(elapsed, 1),
-                        "ttft_mean_ms": mean(ttfts),
-                        "ttft_p95_ms": pct(ordered, 95),
-                        "e2e_ttft_mean_ms": mean(e2e_ttfts),
-                        "sched_delay_mean_ms": mean([row["sched_delay_ms"] for row in scored]),
-                        "server_ttft_mean_ms": (sum_delta / count_delta * 1000) if count_delta > 0 else 0.0,
-                        "foreground_lag_p50_s": _pct(update_lags, 50),
-                        "foreground_lag_p95_s": _pct(update_lags, 95),
-                        "foreground_censored_lag_p95_s": _pct(update_lags + censored_up, 95),
-                        "foreground_undelivered": len(censored_up),
-                        "foreground_applied": len(update_lags),
-                        "foreground_up_sent": control.fg_up,
-                        "invalidate_lag_p50_s": _pct(invalidate_lags, 50),
-                        "invalidate_lag_p95_s": _pct(invalidate_lags, 95),
-                        "invalidate_censored_lag_p95_s": _pct(invalidate_lags + censored_inv, 95),
-                        "invalidate_undelivered": len(censored_inv),
-                        "invalidate_applied": len(invalidate_lags),
-                        "tombs_sent": control.fg_tomb,
-                        "loop_lag_p95_ms": pct(lags, 95),
-                        "slo_violation_2s": sum(value > 2000 for value in ttfts) / len(ttfts) if ttfts else 0.0,
-                        "prefill_tokens_mean": mean([row["prefill_tokens"] for row in scored]),
-                        "reused_tokens_mean": mean([row["reused_tokens"] for row in scored]),
-                        "wrong_placement_rate": mean([row["wrong_placement"] for row in scored]),
-                        "coverage_wrong_rate": mean([row["coverage_wrong"] for row in scored]),
-                        "stale_cache_hits": stale_cache_hits,
-                        "hit_service_ttft_ms": mean([row["ttft_ms"] for row in scored if row["cache_hit"]]),
-                        "hit_requests": sum(row["cache_hit"] for row in scored),
-                        "fn_delivery_lag_p95_s": _pct([row["delivery_lag_s"] for row in scored if row["loose_false_negative"] and row["delivery_lag_s"] >= 0], 95),
-                        "hit_delivery_lag_p95_s": _pct([row["delivery_lag_s"] for row in scored if row["cache_hit"] and row["delivery_lag_s"] >= 0], 95),
-                        "missing_age_p95_s": _pct([row["missing_age_s"] for row in scored if row["missing_age_s"] >= 0], 95),
-                        "tomb_pending_p95_s": _pct([row["tomb_pending_s"] for row in scored if row["tomb_pending_s"] >= 0], 95),
-                        "coverage_shortfall_rate": mean([row["coverage_shortfall"] for row in scored]),
-                        "coverage_regret_mean": mean([row["coverage_regret"] for row in scored]),
-                        "loose_false_negative_rate": mean([row["loose_false_negative"] for row in scored]),
-                        "loose_false_positive_rate": mean([row["loose_false_positive"] for row in scored]),
-                        "placement_counts": counts,
-                        "dispatcher_frames": frames,
-                        "foreground_frames": foreground_frames,
-                        "noise_frames": counted["noise"],
-                        "routable_view_max": max(view_sizes) if view_sizes else 0,
-                        "noise_sent": noise_sent,
-                        "ledger_sent": sent_total,
-                        "ledger_received": received,
-                        "ledger_accounted": accounted,
-                        "ledger_ingress_gap": gap(sent_total, received),
-                        "ledger_balance_gap": gap(received, accounted),
-                        "offered_noise_per_s": noise_sent / elapsed,
-                        "measured_rho": (noise_sent / elapsed / capacity) if capacity else 0.0,
-                        "gateway_cpu": gateway_cpu,
-                        "vllm_pinned": len(pinned),
-                        "capacity_events_per_s": capacity,
-                        "background_rho": rho,
-                        "concurrency": concurrency,
-                        "open_loop": open_loop,
-                        "arrival_rate": arrival_rate if open_loop else 0.0,
-                        "invalidate_every": invalidate_every,
-                        "useful_pool": USEFUL_POOL,
-                        "useful_coverage": USEFUL_COVERAGE,
-                        "noise_coverage": NOISE_COVERAGE,
-                        "noise_workers": noise_workers,
-                        "noise_senders": noise_senders,
-                        "forwarded_per_s": forwarded / elapsed,
-                        **stats,
-                    }
-                    rows.append(summary)
-                    write_json(path, {**control.meta(), "rows": rows})
-                    if records:
-                        csv_path = out_dir / f"requests_{scenario}_{method}_seed{seed}.csv"
-                        with csv_path.open("w", newline="") as handle:
-                            writer = csv.DictWriter(handle, fieldnames=list(records[0]), lineterminator="\n")
-                            writer.writeheader()
-                            writer.writerows(records)
-                    print(summary, flush=True)
-                    cell += 1
+                        summary = {
+                            "seed": seed,
+                            "scenario": scenario,
+                            "method": method,
+                            "method_order": order,
+                            "cell": cell,
+                            "cache_salt": salt,
+                            "requests": len(records),
+                            "scored_requests": len(scored),
+                            "warmup_requests": warmup_requests,
+                            "failed_requests": failed,
+                            "elapsed_s": round(elapsed, 1),
+                            "ttft_mean_ms": mean(ttfts),
+                            "ttft_p95_ms": pct(ordered, 95),
+                            "e2e_ttft_mean_ms": mean(e2e_ttfts),
+                            "sched_delay_mean_ms": mean([row["sched_delay_ms"] for row in scored]),
+                            "server_ttft_mean_ms": (sum_delta / count_delta * 1000) if count_delta > 0 else 0.0,
+                            "foreground_lag_p50_s": _pct(update_lags, 50),
+                            "foreground_lag_p95_s": _pct(update_lags, 95),
+                            "foreground_censored_lag_p95_s": _pct(update_lags + censored_up, 95),
+                            "foreground_undelivered": len(censored_up),
+                            "foreground_applied": len(update_lags),
+                            "foreground_up_sent": control.fg_up,
+                            "invalidate_lag_p50_s": _pct(invalidate_lags, 50),
+                            "invalidate_lag_p95_s": _pct(invalidate_lags, 95),
+                            "invalidate_censored_lag_p95_s": _pct(invalidate_lags + censored_inv, 95),
+                            "invalidate_undelivered": len(censored_inv),
+                            "invalidate_applied": len(invalidate_lags),
+                            "tombs_sent": control.fg_tomb,
+                            "loop_lag_p95_ms": pct(lags, 95),
+                            "slo_violation_2s": sum(value > 2000 for value in ttfts) / len(ttfts) if ttfts else 0.0,
+                            "prefill_tokens_mean": mean([row["prefill_tokens"] for row in scored]),
+                            "reused_tokens_mean": mean([row["reused_tokens"] for row in scored]),
+                            "wrong_placement_rate": mean([row["wrong_placement"] for row in scored]),
+                            "coverage_wrong_rate": mean([row["coverage_wrong"] for row in scored]),
+                            "stale_cache_hits": stale_cache_hits,
+                            "hit_service_ttft_ms": mean([row["ttft_ms"] for row in scored if row["cache_hit"]]),
+                            "hit_requests": sum(row["cache_hit"] for row in scored),
+                            "fn_delivery_lag_p95_s": _pct([row["delivery_lag_s"] for row in scored if row["loose_false_negative"] and row["delivery_lag_s"] >= 0], 95),
+                            "hit_delivery_lag_p95_s": _pct([row["delivery_lag_s"] for row in scored if row["cache_hit"] and row["delivery_lag_s"] >= 0], 95),
+                            "missing_age_p95_s": _pct([row["missing_age_s"] for row in scored if row["missing_age_s"] >= 0], 95),
+                            "tomb_pending_p95_s": _pct([row["tomb_pending_s"] for row in scored if row["tomb_pending_s"] >= 0], 95),
+                            "coverage_shortfall_rate": mean([row["coverage_shortfall"] for row in scored]),
+                            "coverage_regret_mean": mean([row["coverage_regret"] for row in scored]),
+                            "loose_false_negative_rate": mean([row["loose_false_negative"] for row in scored]),
+                            "loose_false_positive_rate": mean([row["loose_false_positive"] for row in scored]),
+                            "placement_counts": counts,
+                            "dispatcher_frames": frames,
+                            "foreground_frames": foreground_frames,
+                            "noise_frames": counted["noise"],
+                            "routable_view_max": max(view_sizes) if view_sizes else 0,
+                            "noise_sent": noise_sent,
+                            "ledger_sent": sent_total,
+                            "ledger_received": received,
+                            "ledger_accounted": accounted,
+                            "ledger_ingress_gap": gap(sent_total, received),
+                            "ledger_balance_gap": gap(received, accounted),
+                            "offered_noise_per_s": noise_sent / elapsed,
+                            "measured_rho": (noise_sent / elapsed / capacity) if capacity else 0.0,
+                            "gateway_cpu": gateway_cpu,
+                            "vllm_pinned": len(pinned),
+                            "capacity_events_per_s": capacity,
+                            "background_rho": rho,
+                            "concurrency": concurrency,
+                            "open_loop": open_loop,
+                            "arrival_rate": arrival_rate if open_loop else 0.0,
+                            "invalidate_every": invalidate_every,
+                            "useful_pool": USEFUL_POOL,
+                            "useful_coverage": USEFUL_COVERAGE,
+                            "noise_coverage": NOISE_COVERAGE,
+                            "noise_workers": noise_workers,
+                            "noise_senders": noise_senders,
+                            "forwarded_per_s": forwarded / elapsed,
+                            **stats,
+                        }
+                        rows.append(summary)
+                        write_json(path, {**control.meta(), "rows": rows})
+                        if records:
+                            csv_path = out_dir / f"requests_{scenario}_{method}_seed{seed}.csv"
+                            with csv_path.open("w", newline="") as handle:
+                                writer = csv.DictWriter(handle, fieldnames=list(records[0]), lineterminator="\n")
+                                writer.writeheader()
+                                writer.writerows(records)
+                        print(summary, flush=True)
+                        cell += 1
+                    except Exception as exc:
+                        error_path = out_dir / "cell_errors.log"
+                        with error_path.open("a") as handle:
+                            handle.write(f"{seed} {scenario} {method} {exc!r}\n")
+                        print({"cell_error": repr(exc), "seed": seed, "scenario": scenario, "method": method}, flush=True)
+                        try:
+                            control.end_noise()
+                        except Exception:
+                            pass
+                        continue
     finally:
         control.stop()
         restore_affinity(pinned)
+        if vllm_roots:
+            reapply_affinity(vllm_roots, set(range(os.cpu_count() or 1)))
 
 
 def main() -> None:
@@ -706,6 +776,8 @@ def main() -> None:
     parser.add_argument("--kv-cache-tokens", type=int, default=104544)
     parser.add_argument("--closed-loop", action="store_true")
     parser.add_argument("--arrival-rate", type=float, default=1.25)
+    parser.add_argument("--gpu-rho", type=float, default=0.0,
+                        help="if positive, measure GPU service time and set the arrival rate to this load")
     parser.add_argument("--invalidate-every", type=int, default=8)
     parser.add_argument("--noise-workers", type=int, default=4)
     parser.add_argument("--noise-senders", type=int, default=4)
@@ -723,6 +795,7 @@ def main() -> None:
         noise_workers=args.noise_workers,
         noise_senders=args.noise_senders,
         warmup_requests=args.warmup_requests,
+        gpu_rho=args.gpu_rho,
     ))
 
 

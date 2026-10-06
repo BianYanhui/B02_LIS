@@ -83,7 +83,7 @@ import json
 import socket
 import struct
 import time
-from collections import Counter, defaultdict, deque
+from collections import Counter, OrderedDict, deque
 
 FRAME = 64
 # e2e background replay sends worker_id + 16. Routing only considers 0-3,
@@ -125,7 +125,8 @@ class Relay:
         # Latest unsent K_UP for a (instance, digest). Lookup replaces a scan
         # of the whole FIFO, which stalled Static on unique noise.
         self.queued_up: dict[tuple[int, int], bytes] = {}
-        self.replicas: dict[int, set[int]] = defaultdict(set)
+        self.superseded_ids: set[int] = set()
+        self.replicas: OrderedDict[int, set[int]] = OrderedDict()
         self.recent: dict[int, float] = {}
         self.ewma_dq = 0.0
         self.queue_high_since: float | None = None
@@ -264,27 +265,44 @@ class Relay:
         decay = 2.718281828459045 ** (-(age + self.ewma_dq) / self.args.tau)
         return decay * coverage - self.args.util_lambda * FRAME <= 0
 
+    def _forget_replica(self, digest: int, instance: int) -> None:
+        holders = self.replicas.get(digest)
+        if not holders:
+            return
+        holders.discard(instance)
+        if not holders:
+            self.replicas.pop(digest, None)
+
+    def _evict_old_replica(self) -> None:
+        """Drop the oldest single-holder digest. One pop, not a copy of the map."""
+        for _ in range(8):
+            if not self.replicas:
+                return
+            old, holders = self.replicas.popitem(last=False)
+            if len(holders) <= 1:
+                return
+            self.replicas[old] = holders
+
     def _admit_replica(self, instance: int, digest: int) -> bool:
         """True when this instance may hold the digest. Every instance id counts.
 
-        Single-holder digests are forgotten past 65536 keys. Unique noise
-        never reaches a cap of 2, and a digest that already has two holders
-        is kept, so the cap still applies to prefixes the router can place.
+        The map keeps at most 65536 digests. Unique noise never reaches a cap
+        of 2, so the oldest single-holder entry can be forgotten. A digest
+        that already has two holders stays, and the cap still applies.
         """
         if not self.dedup:
             return True
-        replicas = self.replicas[digest]
-        if instance not in replicas and len(replicas) >= self.dedup:
+        holders = self.replicas.get(digest)
+        if holders is None:
+            if len(self.replicas) >= 65536:
+                self._evict_old_replica()
+            holders = set()
+            self.replicas[digest] = holders
+        else:
+            self.replicas.move_to_end(digest)
+        if instance not in holders and len(holders) >= self.dedup:
             return False
-        replicas.add(instance)
-        if len(self.replicas) <= 65536:
-            return True
-        for old in list(self.replicas):
-            if old == digest or len(self.replicas[old]) > 1:
-                continue
-            del self.replicas[old]
-            if len(self.replicas) <= 65536:
-                break
+        holders.add(instance)
         return True
 
     def enqueue(self, data: bytes, kind: int, instance: int, seq: int, coverage: int, digest: int, t_send: float) -> None:
@@ -350,7 +368,7 @@ class Relay:
                 self._forget_queued_up(queued)
                 self.drops["global_topk"] += 1
                 self.drops["low_utility"] += 1
-                self.replicas[qdigest].discard(qinst)
+                self._forget_replica(qdigest, qinst)
                 self.emit_update("suppressed", qkind, qinst, qcell, qseq, qcoverage, qdigest, qsent,
                                  selected=False, reason="low_utility")
             else:
@@ -361,11 +379,23 @@ class Relay:
         prev = self.queued_up.pop((instance, digest), None)
         if prev is None:
             return
-        self.queue.remove(prev)
+        # Leave the bytes in the deque. Removing them is a scan of the whole
+        # FIFO, and a repeated digest in front of a long noise queue stalls
+        # every other frame. The release loop skips the marked copy.
+        self.superseded_ids.add(id(prev))
         qkind, qinst, qcell, qseq, qcov, qdig, qt = HDR.unpack(prev[:32])
         self.drops["superseded"] += 1
         self.emit_update("suppressed", qkind, qinst, qcell, qseq, qcov, qdig, qt,
                          selected=False, reason="superseded")
+
+    def _pop_queue(self) -> bytes | None:
+        while self.queue:
+            data = self.queue.popleft()
+            if id(data) in self.superseded_ids:
+                self.superseded_ids.discard(id(data))
+                continue
+            return data
+        return None
 
     def _forget_queued_up(self, data: bytes) -> None:
         kind, instance, _cell, _seq, _coverage, digest, _sent = HDR.unpack(data[:32])
@@ -385,6 +415,7 @@ class Relay:
         self.queue.clear()
         self.pqueue.clear()
         self.queued_up.clear()
+        self.superseded_ids.clear()
         self.replicas.clear()
         self.recent.clear()
         self.inflight_event.set()
@@ -468,7 +499,9 @@ class Relay:
                 self.queue.remove(data)
                 self._forget_queued_up(data)
             else:
-                data = self.queue.popleft()
+                data = self._pop_queue()
+                if data is None:
+                    continue
                 self._forget_queued_up(data)
             if self.down_writer is None:
                 # Dispatcher endpoint not connected yet: requeue and wait.
@@ -478,7 +511,7 @@ class Relay:
             kind, instance, cell, seq, coverage, digest, t_send = HDR.unpack(data[:32])
             if kind == K_UP and self.low_utility(coverage, t_send):
                 self.drops["low_utility"] += 1
-                self.replicas[digest].discard(instance)
+                self._forget_replica(digest, instance)
                 self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
                                  selected=False, reason="low_utility")
                 continue
@@ -498,7 +531,7 @@ class Relay:
                 for old in list(self.recent)[: len(self.recent) - RECENT_KEEP]:
                     self.recent.pop(old, None)
             if kind == K_TOMB:
-                self.replicas[digest].discard(instance)
+                self._forget_replica(digest, instance)
 
     async def send_stats(self, reply_writer: asyncio.StreamWriter | None = None) -> None:
         payload = STATS.pack(

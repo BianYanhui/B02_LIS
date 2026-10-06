@@ -86,11 +86,14 @@ async def _send_until(writer: asyncio.StreamWriter, spec: dict, stop: mp.synchro
             sent += 1
         if not await _drain(writer, stop):
             return sent
-        delay = batch / rate - (time.perf_counter() - started)
-        while delay > 0 and not stop.is_set():
-            step = min(delay, 0.05)
-            await asyncio.sleep(step)
-            delay -= step
+        # The sequence counter is `step`. A pause variable with the same name
+        # rewound it, so a sender that got ahead retransmitted its first batch
+        # for the rest of the cell.
+        pause = batch / rate - (time.perf_counter() - started)
+        while pause > 0 and not stop.is_set():
+            slice_s = min(pause, 0.05)
+            await asyncio.sleep(slice_s)
+            pause -= slice_s
     await _drain(writer, stop, timeout=1.0)
     return sent
 
@@ -275,6 +278,7 @@ class SplitControl:
         self.sent_fg: list[tuple[int, str, int, float]] = []
         self.fg_up = 0
         self.fg_tomb = 0
+        self._noise_live = False
 
     def start(self) -> None:
         from experiments.icc_kv.runtime import Dispatcher
@@ -309,10 +313,21 @@ class SplitControl:
         self.ideal = method == "Ideal"
         self._rpc(("configure", cell, method, rate), timeout=30)
 
+    def offer_for(self, spec: dict) -> int:
+        self._noise_live = True
+        try:
+            return self.pool.run_for(spec)
+        finally:
+            self._noise_live = False
+
     def begin_noise(self, spec: dict) -> None:
+        self._noise_live = True
         self.pool.begin(spec)
 
     def end_noise(self) -> int:
+        if not self._noise_live:
+            return 0
+        self._noise_live = False
         return self.pool.end()
 
     def emit(self, kind: int, worker: int, cell: int, seq: int, coverage: int, digest: int) -> None:
@@ -325,7 +340,10 @@ class SplitControl:
             self.fg_tomb += 1
         else:
             self.fg_up += 1
-        self.emit_q.put((kind, worker, cell, seq, coverage, digest, generated), timeout=5)
+        try:
+            self.emit_q.put_nowait((kind, worker, cell, seq, coverage, digest, generated))
+        except Exception:
+            self.emit_q.put((kind, worker, cell, seq, coverage, digest, generated), timeout=1)
 
     def placement_state(self) -> tuple[dict, dict, dict]:
         if self.ideal:

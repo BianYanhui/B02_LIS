@@ -381,28 +381,91 @@ def cpus_for_vllm() -> set[int]:
     return rest or set(range(os.cpu_count() or 1))
 
 
-def pin_listeners(ports: list[int], allowed: set[int]) -> list[tuple[int, set[int]]]:
+def _child_pids(pid: int) -> list[int]:
+    kids: list[int] = []
+    task = Path(f"/proc/{pid}/task")
+    if not task.is_dir():
+        return kids
+    for tid in task.iterdir():
+        child_file = tid / "children"
+        try:
+            text = child_file.read_text()
+        except OSError:
+            continue
+        kids.extend(int(token) for token in text.split())
+    return kids
+
+
+def _thread_ids(pid: int) -> list[int]:
+    task = Path(f"/proc/{pid}/task")
+    if not task.is_dir():
+        return [pid]
+    return [int(entry.name) for entry in task.iterdir() if entry.name.isdigit()]
+
+
+def process_tree(pid: int) -> list[int]:
+    """The process plus descendants. vLLM's engine is a child, not the listener thread."""
+    seen: list[int] = []
+    guard: set[int] = set()
+    stack = [pid]
+    while stack:
+        current = stack.pop()
+        if current in guard or not Path(f"/proc/{current}").exists():
+            continue
+        guard.add(current)
+        seen.append(current)
+        stack.extend(_child_pids(current))
+    return seen
+
+
+def pin_listeners(ports: list[int], allowed: set[int]) -> tuple[list[tuple[int, set[int]]], list[int]]:
+    """Pin every thread of each listener and of its child processes.
+
+    sched_setaffinity on the process id only changes the main thread.
+    """
     try:
         text = sh(["ss", "-ltnp"])
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return []
-    saved: list[tuple[int, set[int]]] = []
-    seen: set[int] = set()
+        return [], []
+    roots: list[int] = []
+    seen_roots: set[int] = set()
     for line in text.splitlines():
         if not any(re.search(rf":{port}\b", line) for port in ports):
             continue
         for match in re.finditer(r"pid=(\d+)", line):
             pid = int(match.group(1))
-            if pid in seen:
-                continue
-            seen.add(pid)
-            try:
-                previous = os.sched_getaffinity(pid)
-                os.sched_setaffinity(pid, allowed)
-            except OSError:
-                continue
-            saved.append((pid, previous))
-    return saved
+            if pid not in seen_roots:
+                seen_roots.add(pid)
+                roots.append(pid)
+    saved: list[tuple[int, set[int]]] = []
+    seen_threads: set[int] = set()
+    for root in roots:
+        for member in process_tree(root):
+            for tid in _thread_ids(member):
+                if tid in seen_threads:
+                    continue
+                seen_threads.add(tid)
+                try:
+                    previous = os.sched_getaffinity(tid)
+                    os.sched_setaffinity(tid, allowed)
+                except OSError:
+                    continue
+                saved.append((tid, previous))
+    return saved, roots
+
+
+def reapply_affinity(roots: list[int], allowed: set[int]) -> int:
+    """Pin threads and children that appeared after the first pass."""
+    pinned = 0
+    for root in roots:
+        for member in process_tree(root):
+            for tid in _thread_ids(member):
+                try:
+                    os.sched_setaffinity(tid, allowed)
+                except OSError:
+                    continue
+                pinned += 1
+    return pinned
 
 
 def restore_affinity(saved: list[tuple[int, set[int]]]) -> None:

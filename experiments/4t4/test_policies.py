@@ -65,9 +65,10 @@ def main() -> None:
     for seq in range(10):
         frame, sent = up(seq)
         r.enqueue(frame, gw.K_UP, 0, seq, 1024, 7, sent)
+    live = [item for item in r.queue if id(item) not in r.superseded_ids]
     rows.append({"policy": "LatestOnly", "check": "ten extensions retain one latest unsent update",
-                 "status": "PASS" if len(r.queue) == 1 and r.drops["superseded"] == 9 else "FAIL",
-                 "detail": json.dumps({"queue": len(r.queue), "superseded": r.drops["superseded"]})})
+                 "status": "PASS" if len(live) == 1 and r.drops["superseded"] == 9 else "FAIL",
+                 "detail": json.dumps({"queue": len(live), "superseded": r.drops["superseded"]})})
 
     r = relay()
     configure(r, gw.MODE_RATEFIFO, rate=0.0, burst=1)
@@ -180,10 +181,36 @@ def main() -> None:
     r.enqueue(frame, gw.K_UP, 17, 90001, 256, 1, sent)
     sent = time.time()
     r.enqueue(gw.frame(gw.K_TOMB, 17, 17, 90002, 0, 1, sent), gw.K_TOMB, 17, 90002, 0, 1, sent)
-    still = [gw.HDR.unpack(item[:32])[5] for item in r.queue]
+    live = [item for item in r.queue if id(item) not in r.superseded_ids]
+    still = [gw.HDR.unpack(item[:32])[5] for item in live]
     rows.append({"policy": "StaticSemantic", "check": "unique digests enqueue without a queue scan, repeats collapse",
-                 "status": "PASS" if elapsed < 1.0 and len(r.queue) == 7999 and r.drops["superseded"] == 2 and 1 not in still else "FAIL",
-                 "detail": json.dumps({"elapsed_s": round(elapsed, 3), "queue": len(r.queue), "superseded": r.drops["superseded"]})})
+                 "status": "PASS" if elapsed < 1.0 and len(live) == 7999 and r.drops["superseded"] == 2 and 1 not in still else "FAIL",
+                 "detail": json.dumps({"elapsed_s": round(elapsed, 3), "queue": len(live), "superseded": r.drops["superseded"]})})
+
+    r = relay()
+    configure(r, gw.MODE_STATIC, merge=True, priority=True, dedup=2)
+    started = time.perf_counter()
+    for seq in range(70_000):
+        frame, sent = up(seq, owner=16 + (seq % 4), digest=seq, coverage=256)
+        r.enqueue(frame, gw.K_UP, 16 + (seq % 4), seq, 256, seq, sent)
+    elapsed = time.perf_counter() - started
+    rows.append({"policy": "StaticSemantic", "check": "replica map evicts oldest without copying the table",
+                 "status": "PASS" if elapsed < 1.5 and len(r.replicas) <= 65536 else "FAIL",
+                 "detail": json.dumps({"elapsed_s": round(elapsed, 3), "replicas": len(r.replicas)})})
+
+    r = relay()
+    configure(r, gw.MODE_STATIC, merge=True, priority=True, dedup=2)
+    for seq in range(20_000):
+        frame, sent = up(seq, owner=16, digest=seq, coverage=256)
+        r.enqueue(frame, gw.K_UP, 16, seq, 256, seq, sent)
+    started = time.perf_counter()
+    for seq in range(20_000):
+        frame, sent = up(seq, owner=16, digest=seq, coverage=256)
+        r.enqueue(frame, gw.K_UP, 16, 100_000 + seq, 256, seq, sent)
+    elapsed = time.perf_counter() - started
+    rows.append({"policy": "StaticSemantic", "check": "a repeated digest does not scan the queued FIFO",
+                 "status": "PASS" if elapsed < 0.5 and r.drops["superseded"] == 20_000 else "FAIL",
+                 "detail": json.dumps({"elapsed_s": round(elapsed, 3), "superseded": r.drops["superseded"], "queued": len(r.queue)})})
 
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)

@@ -38,6 +38,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--confirm", action="store_true")
     parser.add_argument("--capacity", type=float)
+    parser.add_argument("--out-dir", type=Path)
+    parser.add_argument("--resume", action="store_true")
     parser.add_argument("--requests", type=int, default=500)
     parser.add_argument("--warmup-requests", type=int, default=50)
     parser.add_argument("--seeds", type=int, default=5)
@@ -51,8 +53,18 @@ def main() -> None:
             "overload runner is idle. Pass --confirm and --capacity measured "
             "for this path. It will not resume the old result directories."
         )
-    stamp = time.strftime("%Y%m%d_%H%M%S")
-    out = OUT / f"overload_{stamp}_{git_commit()}"
+    latest = OUT / "overload_latest.txt"
+    if args.resume:
+        if not latest.exists():
+            raise SystemExit(f"no run to resume; {latest} is missing")
+        out = Path(latest.read_text().strip())
+    elif args.out_dir is not None:
+        out = args.out_dir
+    else:
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        out = OUT / f"overload_{stamp}_{git_commit()}"
+    latest.parent.mkdir(parents=True, exist_ok=True)
+    latest.write_text(str(out) + "\n")
     log_path = out / "runner.log"
     common = [
         "--capacity", str(args.capacity),
