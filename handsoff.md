@@ -28,29 +28,41 @@
 
 ## 可变交接
 
-更新时间：2026-10-06 02:00（UTC+8）。测量框架已按审查的 H1–H5 改完，smoke 在 `/tmp/icc_split_smoke/e2e3`。没有实验进程。不要开正式矩阵，不要启动 `overnight.py` 或 `full_queue.py`。
+更新时间：2026-10-06 15:00（UTC+8）。验证 smoke 已完成。没有实验进程。不要开正式矩阵，不要启动 `overnight.py` 或 `full_queue.py`。
 
 ### 正在做的事
 
-审查指出过载信号可能是请求进程拷贝噪声视图造成的。代码改动：可路由视图不再保存 worker id ≥ 16 的噪声；请求、dispatcher、噪声发送器分进程；噪声发送器默认可以开多个；前景更新不在持锁时等待；每格记录发送、到达、丢弃和残余队列；`full_queue.py` 必须带 `--confirm` 和 `--capacity`，写入新的 `analysis/icc_kv/overload_<时间>_<commit>/`，不再续跑 `e2e_full`。副本上限不再按 instance id 豁免。FullSync 不再为唯一噪声建合并索引。
+审查要求先修 N1、N2，给 `path_capacity.py` 加 `--policy`，把 offered 放在排空速率和读入速率之间，标定 GPU 到达率，再跑每格 200 条、四个方法。附件里的七条通过标准不在仓库里。代码改完并跑完 smoke，正式矩阵没有开。
+
+未提交的代码在 `277200f` 之上。副本表用 `OrderedDict.popitem(last=False)`，不再每帧拷贝。墓碑先送出再读视图。放置 RPC 放到线程里。vLLM 按线程和子进程绑核。`path_capacity.py` 走分进程路径，`--policy` 可写多个。`--gpu-rho` 标定到达率。单格失败可续跑。`full_queue.py` 增加 `--out-dir` 和 `--resume`。发送端节拍变量曾盖掉序号计数器，重复发送第一批帧；Static 再用 `deque.remove` 扫整条队列。序号已分开，被替换的帧只做标记。网关镜像 `b02-gw4t4` 已按这份源码重建。摘要里的 `commit` 仍是 `277200f`，因为这些修改还没提交。
 
 ### 当前状态
 
-控制面 8 个发送进程：目标 40000/s 时实际约 34400/s，网关 CPU 0.90，队列排空；目标 70000/s 时实际约 63600/s，网关 CPU 1.00，送达约 42200/s，残余队列约 12.8 万。端到端 smoke 把名义容量设成 30000，场景 ultrahigh，实际送出约 53000/s，网关 CPU 约 0.96，转发约 37000/s。名义 13000 的 2 倍（26000/s）低于这条路径的排空速率。
+已完成。摘要：`/tmp/icc_validate_smoke/e2e_b/e2e_summary.json`，4 行，失败 0。容量名义 25000，场景 ultrahigh，实际约 43700–43900/s。GPU 服务时间 11.0 秒，到达率 0.237 req/s。调度等待约 0.01 ms。账本间隙 0。残余队列 0。
 
-24 条请求、1 个 seed、失败 0。可路由视图最多 10 条。账本相对误差约 0。Ideal prefill 2769、假阴性 0、队列峰值 94 万。FullSync prefill 3110、假阴性 25%、覆盖错放 17%、前景延迟 P95 17 秒、失效延迟 P95 17 秒、队列峰值 104 万。Adaptive prefill 也是 3110、假阴性 8.3%、覆盖错放 4.2%、失效延迟 P95 2.8 秒、队列峰值 16、丢掉约 360 万条低效用更新；前景更新 P95 仍有 14 秒，因为网关核在读噪声。命中请求服务时间 Ideal 1791 ms、FullSync 2089 ms、Adaptive 2294 ms。这格不能写 TTFT，也不能把 Adaptive 的 prefill 写成已经贴近 Ideal。
+| 方法 | prefill | 假阴性 | 假阳性 | 前景 P95 | 失效 P95 | 队列峰值 | 命中 TTFT |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Ideal | 1202 | 0 | 0 | — | — | 587 | 997 ms |
+| FullSync | 1140 | 0 | 0 | 3 ms | 4 ms | 1853 | 862 ms |
+| StaticSemantic | 1140 | 0 | 0 | 4 ms | 4 ms | 3742 | 850 ms |
+| Adaptive | 1140 | 0 | 0 | 1.15 s | 1.07 s | 19 | 875 ms |
+
+结论：这个速率上网关 CPU 约 0.97–1.00，FullSync 和 Static 仍能在数毫秒内排空，Adaptive 的 prefill 与它们相同，前景延迟反而约 1.15 秒。不能写 prefill 改善，也不能写视图更好。TTFT 链不能写。目标 60000/s 的 6 秒探针会在几秒内把队列打到约 16 万，长格子不能放在排空速率之上。`/tmp/icc_validate_smoke/e2e` 是序号 bug 修掉之前的 Static 格，不要和 `e2e_b` 混用。
+
+机器：没有 `experiments.icc_kv` 进程。vLLM 仍是 127.0.0.1:8000–8003，pid 1375061–1375064，亲和性 0–47。四张 GPU 利用率 0，各约占 6.7 GiB。容器 `b02-gateway4t4` 在跑，镜像 `b02-gw4t4`，只听 9710；9711 没有监听。
 
 ### 下一步
 
-等用户看过再开正式矩阵。正式跑要用实测排空速率标 ρ，输出目录用 `full_queue.py --confirm --capacity <实测>`。不要写回 `e2e_full`、`scale_c13000`、`burst_c13000`、`ablation_c13000`。
+用户说「继续」时，先不要开正式矩阵。先把未提交的实验代码提交并推送，再等用户决定过载格怎么改。没说继续就不要跑长实验。
 
 ### 已经定下来的约束
 
 - 不要按 ρ 改 HTB、tau、效用系数。HTB 天花板 1 Gbit。Gateway `--cpus 1 --cpuset-cpus 0`。
 - 背景噪声 coverage 256，请求前缀 `U0000`–`U0015` coverage 4096。
 - 不要把 4 张 GPU 写成大规模系统。不要把 0.73–3.04 updates/s 和 84.5×10³ updates/s 写成同一个瓶颈。
-- Python：`/home/byh/B02/poc/.venv/bin/python`。`analysis/icc_kv/` 在 `.gitignore`。vLLM 仍是 8000–8003 上原来的进程，smoke 期间把它们绑到 16 号核之后，结束时恢复。
+- 正式结果不要写回 `e2e_full`、`scale_c13000`、`burst_c13000`、`ablation_c13000`。
+- Python：`/home/byh/B02/poc/.venv/bin/python`。`analysis/icc_kv/` 在 `.gitignore`。
 
 ### Git
 
-未提交且不要提交：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF。不要 amend。
+HEAD 是 `277200f`，与 `origin/main` 一致。实验代码还在工作区，没有进这次提交。不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF。不要 amend。
