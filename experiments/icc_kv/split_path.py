@@ -55,6 +55,7 @@ async def _send_until(writer: asyncio.StreamWriter, spec: dict, stop: mp.synchro
     index = int(spec["index"])
     workers = max(1, int(spec["workers"]))
     coverage = int(spec["coverage"])
+    coverage_table = [int(item) for item in (spec.get("coverage_table") or [])]
     cell = int(spec["cell"])
     seq0 = int(spec["seq0"])
     seconds = float(spec["seconds"])
@@ -81,9 +82,11 @@ async def _send_until(writer: asyncio.StreamWriter, spec: dict, stop: mp.synchro
                 break
             seq = seq0 + index + step * n
             step += 1
+            digest = int(noise_digest(seq))
+            frame_coverage = coverage_table[digest % len(coverage_table)] if coverage_table else coverage
             writer.write(frame(
                 K_UP, int(NOISE_WORKER0 + (seq % workers)), int(cell), int(seq),
-                int(coverage), int(noise_digest(seq)), now,
+                int(frame_coverage), digest, now,
             ))
             sent += 1
         if not await _drain(writer, stop):

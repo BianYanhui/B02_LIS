@@ -323,7 +323,20 @@ class Relay:
         return int(total * 1000)
 
     def live_depth(self) -> int:
-        return len(self.queue) - len(self.superseded_ids) + len(self.pqueue)
+        return self._fifo_live() + len(self.pqueue)
+
+    def _fifo_live(self) -> int:
+        return len(self.queue) - len(self.superseded_ids)
+
+    def _bounded_full(self, kind: int, instance: int, digest: int) -> bool:
+        """Mode 6 tail drop. Priority tombs and merge replacements do not grow the FIFO."""
+        if not self.bounded or self.max_queue <= 0:
+            return False
+        if self.priority and kind == K_TOMB:
+            return False
+        if self.merge and kind == K_UP and (instance, digest) in self.queued_up:
+            return False
+        return self._fifo_live() >= self.max_queue
 
     def low_utility(self, coverage: int, t_send: float) -> bool:
         if not self.congested():
@@ -381,7 +394,7 @@ class Relay:
             self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
                              selected=False, reason="rate_limit", score=score)
             return
-        if self.bounded and self.max_queue > 0 and self.live_depth() >= self.max_queue:
+        if self._bounded_full(kind, instance, digest):
             self.drops["queue_drop"] += 1
             self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
                              selected=False, reason="queue_drop")

@@ -13,18 +13,31 @@ K_UP, K_TOMB, K_RESET, K_STATS_REQ, K_CONFIG, K_ACK, K_STATS, K_RESET_DONE, K_ST
 WIRE_BYTES = 104
 
 # mode, merge, priority, adaptive, dedup, global_topk
+# StaticTopK keeps the k highest-coverage digests. Bounded* caps frames.
+# "StaticTopK" is the k=16 alias used by the paper's main method.
+TOPK_SWEEP = (4, 8, 16, 32, 64)
 POLICIES: dict[str, tuple[int, int, int, int, int, int]] = {
     "FullSync": (0, 0, 0, 0, 0, 0),
     "RateFIFO": (1, 0, 0, 0, 0, 0),
     "StaticSemantic": (4, 1, 1, 0, 2, 0),
     "StaticTopK": (4, 1, 1, 0, 2, 16),
-    "BoundedFIFO16": (6, 0, 0, 0, 0, 0),
-    "BoundedFIFO64": (6, 0, 0, 0, 0, 0),
+    "StaticTopK16NoMerge": (4, 0, 1, 0, 2, 16),
+    "StaticTopK16NoDedup": (4, 1, 1, 0, 0, 16),
+    "StaticTopK16NoPriority": (4, 1, 0, 0, 2, 16),
     "Adaptive": (5, 1, 1, 1, 2, 16),
     "AdaptiveNoPriority": (5, 1, 0, 1, 2, 16),
     "Ideal": (0, 0, 0, 0, 0, 0),
+    "BoundedFIFO4096": (6, 0, 0, 0, 0, 0),
 }
-POLICY_MAX_QUEUE: dict[str, int] = {"BoundedFIFO16": 16, "BoundedFIFO64": 64}
+POLICY_MAX_QUEUE: dict[str, int] = {"BoundedFIFO4096": 4096}
+for _k in TOPK_SWEEP:
+    POLICIES[f"StaticTopK{_k}"] = (4, 1, 1, 0, 2, _k)
+    POLICIES[f"BoundedFIFO{_k}"] = (6, 0, 0, 0, 0, 0)
+    POLICIES[f"BoundedPrio{_k}"] = (6, 0, 1, 0, 0, 0)
+    POLICIES[f"BoundedSemantic{_k}"] = (6, 1, 1, 0, 2, 0)
+    POLICY_MAX_QUEUE[f"BoundedFIFO{_k}"] = _k
+    POLICY_MAX_QUEUE[f"BoundedPrio{_k}"] = _k
+    POLICY_MAX_QUEUE[f"BoundedSemantic{_k}"] = _k
 
 
 def frame(kind: int, instance: int, cell: int, seq: int, coverage: int, digest: int, t: float, payload: bytes = b"") -> bytes:

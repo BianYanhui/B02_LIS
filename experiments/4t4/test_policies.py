@@ -360,6 +360,135 @@ def main() -> None:
                  "status": "PASS" if r.live_depth() == 16 and 9000 in r.topk_best and r.drops["low_utility"] == 0 else "FAIL",
                  "detail": json.dumps({"live": r.live_depth(), "has_long": 9000 in r.topk_best, "low_utility": r.drops["low_utility"]})})
 
+    r = relay()
+    r.mode = gw.MODE_BOUNDED
+    r.priority = True
+    r.max_queue = 16
+    for seq in range(16):
+        frame, sent = up(seq, digest=seq + 1)
+        r.enqueue(frame, gw.K_UP, 0, seq, 1024, seq + 1, sent)
+    frame, sent = tomb(100)
+    r.enqueue(frame, gw.K_TOMB, 0, 100, 0, 1, sent)
+    frame, sent = up(101, digest=101)
+    r.enqueue(frame, gw.K_UP, 0, 101, 1024, 101, sent)
+    rows.append({"policy": "BoundedPrio16", "check": "priority tomb is admitted when the FIFO is full",
+                 "status": "PASS" if len(r.pqueue) == 1 and r.drops["queue_drop"] == 1 and r._fifo_live() == 16 else "FAIL",
+                 "detail": json.dumps({"pqueue": len(r.pqueue), "queue_drop": r.drops["queue_drop"], "fifo": r._fifo_live()})})
+
+    r = relay()
+    r.mode = gw.MODE_BOUNDED
+    r.merge = True
+    r.priority = True
+    r.dedup = 2
+    r.max_queue = 16
+    for seq in range(16):
+        frame, sent = up(seq, digest=seq + 1)
+        r.enqueue(frame, gw.K_UP, 0, seq, 1024, seq + 1, sent)
+    before = r.drops["queue_drop"]
+    frame, sent = up(50, digest=1, coverage=2048)
+    r.enqueue(frame, gw.K_UP, 0, 50, 2048, 1, sent)
+    rows.append({"policy": "BoundedSemantic16", "check": "merge replacement does not count as a new FIFO frame",
+                 "status": "PASS" if r.drops["queue_drop"] == before and r._fifo_live() == 16 else "FAIL",
+                 "detail": json.dumps({"queue_drop": r.drops["queue_drop"], "fifo": r._fifo_live(), "superseded": r.drops["superseded"]})})
+
+    import random as _random
+    from collections import Counter
+
+    def _counts(target) -> Counter:
+        counts: Counter = Counter()
+        for item in list(target.queue) + list(target.pqueue):
+            if id(item) in target.superseded_ids:
+                continue
+            kind, _inst, _cell, _seq, _cov, digest, _sent = gw.HDR.unpack(item[:32])
+            if kind == gw.K_UP:
+                counts[digest] += 1
+        return counts
+
+    def _invariant(target, cap: int) -> str:
+        counts = _counts(target)
+        if target.global_topk:
+            if dict(target.topk_refs) != dict(counts):
+                return f"refs {dict(target.topk_refs)} != {dict(counts)}"
+            if len(target.topk_best) > target.global_topk:
+                return "topk overflow"
+        elif target.topk_refs or target.topk_best:
+            return "topk set on a policy without k"
+        queued_ids = {id(item) for item in target.queue}
+        if not target.superseded_ids <= queued_ids:
+            return "ghost missing from deque"
+        if target.bounded and cap and target._fifo_live() > cap:
+            return f"fifo {target._fifo_live()} > {cap}"
+        if target.merge:
+            seen = set()
+            for item in list(target.queue) + list(target.pqueue):
+                if id(item) in target.superseded_ids:
+                    continue
+                kind, inst, _cell, _seq, _cov, digest, _sent = gw.HDR.unpack(item[:32])
+                if kind == gw.K_UP:
+                    key = (inst, digest)
+                    if key in seen:
+                        return "two live upserts"
+                    seen.add(key)
+        if target.dedup:
+            for holders in target.replicas.values():
+                if len(holders) > target.dedup:
+                    return "dedup overflow"
+        balance = target.received - target.forwarded - sum(target.drops.values()) - target.live_depth()
+        if balance != 0:
+            return f"balance {balance}"
+        return ""
+
+    configs = [
+        ("Adaptive", gw.MODE_ADAPTIVE, True, True, True, 2, 16, 0),
+        ("StaticTopK16", gw.MODE_STATIC, True, True, False, 2, 16, 0),
+        ("StaticSemantic", gw.MODE_STATIC, True, True, False, 2, 0, 0),
+        ("BoundedFIFO16", gw.MODE_BOUNDED, False, False, False, 0, 0, 16),
+        ("BoundedPrio16", gw.MODE_BOUNDED, False, True, False, 0, 0, 16),
+        ("BoundedSemantic16", gw.MODE_BOUNDED, True, True, False, 2, 0, 16),
+        ("AdaptiveNoMerge", gw.MODE_ADAPTIVE, False, True, True, 2, 16, 0),
+        ("FullSync", gw.MODE_FULLSYNC, False, False, False, 0, 0, 0),
+        ("StaticTopK4", gw.MODE_STATIC, True, True, False, 2, 4, 0),
+        ("BoundedFIFO64", gw.MODE_BOUNDED, False, False, False, 0, 0, 64),
+        ("BoundedSemantic4", gw.MODE_BOUNDED, True, True, False, 2, 0, 4),
+        ("AdaptiveK4", gw.MODE_ADAPTIVE, True, True, True, 2, 4, 0),
+        ("StaticTopK16NoPriority", gw.MODE_STATIC, True, False, False, 2, 16, 0),
+        ("BoundedFIFO0", gw.MODE_BOUNDED, False, False, False, 0, 0, 0),
+    ]
+    rng = _random.Random(0)
+    for name, mode, merge, priority, adaptive, dedup, topk, cap in configs:
+        target = relay()
+        configure(target, mode, merge=merge, priority=priority, adaptive=adaptive, dedup=dedup)
+        target.global_topk = topk
+        target.max_queue = cap
+        seq = 0
+        problem = ""
+        for _step in range(4000):
+            roll = rng.randrange(10)
+            if roll < 7:
+                digest = rng.randrange(1, 12)
+                frame, sent = up(seq, owner=rng.randrange(4), digest=digest, coverage=rng.choice((256, 1024, 4096)))
+                target.enqueue(frame, gw.K_UP, frame[1], seq, gw.HDR.unpack(frame[:32])[4], digest, sent)
+                seq += 1
+            elif roll < 9:
+                digest = rng.randrange(1, 12)
+                frame, sent = tomb(seq, owner=rng.randrange(4), digest=digest)
+                target.enqueue(frame, gw.K_TOMB, frame[1], seq, 0, digest, sent)
+                seq += 1
+            else:
+                data = target._dequeue()
+                if data is None:
+                    continue
+                if rng.randrange(10) == 0:
+                    target._requeue_front(data)
+                else:
+                    target.forwarded += 1
+            problem = _invariant(target, cap)
+            if problem:
+                break
+        rows.append({"policy": name, "check": "random ledger and top-k invariants",
+                     "status": "PASS" if not problem else "FAIL",
+                     "detail": json.dumps({"problem": problem, "received": target.received, "drops": dict(target.drops)})})
+
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="") as handle:

@@ -20,7 +20,7 @@ from pathlib import Path
 
 from experiments.icc_kv.wire import (
     FRAME, HDR, K_ACK, K_RESET, K_RESET_DONE, K_STATS, K_STATS2, K_STATS_REQ, K_TOMB, K_UP,
-    STATS, STATS2, config_frame, frame,
+    POLICY_MAX_QUEUE, STATS, STATS2, config_frame, frame,
 )
 
 ROOT = Path("/home/byh/B02")
@@ -54,11 +54,34 @@ def parse_tc_rate(text: str, classid: str = "1:1") -> int:
 
 
 def tc_link_bit_s() -> int:
-    text = subprocess.check_output(
-        ["docker", "exec", "b02-gateway4t4", "tc", "class", "show", "dev", "eth0"],
-        text=True,
-    )
+    """0 when docker or tc cannot be read. Callers that configure the link still reject 0."""
+    try:
+        text = subprocess.check_output(
+            ["docker", "exec", "b02-gateway4t4", "tc", "class", "show", "dev", "eth0"],
+            text=True, timeout=10,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return 0
     return parse_tc_rate(text)
+
+
+def git_dirty_files() -> list[str]:
+    """Tracked edits under experiments/. Untracked result files are ignored."""
+    try:
+        out = subprocess.check_output(
+            ["git", "-C", str(ROOT), "status", "--porcelain", "--untracked-files=no", "--", "experiments"],
+            text=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return ["git-status-failed"]
+    return [line[3:] for line in out.splitlines() if len(line) > 3]
+
+
+def require_clean_tree(allow_dirty: bool = False) -> list[str]:
+    dirty = git_dirty_files()
+    if dirty and not allow_dirty:
+        raise SystemExit("experiments/ has uncommitted changes: " + ", ".join(dirty))
+    return dirty
 
 
 def gateway_source_sha256() -> str:
@@ -422,11 +445,13 @@ class PathRuntime:
             "commit": git_commit(),
             "fixed_link_bit_s": self.link_bit_s,
             "tc_link_bit_s": tc_link_bit_s(),
+            "git_dirty_files": git_dirty_files(),
             "gateway_cpus": 1,
             "gateway_cpuset": "0",
             "dispatcher_cpuset": "1",
             "max_queue": MAX_QUEUE,
-            "max_queue_enforced": False,
+            "max_queue_enforced": "mode6_only",
+            "policy_max_queue": dict(POLICY_MAX_QUEUE),
             "max_inflight": MAX_INFLIGHT,
             "request_cpuset": "2",
             "noise_cpuset": "3+",

@@ -16,20 +16,27 @@ import csv
 import hashlib
 import importlib.util
 import json
+import math
 import random
 import sys
 import threading
 import time
+import traceback
 from pathlib import Path
 
 import aiohttp
 
+from experiments.icc_kv.capacity_window import window_problems
 from experiments.icc_kv.runtime import (
     OUT, ROOT, PathRuntime, cpus_for_vllm, gateway_pid, pin_listeners,
-    prepare_fixed_gateway, process_cpu_seconds, reapply_affinity, restore_affinity, write_json,
+    prepare_fixed_gateway, process_cpu_seconds, reapply_affinity, require_clean_tree,
+    restore_affinity, write_json,
 )
 from experiments.icc_kv.split_path import SplitControl
 from experiments.icc_kv.wire import K_TOMB, K_UP
+from experiments.icc_kv.workload import burst_nominal_rho, interleave, noise_overlap, useful_slots
+
+RHOS = {"normal": 0.5, "near": 0.9, "high": 1.2, "xhigh": 1.5, "ultrahigh": 2.0, "burst": 0.9}
 
 # Request prefixes are long enough to clear the 1024-token admission bar.
 # Background noise is a new short prefix every event, so merge cannot collapse it.
@@ -260,6 +267,21 @@ async def reset_prefix_caches(session: aiohttp.ClientSession, urls: list[str]) -
                 raise RuntimeError(f"reset_prefix_cache {url} -> {response.status} {body}")
 
 
+def _error_cells(path: Path) -> list[int]:
+    if not path.exists():
+        return []
+    cells: list[int] = []
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            cells.append(int(json.loads(line).get("cell") or 0))
+        except json.JSONDecodeError:
+            continue
+    return cells
+
+
 def _pct(values: list[float], p: float) -> float:
     if not values:
         return 0.0
@@ -299,15 +321,28 @@ async def calibrate_gpu_arrival(concurrency: int, gpu_rho: float, requests: int 
     scored = samples[min(4, len(samples)):] or samples
     service = sum(scored) / len(scored)
     arrival = gpu_rho * concurrency / max(service, 1e-3)
-    print({
+    result = {
         "gpu_calibration": True,
         "service_s": round(service, 3),
         "gpu_rho": gpu_rho,
         "concurrency": concurrency,
         "arrival_rate": round(arrival, 4),
         "samples": len(scored),
-    }, flush=True)
-    return arrival
+        "time": time.time(),
+    }
+    print(result, flush=True)
+    return result
+
+
+async def gather_or_cancel(coros: list) -> None:
+    tasks = [asyncio.ensure_future(coro) for coro in coros]
+    try:
+        await asyncio.gather(*tasks)
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
 
 
 async def run_e2e(
@@ -316,8 +351,17 @@ async def run_e2e(
     open_loop: bool = True, arrival_rate: float = 1.25, invalidate_every: int = 8,
     noise_workers: int = 4, noise_senders: int = 4, warmup_requests: int = 0,
     gpu_rho: float = 0.0, link_bit_s: int = 0,
+    useful_pool: int = USEFUL_POOL, useful_coverage_mix: str = "",
+    noise_coverage_mix: str = "", burst_mult: float = 5.0,
+    cell_seconds: float = 0.0, capacity_file: str = "",
+    allow_outside_window: bool = False, allow_dirty: bool = False,
+    calibrate_only: bool = False, calibration_out: str = "",
 ) -> None:
+    require_clean_tree(allow_dirty)
     formal = load_formal()
+    slot_cov = useful_slots(useful_pool, useful_coverage_mix, USEFUL_COVERAGE)
+    noise_table = interleave(noise_coverage_mix)
+    overlap = noise_overlap(noise_coverage_mix, slot_cov)
     link = int(link_bit_s) if link_bit_s else 1_000_000_000
     prepare_fixed_gateway(link)
     control = SplitControl(senders=noise_senders, link_bit_s=link)
@@ -332,18 +376,43 @@ async def run_e2e(
         vllm_allowed = cpus_for_vllm()
         pinned, vllm_roots = pin_listeners([8000, 8001, 8002, 8003], vllm_allowed)
         if gpu_rho > 0:
-            arrival_rate = await calibrate_gpu_arrival(concurrency, gpu_rho)
+            calibration = await calibrate_gpu_arrival(concurrency, gpu_rho)
+            arrival_rate = float(calibration["arrival_rate"])
+            if calibration_out:
+                write_json(Path(calibration_out), calibration)
+        elif calibrate_only:
+            raise SystemExit("--calibrate-only needs --gpu-rho")
+        if calibrate_only:
+            return
+        if cell_seconds > 0:
+            if not open_loop:
+                raise SystemExit("--cell-seconds is only defined for the open loop")
+            requests_per_run = max(warmup_requests + 1, math.ceil(cell_seconds * arrival_rate))
+        peaks = {
+            scenario: RHOS[scenario] * capacity * (burst_mult if scenario == "burst" else 1.0)
+            for scenario in scenarios
+        }
+        capacity_info: dict = {}
+        if capacity_file:
+            capacity_info = json.loads(Path(capacity_file).read_text())
+            problems = window_problems(capacity_info, link=link, capacity=capacity, peaks=peaks)
+            capacity_info = {**capacity_info, "problems": problems}
+            if problems and not allow_outside_window:
+                raise SystemExit("capacity window: " + "; ".join(problems))
         gateway = gateway_pid()
         await formal.check_endpoints()
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / "e2e_summary.json"
         rows: list[dict] = json.loads(path.read_text()).get("rows", []) if path.exists() else []
         done = {(row["seed"], row["scenario"], row["method"]) for row in rows}
-        cell = 1 + len(rows)
+        error_path = out_dir / "cell_errors.log"
+        error_cells = _error_cells(error_path)
+        seen_cells = [int(row["cell"]) for row in rows if "cell" in row]
+        cell = 1 + max(seen_cells + error_cells + [0])
+        cell_errors = 0
         run_id = time.time_ns()
         import bisect
-        cdf = formal.zipf_cdf(1.2, USEFUL_POOL)
-        rhos = {"normal": 0.5, "near": 0.9, "high": 1.2, "xhigh": 1.5, "ultrahigh": 2.0, "burst": 0.9}
+        cdf = formal.zipf_cdf(1.2, useful_pool)
 
         for seed in range(seeds):
             for scenario_index, scenario in enumerate(scenarios):
@@ -353,7 +422,7 @@ async def run_e2e(
                     if (seed, scenario, method) in done:
                         continue
                     try:
-                        rho = rhos[scenario]
+                        rho = RHOS[scenario]
                         rate = capacity if method == "RateFIFO" else 0.0
                         cell_id = cell
                         salt = f"icc-noise-{run_id}-{cell_id}"
@@ -367,6 +436,8 @@ async def run_e2e(
                             "seconds": 0,
                             "scenario": scenario,
                             "coverage": NOISE_COVERAGE,
+                            "coverage_table": noise_table,
+                            "burst_mult": burst_mult,
                             "seq0": 100_000_000,
                             "workers": noise_workers,
                         })
@@ -385,8 +456,8 @@ async def run_e2e(
                         loop_lags: list[float] = []
                         view_sizes: list[int] = []
                         stop_probe = asyncio.Event()
-                        versions = [0] * USEFUL_POOL
-                        digest_text = [f"U{slot:04d}" for slot in range(USEFUL_POOL)]
+                        versions = [0] * useful_pool
+                        digest_text = [f"U{slot:04d}" for slot in range(useful_pool)]
                         digests = [formal.digest64(text) for text in digest_text]
                         seq_box = [1]
                         state_lock = asyncio.Lock()
@@ -440,8 +511,8 @@ async def run_e2e(
                                     fresh_tombs.clear()
                                     if invalidate_every and request_id and request_id % invalidate_every == 0:
                                         installed = [
-                                            candidate for candidate in range(USEFUL_POOL)
-                                            if any(truth.get((worker, digests[candidate]), 0) >= USEFUL_COVERAGE for worker in range(4))
+                                            candidate for candidate in range(useful_pool)
+                                            if any(truth.get((worker, digests[candidate]), 0) >= slot_cov[candidate] for worker in range(4))
                                         ]
                                         if slot in installed:
                                             invalidate_slot(slot)
@@ -512,7 +583,7 @@ async def run_e2e(
                                     formal.prompt_for(formal.TraceRequest(
                                         request_id=request_id, phase=0, lineage_id=slot, step=0,
                                         tenant=f"tenant-{slot % 8}", digest=digest_text[slot],
-                                        coverage_tokens=USEFUL_COVERAGE, workload="reuse_intensive", discard=False,
+                                        coverage_tokens=slot_cov[slot], workload="reuse_intensive", discard=False,
                                     )),
                                     f"{salt}-v{decision['version']}", 4, 2,
                                 )
@@ -526,14 +597,14 @@ async def run_e2e(
                                     regret = max(0, decision["ideal_cov"] - decision["routed_truth"])
                                     if cached >= 512 and decision["routed_truth"] == 0 and decision["version"] > 0:
                                         stale_cache_hits += 1
-                                    evicted = shadows[routed].insert(digest_text[slot], USEFUL_COVERAGE)
-                                    truth[(routed, decision["digest"])] = USEFUL_COVERAGE
+                                    evicted = shadows[routed].insert(digest_text[slot], slot_cov[slot])
+                                    truth[(routed, decision["digest"])] = slot_cov[slot]
                                     installed_at[(routed, decision["digest"])] = time.time()
                                     tomb_at.pop((routed, decision["digest"]), None)
                                     if method == "Ideal":
-                                        control.set_local(routed, decision["digest"], USEFUL_COVERAGE)
+                                        control.set_local(routed, decision["digest"], slot_cov[slot])
                                     else:
-                                        pending_emits.append((K_UP, routed, seq_box[0], USEFUL_COVERAGE, decision["digest"]))
+                                        pending_emits.append((K_UP, routed, seq_box[0], slot_cov[slot], decision["digest"]))
                                         seq_box[0] += 1
                                     for victim in evicted:
                                         victim_digest = formal.digest64(victim)
@@ -548,6 +619,8 @@ async def run_e2e(
                                     prefill = max(0, int(response["input_tokens"] or 0) - cached)
                                     records.append({
                                         "request_id": request_id,
+                                        "slot": slot,
+                                        "coverage_tokens": slot_cov[slot],
                                         "warmup": int(request_id < warmup_requests),
                                         "decision_s": decision["decision_s"],
                                         "ttft_ms": response["ttft_ms"],
@@ -582,13 +655,13 @@ async def run_e2e(
                                 cpu_mark = process_cpu_seconds(gateway)
                                 cpu_t0 = time.perf_counter()
                                 if open_loop:
-                                    await asyncio.gather(*[
+                                    await gather_or_cancel([
                                         serve(request_id, slot, origin + request_id / max(arrival_rate, 1e-6))
                                         for request_id, slot in planned
                                     ])
                                 else:
                                     for offset in range(0, len(planned), concurrency):
-                                        await asyncio.gather(*[
+                                        await gather_or_cancel([
                                             serve(request_id, slot, None)
                                             for request_id, slot in planned[offset:offset + concurrency]
                                         ])
@@ -622,7 +695,7 @@ async def run_e2e(
                         applied = counted["applied"]
                         frames = counted["frames"]
                         foreground_frames = counted["foreground"]
-                        update_lags = [max(0.0, row.applied_at - row.generated_at) for row in applied if row.coverage >= USEFUL_COVERAGE]
+                        update_lags = [max(0.0, row.applied_at - row.generated_at) for row in applied if row.kind != "invalidate"]
                         invalidate_lags = [max(0.0, row.applied_at - row.generated_at) for row in applied if row.kind == "invalidate"]
                         applied_seqs = {row.seq for row in applied}
                         censored_up: list[float] = []
@@ -634,7 +707,7 @@ async def run_e2e(
                             lag = max(0.0, closed - generated)
                             if kind == "invalidate":
                                 censored_inv.append(lag)
-                            elif coverage >= USEFUL_COVERAGE:
+                            else:
                                 censored_up.append(lag)
                         ttfts = [row["ttft_ms"] for row in scored]
                         e2e_ttfts = [row["e2e_ttft_ms"] for row in scored]
@@ -739,9 +812,27 @@ async def run_e2e(
                             "open_loop": open_loop,
                             "arrival_rate": arrival_rate if open_loop else 0.0,
                             "invalidate_every": invalidate_every,
-                            "useful_pool": USEFUL_POOL,
+                            "useful_pool": useful_pool,
                             "useful_coverage": USEFUL_COVERAGE,
+                            "useful_coverage_mix": useful_coverage_mix,
+                            "useful_slot_coverage": slot_cov,
                             "noise_coverage": NOISE_COVERAGE,
+                            "noise_coverage_mix": noise_coverage_mix,
+                            "noise_overlap": overlap,
+                            "fn_rate_by_coverage": {
+                                str(coverage): _mean([
+                                    row["loose_false_negative"] for row in scored
+                                    if row["coverage_tokens"] == coverage
+                                ])
+                                for coverage in sorted({row["coverage_tokens"] for row in scored})
+                            },
+                            "requests_by_coverage": {
+                                str(coverage): sum(row["coverage_tokens"] == coverage for row in scored)
+                                for coverage in sorted({row["coverage_tokens"] for row in scored})
+                            },
+                            "burst_mult": burst_mult,
+                            "nominal_rho_effective": burst_nominal_rho(rho, burst_mult) if scenario == "burst" else rho,
+                            "capacity_window": capacity_info,
                             "noise_workers": noise_workers,
                             "noise_senders": noise_senders,
                             "forwarded_per_s": forwarded_end / noise_window,
@@ -759,15 +850,27 @@ async def run_e2e(
                         print(summary, flush=True)
                         cell += 1
                     except Exception as exc:
-                        error_path = out_dir / "cell_errors.log"
+                        cell_errors += 1
+                        record = {
+                            "time": time.time(),
+                            "cell": cell,
+                            "seed": seed,
+                            "scenario": scenario,
+                            "method": method,
+                            "error": repr(exc),
+                            "traceback": traceback.format_exc()[-4000:],
+                        }
                         with error_path.open("a") as handle:
-                            handle.write(f"{seed} {scenario} {method} {exc!r}\n")
-                        print({"cell_error": repr(exc), "seed": seed, "scenario": scenario, "method": method}, flush=True)
+                            handle.write(json.dumps(record) + "\n")
+                        print({"cell_error": record["error"], "cell": cell, "seed": seed, "scenario": scenario, "method": method}, flush=True)
                         try:
                             control.end_noise()
                         except Exception:
                             pass
+                        cell += 1
                         continue
+        if cell_errors:
+            raise SystemExit(f"{cell_errors} cells failed; see {error_path}")
     finally:
         control.stop()
         restore_affinity(pinned)
@@ -779,7 +882,7 @@ def main() -> None:
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--trace", type=Path, default=OUT / "trace" / "events.csv")
-    parser.add_argument("--capacity", type=float, required=True)
+    parser.add_argument("--capacity", type=float, default=0.0)
     parser.add_argument("--scenarios", default="normal,near,burst")
     parser.add_argument("--methods", default="FullSync,StaticSemantic,Adaptive,Ideal")
     parser.add_argument("--seeds", type=int, default=5)
@@ -797,7 +900,21 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, default=OUT / "e2e")
     parser.add_argument("--link-bit", type=int, default=0,
                         help="fixed HTB ceiling for every cell; 0 keeps 1 Gbit")
+    parser.add_argument("--useful-pool", type=int, default=USEFUL_POOL)
+    parser.add_argument("--useful-coverage-mix", default="")
+    parser.add_argument("--noise-coverage-mix", default="")
+    parser.add_argument("--burst-mult", type=float, default=5.0)
+    parser.add_argument("--cell-seconds", type=float, default=0.0)
+    parser.add_argument("--capacity-file", default="")
+    parser.add_argument("--allow-outside-window", action="store_true")
+    parser.add_argument("--allow-dirty", action="store_true")
+    parser.add_argument("--calibrate-only", action="store_true")
+    parser.add_argument("--calibration-out", default="")
     args = parser.parse_args()
+    if args.calibrate_only and not args.capacity:
+        args.capacity = 1.0
+    elif not args.capacity:
+        raise SystemExit("--capacity is required")
     asyncio.run(run_e2e(
         args.trace, args.capacity,
         [item for item in args.scenarios.split(",") if item],
@@ -811,6 +928,16 @@ def main() -> None:
         warmup_requests=args.warmup_requests,
         gpu_rho=args.gpu_rho,
         link_bit_s=args.link_bit,
+        useful_pool=args.useful_pool,
+        useful_coverage_mix=args.useful_coverage_mix,
+        noise_coverage_mix=args.noise_coverage_mix,
+        burst_mult=args.burst_mult,
+        cell_seconds=args.cell_seconds,
+        capacity_file=args.capacity_file,
+        allow_outside_window=args.allow_outside_window,
+        allow_dirty=args.allow_dirty,
+        calibrate_only=args.calibrate_only,
+        calibration_out=args.calibration_out,
     ))
 
 
