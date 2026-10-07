@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -18,8 +19,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from experiments.icc_kv.wire import (
-    FRAME, HDR, K_ACK, K_RESET, K_RESET_DONE, K_STATS, K_STATS_REQ, K_TOMB, K_UP,
-    STATS, config_frame, frame,
+    FRAME, HDR, K_ACK, K_RESET, K_RESET_DONE, K_STATS, K_STATS2, K_STATS_REQ, K_TOMB, K_UP,
+    STATS, STATS2, config_frame, frame,
 )
 
 ROOT = Path("/home/byh/B02")
@@ -35,6 +36,44 @@ MAX_INFLIGHT = 0
 # Harness noise uses worker ids at or above this value. Those frames are
 # counted and are not part of the placement view.
 ROUTABLE_BELOW = 16
+
+
+_TC_UNITS = {"bit": 1, "kbit": 1_000, "mbit": 1_000_000, "gbit": 1_000_000_000}
+
+
+def parse_tc_rate(text: str, classid: str = "1:1") -> int:
+    """Parse `tc class show` rate for one class. 0 when the class is absent."""
+    for line in text.splitlines():
+        match = re.search(
+            rf"class htb {re.escape(classid)} .*?\brate (\d+(?:\.\d+)?)([KMG]?bit)\b",
+            line,
+        )
+        if match:
+            return int(round(float(match.group(1)) * _TC_UNITS[match.group(2).lower()]))
+    return 0
+
+
+def tc_link_bit_s() -> int:
+    text = subprocess.check_output(
+        ["docker", "exec", "b02-gateway4t4", "tc", "class", "show", "dev", "eth0"],
+        text=True,
+    )
+    return parse_tc_rate(text)
+
+
+def gateway_source_sha256() -> str:
+    return hashlib.sha256((NET / "gateway_relay_4t4.py").read_bytes()).hexdigest()
+
+
+def check_gateway_source() -> str:
+    remote = subprocess.check_output(
+        ["docker", "exec", "b02-gateway4t4", "sha256sum", "/opt/gateway_relay_4t4.py"],
+        text=True,
+    ).split()[0]
+    local = gateway_source_sha256()
+    if remote != local:
+        raise RuntimeError(f"gateway source mismatch local={local} container={remote}")
+    return remote
 
 
 def sh(args: list[str]) -> str:
@@ -55,7 +94,7 @@ def prepare_fixed_gateway(link_bit_s: int | None = None) -> str:
     link_bit_s stays at the 1 Gbit ceiling unless a run passes one lower
     value for the whole matrix. It is not retuned per rho.
     """
-    sh(["bash", str(NET / "setup_net_4t4.sh")])
+    sh(["bash", str(NET / "setup_net_4t4.sh"), "--rebuild"])
     ip = bridge_ip()
     global ACTIVE_LINK_BIT_S
     link = int(link_bit_s) if link_bit_s else FIXED_LINK_BIT_S
@@ -87,6 +126,10 @@ def prepare_fixed_gateway(link_bit_s: int | None = None) -> str:
       tc filter add dev eth0 protocol ip parent 1:0 prio 2 u32 match ip dport 5211 0xffff flowid 1:20
       tc filter add dev eth0 protocol ip parent 1:0 prio 3 u32 match ip sport 9710 0xffff flowid 1:30
     """])
+    observed = tc_link_bit_s()
+    if observed != link:
+        raise RuntimeError(f"HTB class 1:1 rate is {observed}, expected {link}")
+    check_gateway_source()
     return ip
 
 
@@ -175,7 +218,8 @@ class Dispatcher:
 
 
 class PathRuntime:
-    def __init__(self) -> None:
+    def __init__(self, link_bit_s: int = 0) -> None:
+        self.link_bit_s = int(link_bit_s) if link_bit_s else FIXED_LINK_BIT_S
         self.ip = ""
         self.dispatcher = Dispatcher(cell=-1)
         self._server: asyncio.AbstractServer | None = None
@@ -188,6 +232,7 @@ class PathRuntime:
         self._fg_lock = asyncio.Lock()
         self._stats_wait = asyncio.Event()
         self.last_stats: dict | None = None
+        self._stats_partial: dict | None = None
 
     async def start(self) -> None:
         try:
@@ -265,7 +310,7 @@ class PathRuntime:
                     self.dispatcher.resets += 1
                 elif kind == K_STATS:
                     forwarded, rate, superseded, replica_cap, low_utility, queue_drop, expired, maxq = STATS.unpack(data[32:64])
-                    self.last_stats = {
+                    self._stats_partial = {
                         "relay_forwarded": forwarded,
                         "relay_drop_rate_limit": rate,
                         "relay_drop_superseded": superseded,
@@ -276,6 +321,20 @@ class PathRuntime:
                         "relay_max_queue": maxq,
                         "relay_queued": int(seq),
                         "relay_received": int(coverage),
+                    }
+                elif kind == K_STATS2:
+                    (global_topk, stale_cell, ghost_queued, live_queued, congested_entries,
+                     congested_ms, pqueued, _reserved) = STATS2.unpack(data[32:64])
+                    self.last_stats = {
+                        **(self._stats_partial or {}),
+                        "relay_drop_global_topk": global_topk,
+                        "relay_drop_stale_cell": stale_cell,
+                        "relay_ghost_queued": ghost_queued,
+                        "relay_live_queued": live_queued,
+                        "relay_pqueued": pqueued,
+                        "relay_congested_entries": congested_entries,
+                        "relay_congested_ms": congested_ms,
+                        "stats2_missing": 0,
                     }
                     self._stats_wait.set()
         except (asyncio.IncompleteReadError, ConnectionResetError):
@@ -329,13 +388,16 @@ class PathRuntime:
         assert self.fg_agent is not None
         self._stats_wait.clear()
         self.last_stats = None
+        self._stats_partial = None
         async with self._fg_lock:
             self.fg_agent.write(frame(K_STATS_REQ, 0, self.dispatcher.cell, 0, 0, 0, time.time()))
             await self.fg_agent.drain()
         try:
             await asyncio.wait_for(self._stats_wait.wait(), timeout=15)
         except asyncio.TimeoutError:
-            return {}
+            partial = dict(self.last_stats or self._stats_partial or {})
+            partial["stats2_missing"] = 1
+            return partial
         return dict(self.last_stats or {})
 
     async def send_event(self, kind: int, worker: int, cell: int, seq: int, coverage: int, digest: int, generated_at: float) -> None:
@@ -358,7 +420,8 @@ class PathRuntime:
     def meta(self) -> dict:
         return {
             "commit": git_commit(),
-            "fixed_link_bit_s": ACTIVE_LINK_BIT_S,
+            "fixed_link_bit_s": self.link_bit_s,
+            "tc_link_bit_s": tc_link_bit_s(),
             "gateway_cpus": 1,
             "gateway_cpuset": "0",
             "dispatcher_cpuset": "1",

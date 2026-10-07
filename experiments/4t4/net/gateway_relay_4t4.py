@@ -92,12 +92,14 @@ BACKGROUND_INSTANCE = 16
 HDR = struct.Struct(">BBHIqQd")
 CFG = struct.Struct(">BBBBHIIIII")
 STATS = struct.Struct(">IIIIIIII")
-K_UP, K_TOMB, K_RESET, K_STATS_REQ, K_CONFIG, K_ACK, K_STATS, K_RESET_DONE = 1, 2, 3, 4, 5, 6, 7, 8
+K_UP, K_TOMB, K_RESET, K_STATS_REQ, K_CONFIG, K_ACK, K_STATS, K_RESET_DONE, K_STATS2 = 1, 2, 3, 4, 5, 6, 7, 8, 9
+STATS2 = struct.Struct(">IIIIIIII")
 RECENT_KEEP = 4096
-MODE_FULLSYNC, MODE_RATEFIFO, MODE_LATEST, MODE_AGECOV, MODE_STATIC, MODE_ADAPTIVE = range(6)
+MODE_FULLSYNC, MODE_RATEFIFO, MODE_LATEST, MODE_AGECOV, MODE_STATIC, MODE_ADAPTIVE, MODE_BOUNDED = range(7)
 MODE_NAMES = {
     MODE_FULLSYNC: "FullSync", MODE_RATEFIFO: "RateFIFO", MODE_LATEST: "LatestOnly",
     MODE_AGECOV: "AgeCov-Greedy", MODE_STATIC: "StaticSemantic", MODE_ADAPTIVE: "Adaptive",
+    MODE_BOUNDED: "BoundedFIFO",
 }
 
 
@@ -132,8 +134,13 @@ class Relay:
         self.queue_high_since: float | None = None
         self.queue_low_since: float | None = None
         self.congested_latched = False
-        # digest -> coverage of the live unsent upsert. Bounded by global_topk.
+        self.congested_entries = 0
+        self.congested_since: float | None = None
+        self.congested_total_s = 0.0
+        # digest -> coverage of the best live unsent upsert, and how many
+        # live queued upserts still hold that digest. The two maps share keys.
         self.topk_best: dict[int, int] = {}
+        self.topk_refs: dict[int, int] = {}
         self._read_batch = 0
         self.drops: Counter[str] = Counter()
         self.forwarded = 0
@@ -157,6 +164,10 @@ class Relay:
     @property
     def agecov(self) -> bool:
         return self.mode == MODE_AGECOV
+
+    @property
+    def bounded(self) -> bool:
+        return self.mode == MODE_BOUNDED
 
     def score(self, coverage: int, t_send: float) -> float:
         """A deliberately simple non-semantic Age x Coverage comparator."""
@@ -224,6 +235,13 @@ class Relay:
                     self.rate_burst_frames = rate_burst
                     self.rate_tokens = float(rate_burst)
                     self.rate_last = time.monotonic()
+                    if self.adaptive and self.global_topk and int(self.args.adaptive_queue_gate) >= int(self.global_topk):
+                        print(json.dumps({
+                            "event": "config_warning",
+                            "reason": "adaptive queue gate is not below global_topk, so congestion cannot latch",
+                            "gate": int(self.args.adaptive_queue_gate),
+                            "global_topk": int(self.global_topk),
+                        }), flush=True)
                     continue
                 if kind == K_STATS_REQ:
                     # Return control-plane stats on the reverse direction of
@@ -263,28 +281,49 @@ class Relay:
         low = int(getattr(self.args, "adaptive_queue_exit", 2))
         enter_hold = float(getattr(self.args, "congestion_hold", 0.2))
         exit_hold = float(getattr(self.args, "congestion_exit_hold", 0.5))
-        depth = len(self.queue)
+        # Superseded copies stay in the deque until popped. They are not load.
+        depth = len(self.queue) - len(self.superseded_ids)
         if depth >= high:
             self.queue_low_since = None
             if self.queue_high_since is None:
                 self.queue_high_since = now
-            if now - self.queue_high_since >= enter_hold:
-                self.congested_latched = True
+            if not self.congested_latched and now - self.queue_high_since >= enter_hold:
+                self._set_latched(True, now)
         elif depth <= low:
             self.queue_high_since = None
             if self.congested_latched:
                 if self.queue_low_since is None:
                     self.queue_low_since = now
                 if now - self.queue_low_since >= exit_hold:
-                    self.congested_latched = False
+                    self._set_latched(False, now)
                     self.queue_low_since = None
         else:
-            # Between the two thresholds the previous decision stands.
-            # Dropping just under the enter gate must not clear the hold.
+            # Not latched: keep queue_high_since, so a dip into the middle
+            # band does not restart the enter hold. Only depth <= low clears it.
+            # Latched: a middle-band depth restarts the exit hold.
             self.queue_low_since = None
-            if not self.congested_latched:
-                self.queue_high_since = None
         return self.congested_latched
+
+    def _set_latched(self, latched: bool, now: float) -> None:
+        if latched == self.congested_latched:
+            return
+        self.congested_latched = latched
+        if latched:
+            self.congested_entries += 1
+            self.congested_since = now
+        else:
+            if self.congested_since is not None:
+                self.congested_total_s += now - self.congested_since
+            self.congested_since = None
+
+    def congested_ms(self) -> int:
+        total = self.congested_total_s
+        if self.congested_since is not None:
+            total += time.monotonic() - self.congested_since
+        return int(total * 1000)
+
+    def live_depth(self) -> int:
+        return len(self.queue) - len(self.superseded_ids) + len(self.pqueue)
 
     def low_utility(self, coverage: int, t_send: float) -> bool:
         if not self.congested():
@@ -334,13 +373,18 @@ class Relay:
         return True
 
     def enqueue(self, data: bytes, kind: int, instance: int, seq: int, coverage: int, digest: int, t_send: float) -> None:
-        _kind, _instance, cell, _seq, _coverage, _digest, _t = HDR.unpack(data[:32])
+        cell = self.current_cell
         self.received += 1
         score = self.score(coverage, t_send) if self.agecov else None
         if not self.consume_rate_token():
             self.drops["rate_limit"] += 1
             self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
                              selected=False, reason="rate_limit", score=score)
+            return
+        if self.bounded and self.max_queue > 0 and self.live_depth() >= self.max_queue:
+            self.drops["queue_drop"] += 1
+            self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
+                             selected=False, reason="queue_drop")
             return
         if kind == K_UP:
             # Drop before merge, the replica map, and the queue. Those steps
@@ -353,7 +397,7 @@ class Relay:
             if self._topk_drop_new(coverage, digest):
                 self.drops["global_topk"] += 1
                 self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
-                                 selected=False, reason="low_utility")
+                                 selected=False, reason="global_topk")
                 return
             if self.merge:
                 self._supersede_queued_up(instance, digest)
@@ -370,14 +414,32 @@ class Relay:
             self.queue.append(data)
             if kind == K_UP and self.merge:
                 self.queued_up[(instance, digest)] = data
-            if kind == K_UP and self.global_topk:
-                self.topk_best[digest] = max(self.topk_best.get(digest, 0), coverage)
+            if kind == K_UP:
+                self._topk_add(digest, coverage)
         self.emit_update("enqueued", kind, instance, cell, seq, coverage, digest, t_send,
                          selected=True, score=score)
         if kind == K_UP and self.global_topk:
             self.trim_global_topk()
-        self.maxq = max(self.maxq, len(self.queue) + len(self.pqueue))
+        self.maxq = max(self.maxq, self.live_depth())
         self.queue_event.set()
+
+    def _topk_add(self, digest: int, coverage: int) -> None:
+        if not self.global_topk:
+            return
+        self.topk_refs[digest] = self.topk_refs.get(digest, 0) + 1
+        if coverage > self.topk_best.get(digest, -1):
+            self.topk_best[digest] = coverage
+
+    def _topk_release(self, digest: int) -> None:
+        """One live queued upsert for this digest left the queue."""
+        if not self.global_topk:
+            return
+        left = self.topk_refs.get(digest, 0) - 1
+        if left > 0:
+            self.topk_refs[digest] = left
+        else:
+            self.topk_refs.pop(digest, None)
+            self.topk_best.pop(digest, None)
 
     def _topk_limit(self) -> int:
         if not self.global_topk:
@@ -426,6 +488,7 @@ class Relay:
 
     def _topk_evict(self, digest: int) -> None:
         self.topk_best.pop(digest, None)
+        self.topk_refs.pop(digest, None)
         retained: deque[bytes] = deque()
         for queued in self.queue:
             qkind, qinst, qcell, qseq, qcoverage, qdigest, qsent = HDR.unpack(queued[:32])
@@ -434,7 +497,7 @@ class Relay:
                 self.drops["global_topk"] += 1
                 self._forget_replica(qdigest, qinst)
                 self.emit_update("suppressed", qkind, qinst, qcell, qseq, qcoverage, qdigest, qsent,
-                                 selected=False, reason="low_utility")
+                                 selected=False, reason="global_topk")
             else:
                 retained.append(queued)
         self.queue = retained
@@ -448,6 +511,8 @@ class Relay:
         # every other frame. The release loop skips the marked copy.
         self.superseded_ids.add(id(prev))
         qkind, qinst, qcell, qseq, qcov, qdig, qt = HDR.unpack(prev[:32])
+        if qkind == K_UP:
+            self._topk_release(qdig)
         self.drops["superseded"] += 1
         self.emit_update("suppressed", qkind, qinst, qcell, qseq, qcov, qdig, qt,
                          selected=False, reason="superseded")
@@ -465,17 +530,42 @@ class Relay:
         kind, instance, _cell, _seq, _coverage, digest, _sent = HDR.unpack(data[:32])
         if kind == K_UP and self.queued_up.get((instance, digest)) is data:
             del self.queued_up[(instance, digest)]
-            if self.global_topk and not any(other == digest for _inst, other in self.queued_up):
-                self.topk_best.pop(digest, None)
 
     def _requeue_front(self, data: bytes) -> None:
-        kind, instance, _cell, _seq, _coverage, digest, _sent = HDR.unpack(data[:32])
+        kind, instance, _cell, _seq, coverage, digest, _sent = HDR.unpack(data[:32])
         if kind == K_TOMB and self.priority:
             self.pqueue.appendleft(data)
             return
         self.queue.appendleft(data)
         if kind == K_UP and self.merge and (instance, digest) not in self.queued_up:
             self.queued_up[(instance, digest)] = data
+        if kind == K_UP:
+            self._topk_add(digest, coverage)
+
+    def _dequeue(self) -> bytes | None:
+        """Pop the next live frame and drop its top-k count. None if only ghosts remain."""
+        if self.pqueue:
+            data = self.pqueue.popleft()
+        elif self.agecov:
+            if not self.queue:
+                return None
+            data = max(
+                self.queue,
+                key=lambda queued: (
+                    self.score(HDR.unpack(queued[:32])[4], HDR.unpack(queued[:32])[6]),
+                    -HDR.unpack(queued[:32])[3],
+                ),
+            )
+            self.queue.remove(data)
+        else:
+            data = self._pop_queue()
+            if data is None:
+                return None
+        self._forget_queued_up(data)
+        kind, _instance, _cell, _seq, _coverage, digest, _sent = HDR.unpack(data[:32])
+        if kind == K_UP:
+            self._topk_release(digest)
+        return data
 
     def do_reset(self, cell: int) -> None:
         self.queue.clear()
@@ -489,7 +579,11 @@ class Relay:
         self.queue_high_since = None
         self.queue_low_since = None
         self.congested_latched = False
+        self.congested_entries = 0
+        self.congested_since = None
+        self.congested_total_s = 0.0
         self.topk_best.clear()
+        self.topk_refs.clear()
         self.drops.clear()
         self.forwarded = 0
         self.received = 0
@@ -552,26 +646,9 @@ class Relay:
                 if len(self.recent) >= self.max_inflight:
                     await self.inflight_event.wait()
                 continue
-            if self.pqueue:
-                data = self.pqueue.popleft()
-            elif self.agecov:
-                # No semantic invalidation priority: select solely by the
-                # specified Age x Coverage score, with sequence number as a
-                # deterministic tie-breaker.
-                data = max(
-                    self.queue,
-                    key=lambda queued: (
-                        self.score(HDR.unpack(queued[:32])[4], HDR.unpack(queued[:32])[6]),
-                        -HDR.unpack(queued[:32])[3],
-                    ),
-                )
-                self.queue.remove(data)
-                self._forget_queued_up(data)
-            else:
-                data = self._pop_queue()
-                if data is None:
-                    continue
-                self._forget_queued_up(data)
+            data = self._dequeue()
+            if data is None:
+                continue
             if self.down_writer is None:
                 # Dispatcher endpoint not connected yet: requeue and wait.
                 self._requeue_front(data)
@@ -602,6 +679,18 @@ class Relay:
             if kind == K_TOMB:
                 self._forget_replica(digest, instance)
 
+    def stats2_payload(self) -> bytes:
+        return STATS2.pack(
+            self.drops["global_topk"],
+            self.drops["stale_cell"],
+            len(self.superseded_ids),
+            self.live_depth(),
+            self.congested_entries,
+            self.congested_ms(),
+            len(self.pqueue),
+            0,
+        )
+
     async def send_stats(self, reply_writer: asyncio.StreamWriter | None = None) -> None:
         payload = STATS.pack(
             self.forwarded,
@@ -615,10 +704,15 @@ class Relay:
         )
         if reply_writer is not None:
             # The 32-byte stats payload is full. Residual queue and received
-            # frames ride in the header: seq is the queue, coverage is received.
-            queued_now = len(self.queue) + len(self.pqueue)
+            # frames ride in the header: seq is the live queue, coverage is received.
+            # K_STATS2 carries the drops that did not fit, plus congestion time.
+            queued_now = self.live_depth()
+            now = time.time()
             reply_writer.write(frame(
-                K_STATS, 0, self.current_cell, queued_now, self.received, 0, time.time(), payload,
+                K_STATS, 0, self.current_cell, queued_now, self.received, 0, now, payload,
+            ))
+            reply_writer.write(frame(
+                K_STATS2, 0, self.current_cell, queued_now, self.received, 0, now, self.stats2_payload(),
             ))
             await reply_writer.drain()
         print(json.dumps({

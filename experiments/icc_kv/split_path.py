@@ -12,11 +12,13 @@ import contextlib
 import hashlib
 import multiprocessing as mp
 import os
+import queue
 import socket
+import threading
 import time
 from multiprocessing.queues import Queue
 
-from experiments.icc_kv.runtime import RELAY_PORT, PathRuntime
+from experiments.icc_kv.runtime import FIXED_LINK_BIT_S, RELAY_PORT, PathRuntime
 from experiments.icc_kv.wire import K_UP, frame
 
 NOISE_WORKER0 = 16
@@ -134,8 +136,8 @@ def noise_entry(spec_q: Queue, result_q: Queue, ready_q: Queue, stop: mp.synchro
     asyncio.run(_noise_async(spec_q, result_q, ready_q, stop))
 
 
-async def _control_async(cmd_q: Queue, reply_q: Queue, emit_q: Queue) -> None:
-    runtime = PathRuntime()
+async def _control_async(cmd_q: Queue, reply_q: Queue, emit_q: Queue, link_bit_s: int = 0) -> None:
+    runtime = PathRuntime(link_bit_s=link_bit_s)
     try:
         await runtime.start()
     except Exception as exc:
@@ -181,23 +183,25 @@ async def _control_async(cmd_q: Queue, reply_q: Queue, emit_q: Queue) -> None:
 
     async def cmd_pump() -> None:
         while not stop.is_set():
-            msg = await asyncio.to_thread(cmd_q.get)
+            rid, msg = await asyncio.to_thread(cmd_q.get)
             if msg[0] == "stop":
                 stop.set()
-                reply_q.put({"op": "stopped"})
+                reply_q.put({"op": "stopped", "rid": rid})
                 return
             try:
-                reply_q.put(await handle(msg))
+                reply = await handle(msg)
             except Exception as exc:
-                reply_q.put({"error": repr(exc)})
+                reply = {"error": repr(exc)}
+            reply["rid"] = rid
+            reply_q.put(reply)
 
     await asyncio.gather(cmd_pump(), emit_pump())
     await runtime.stop()
 
 
-def control_entry(cmd_q: Queue, reply_q: Queue, emit_q: Queue, cpu: int) -> None:
+def control_entry(cmd_q: Queue, reply_q: Queue, emit_q: Queue, cpu: int, link_bit_s: int = 0) -> None:
     _pin(cpu)
-    asyncio.run(_control_async(cmd_q, reply_q, emit_q))
+    asyncio.run(_control_async(cmd_q, reply_q, emit_q, link_bit_s))
 
 
 class NoisePool:
@@ -266,7 +270,7 @@ class NoisePool:
 class SplitControl:
     """Dispatcher in one process, noise in others, placement reads a small view."""
 
-    def __init__(self, senders: int = 4) -> None:
+    def __init__(self, senders: int = 4, link_bit_s: int = 0) -> None:
         self.ctx = mp.get_context("spawn")
         self.cmd_q: Queue = self.ctx.Queue()
         self.reply_q: Queue = self.ctx.Queue()
@@ -279,6 +283,10 @@ class SplitControl:
         self.fg_up = 0
         self.fg_tomb = 0
         self._noise_live = False
+        self.link_bit_s = int(link_bit_s) if link_bit_s else FIXED_LINK_BIT_S
+        self._rpc_lock = threading.Lock()
+        self._rid = 0
+        self.stale_replies = 0
 
     def start(self) -> None:
         from experiments.icc_kv.runtime import Dispatcher
@@ -287,7 +295,7 @@ class SplitControl:
         self.proc = self.ctx.Process(
             target=control_entry,
             name="icc-dispatcher",
-            args=(self.cmd_q, self.reply_q, self.emit_q, 1),
+            args=(self.cmd_q, self.reply_q, self.emit_q, 1, self.link_bit_s),
             daemon=True,
         )
         self.proc.start()
@@ -297,8 +305,23 @@ class SplitControl:
         self.pool.start()
 
     def _rpc(self, msg: tuple, timeout: float = 30.0) -> dict:
-        self.cmd_q.put(msg)
-        reply = self.reply_q.get(timeout=timeout)
+        with self._rpc_lock:
+            self._rid += 1
+            rid = self._rid
+            self.cmd_q.put((rid, msg))
+            deadline = time.monotonic() + timeout
+            while True:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    raise TimeoutError(f"control rpc {msg[0]!r} rid={rid} timed out after {timeout}s")
+                try:
+                    reply = self.reply_q.get(timeout=left)
+                except queue.Empty:
+                    raise TimeoutError(f"control rpc {msg[0]!r} rid={rid} timed out after {timeout}s") from None
+                if reply.get("rid") == rid:
+                    break
+                self.stale_replies += 1
+        reply.pop("rid", None)
         if reply.get("error"):
             raise RuntimeError(reply["error"])
         return reply
@@ -387,7 +410,7 @@ class SplitControl:
         if self.proc is not None and self.proc.is_alive():
             try:
                 self.emit_q.put(None, timeout=2)
-                self.cmd_q.put(("stop",), timeout=2)
+                self.cmd_q.put((0, ("stop",)), timeout=2)
                 self.reply_q.get(timeout=20)
             except Exception:
                 pass

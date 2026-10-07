@@ -8,7 +8,8 @@ FRAME = 64
 HDR = struct.Struct(">BBHIqQd")
 CFG = struct.Struct(">BBBBHIIIII")
 STATS = struct.Struct(">IIIIIIII")
-K_UP, K_TOMB, K_RESET, K_STATS_REQ, K_CONFIG, K_ACK, K_STATS, K_RESET_DONE = 1, 2, 3, 4, 5, 6, 7, 8
+STATS2 = struct.Struct(">IIIIIIII")
+K_UP, K_TOMB, K_RESET, K_STATS_REQ, K_CONFIG, K_ACK, K_STATS, K_RESET_DONE, K_STATS2 = 1, 2, 3, 4, 5, 6, 7, 8, 9
 WIRE_BYTES = 104
 
 # mode, merge, priority, adaptive, dedup, global_topk
@@ -16,10 +17,14 @@ POLICIES: dict[str, tuple[int, int, int, int, int, int]] = {
     "FullSync": (0, 0, 0, 0, 0, 0),
     "RateFIFO": (1, 0, 0, 0, 0, 0),
     "StaticSemantic": (4, 1, 1, 0, 2, 0),
+    "StaticTopK": (4, 1, 1, 0, 2, 16),
+    "BoundedFIFO16": (6, 0, 0, 0, 0, 0),
+    "BoundedFIFO64": (6, 0, 0, 0, 0, 0),
     "Adaptive": (5, 1, 1, 1, 2, 16),
     "AdaptiveNoPriority": (5, 1, 0, 1, 2, 16),
     "Ideal": (0, 0, 0, 0, 0, 0),
 }
+POLICY_MAX_QUEUE: dict[str, int] = {"BoundedFIFO16": 16, "BoundedFIFO64": 64}
 
 
 def frame(kind: int, instance: int, cell: int, seq: int, coverage: int, digest: int, t: float, payload: bytes = b"") -> bytes:
@@ -28,6 +33,7 @@ def frame(kind: int, instance: int, cell: int, seq: int, coverage: int, digest: 
 
 def config_frame(cell: int, policy: str, *, max_queue: int, max_inflight: int, rate_frames_per_s: float, rate_burst: int) -> bytes:
     mode, merge, priority, adaptive, dedup, topk = POLICIES[policy]
+    max_queue = POLICY_MAX_QUEUE.get(policy, max_queue)
     payload = CFG.pack(
         mode, merge, priority, adaptive, dedup, topk,
         max_queue, max_inflight, int(rate_frames_per_s * 1000), rate_burst,

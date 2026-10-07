@@ -318,8 +318,9 @@ async def run_e2e(
     gpu_rho: float = 0.0, link_bit_s: int = 0,
 ) -> None:
     formal = load_formal()
-    prepare_fixed_gateway(link_bit_s or None)
-    control = SplitControl(senders=noise_senders)
+    link = int(link_bit_s) if link_bit_s else 1_000_000_000
+    prepare_fixed_gateway(link)
+    control = SplitControl(senders=noise_senders, link_bit_s=link)
     pinned: list[tuple[int, set[int]]] = []
     vllm_roots: list[int] = []
     try:
@@ -369,6 +370,7 @@ async def run_e2e(
                             "seq0": 100_000_000,
                             "workers": noise_workers,
                         })
+                        noise_t0 = time.perf_counter()
                         shadows = [formal.ShadowCache(kv_tokens) for _ in range(4)]
                         truth: dict[tuple[int, int], int] = {}
                         placement = Placement()
@@ -599,6 +601,8 @@ async def run_e2e(
                             with contextlib.suppress(asyncio.CancelledError):
                                 await probe_task
                             noise_sent = control.end_noise()
+                            noise_t1 = time.perf_counter()
+                        stats_end = control.stats()
                         stats = {}
                         previous_received = -1
                         for _settle in range(12):
@@ -646,9 +650,12 @@ async def run_e2e(
                             return sum(values) / len(values) if values else 0.0
 
                         elapsed = max(time.perf_counter() - started, 1e-6)
+                        noise_window = max(noise_t1 - noise_t0, 1e-6)
+                        forwarded_end = int(stats_end.get("relay_forwarded") or 0)
                         drop_keys = (
                             "relay_drop_rate_limit", "relay_drop_superseded", "relay_drop_replica_cap",
                             "relay_drop_low_utility", "relay_drop_queue_drop", "relay_drop_expired",
+                            "relay_drop_global_topk",
                         )
                         forwarded = int(stats.get("relay_forwarded") or 0)
                         received = int(stats.get("relay_received") or 0)
@@ -718,8 +725,12 @@ async def run_e2e(
                             "ledger_accounted": accounted,
                             "ledger_ingress_gap": gap(sent_total, received),
                             "ledger_balance_gap": gap(received, accounted),
-                            "offered_noise_per_s": noise_sent / elapsed,
-                            "measured_rho": (noise_sent / elapsed / capacity) if capacity else 0.0,
+                            "ledger_stale_cell": int(stats.get("relay_drop_stale_cell") or 0),
+                            "noise_window_s": noise_window,
+                            "offered_noise_per_s": noise_sent / noise_window,
+                            "measured_rho": (noise_sent / noise_window / capacity) if capacity else 0.0,
+                            "congested_fraction": int(stats.get("relay_congested_ms") or 0) / 1000.0 / noise_window,
+                            "rpc_stale_replies": control.stale_replies,
                             "gateway_cpu": gateway_cpu,
                             "vllm_pinned": len(pinned),
                             "capacity_events_per_s": capacity,
@@ -733,7 +744,8 @@ async def run_e2e(
                             "noise_coverage": NOISE_COVERAGE,
                             "noise_workers": noise_workers,
                             "noise_senders": noise_senders,
-                            "forwarded_per_s": forwarded / elapsed,
+                            "forwarded_per_s": forwarded_end / noise_window,
+                            "forwarded_total_per_cell_s": forwarded / elapsed,
                             **stats,
                         }
                         rows.append(summary)

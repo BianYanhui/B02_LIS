@@ -212,6 +212,154 @@ def main() -> None:
                  "status": "PASS" if elapsed < 0.5 and r.drops["superseded"] == 20_000 else "FAIL",
                  "detail": json.dumps({"elapsed_s": round(elapsed, 3), "superseded": r.drops["superseded"], "queued": len(r.queue)})})
 
+    def fill(target, n, base=0):
+        for i in range(n):
+            target.queue.append(up(base + i, digest=base + i)[0])
+
+    r = relay()
+    configure(r, gw.MODE_ADAPTIVE, merge=True, priority=True, adaptive=True, dedup=2)
+    fill(r, 8)
+    first = r.congested()
+    started_hold = r.queue_high_since
+    for _ in range(3):
+        r.queue.pop()
+    mid = r.congested()
+    kept = r.queue_high_since == started_hold and started_hold is not None
+    fill(r, 3, base=100)
+    r.queue_high_since = time.monotonic() - 1.0
+    latched = r.congested()
+    rows.append({"policy": "Adaptive", "check": "B1 middle band keeps the enter hold, latch after hold",
+                 "status": "PASS" if first is False and mid is False and kept and latched is True and r.congested_entries == 1 else "FAIL",
+                 "detail": json.dumps({"first": first, "mid": mid, "kept": kept, "latched": latched, "entries": r.congested_entries})})
+
+    r = relay()
+    configure(r, gw.MODE_ADAPTIVE, merge=True, priority=True, adaptive=True, dedup=2)
+    r.queue_high_since = time.monotonic() - 1.0
+    fill(r, 2)
+    low = r.congested()
+    cleared = r.queue_high_since is None
+    fill(r, 6, base=50)
+    r.queue_high_since = time.monotonic() - 1.0
+    r.congested()
+    for _ in range(2):
+        r.queue.pop()
+    r.congested()
+    still = r.congested_latched and r.queue_low_since is None
+    r.queue.clear()
+    r.congested()
+    r.queue_low_since = time.monotonic() - 1.0
+    exited = r.congested() is False and r.congested_latched is False
+    rows.append({"policy": "Adaptive", "check": "B1 low band clears enter timer; latch survives middle band; exit after hold",
+                 "status": "PASS" if low is False and cleared and still and exited else "FAIL",
+                 "detail": json.dumps({"low": low, "cleared": cleared, "still": still, "exited": exited})})
+
+    r = relay()
+    configure(r, gw.MODE_STATIC, merge=True)
+    for seq in range(12):
+        frame, sent = up(seq, digest=seq % 4, coverage=256)
+        r.enqueue(frame, gw.K_UP, 0, seq, 256, seq % 4, sent)
+    rows.append({"policy": "StaticSemantic", "check": "N8 ghosts excluded from live depth",
+                 "status": "PASS" if len(r.queue) == 12 and r.live_depth() == 4 and len(r.superseded_ids) == 8 else "FAIL",
+                 "detail": json.dumps({"deque": len(r.queue), "live": r.live_depth(), "ghosts": len(r.superseded_ids)})})
+
+    r = relay()
+    configure(r, gw.MODE_ADAPTIVE, merge=True, priority=True, adaptive=True, dedup=2)
+    r.global_topk = 4
+    for seq in range(4):
+        frame, sent = up(seq, owner=0, digest=100 + seq, coverage=2048)
+        r.enqueue(frame, gw.K_UP, 0, seq, 2048, 100 + seq, sent)
+    frame, sent = tomb(10, owner=0, digest=100)
+    r.enqueue(frame, gw.K_TOMB, 0, 10, 0, 100, sent)
+    freed = 100 not in r.topk_best and 100 not in r.topk_refs
+    frame, sent = up(11, owner=1, digest=200, coverage=512)
+    r.enqueue(frame, gw.K_UP, 1, 11, 512, 200, sent)
+    rows.append({"policy": "Adaptive", "check": "B2 superseded upsert releases its top-k slot",
+                 "status": "PASS" if freed and r.drops["global_topk"] == 0 and 200 in r.topk_best else "FAIL",
+                 "detail": json.dumps({"freed": freed, "global_topk": r.drops["global_topk"], "best": sorted(r.topk_best)})})
+
+    r = relay()
+    configure(r, gw.MODE_ADAPTIVE, merge=True, priority=True, adaptive=True, dedup=2)
+    r.global_topk = 4
+    for seq in range(2):
+        frame, sent = up(seq, digest=5, coverage=1024)
+        r.enqueue(frame, gw.K_UP, 0, seq, 1024, 5, sent)
+    sent_frame = r._dequeue()
+    unpacked = gw.HDR.unpack(sent_frame[:32])
+    rows.append({"policy": "Adaptive", "check": "B2 ghost skip and dequeue leave no top-k entry",
+                 "status": "PASS" if unpacked[3] == 1 and not r.topk_best and not r.topk_refs else "FAIL",
+                 "detail": json.dumps({"seq": unpacked[3], "best": sorted(r.topk_best)})})
+
+    r = relay()
+    configure(r, gw.MODE_ADAPTIVE, merge=True, priority=True, adaptive=True, dedup=2)
+    r.global_topk = 1
+    frame, sent = up(1, digest=9, coverage=2048)
+    r.enqueue(frame, gw.K_UP, 0, 1, 2048, 9, sent)
+    data = r._dequeue()
+    gone = 9 not in r.topk_best
+    r._requeue_front(data)
+    rows.append({"policy": "Adaptive", "check": "B2 requeue restores the top-k slot",
+                 "status": "PASS" if gone and r.topk_best.get(9) == 2048 and r.topk_refs.get(9) == 1 else "FAIL",
+                 "detail": json.dumps({"gone": gone, "best": dict(r.topk_best), "refs": dict(r.topk_refs)})})
+
+    r = relay()
+    r.drops["global_topk"] = 7
+    r.drops["stale_cell"] = 2
+    unpacked = gw.STATS2.unpack(r.stats2_payload())
+    rows.append({"policy": "Adaptive", "check": "B4 STATS2 carries global_topk, stale_cell, live depth",
+                 "status": "PASS" if unpacked[0] == 7 and unpacked[1] == 2 and unpacked[3] == r.live_depth() else "FAIL",
+                 "detail": json.dumps({"stats2": list(unpacked)})})
+
+    r = relay()
+    reasons: list[str | None] = []
+    r.emit_update = lambda *args, **kwargs: reasons.append(kwargs.get("reason"))
+    configure(r, gw.MODE_ADAPTIVE, merge=True, adaptive=True)
+    r.global_topk = 1
+    frame, sent = up(1, digest=1, coverage=2048)
+    r.enqueue(frame, gw.K_UP, 0, 1, 2048, 1, sent)
+    frame, sent = up(2, digest=2, coverage=256)
+    r.enqueue(frame, gw.K_UP, 0, 2, 256, 2, sent)
+    rows.append({"policy": "Adaptive", "check": "B6 top-k suppression reason is global_topk",
+                 "status": "PASS" if r.drops["global_topk"] == 1 and "global_topk" in reasons and "low_utility" not in reasons else "FAIL",
+                 "detail": json.dumps({"drops": r.drops["global_topk"], "reasons": reasons})})
+
+    r = relay()
+    r.mode = gw.MODE_BOUNDED
+    r.max_queue = 16
+    for seq in range(20):
+        frame, sent = up(seq, digest=seq)
+        r.enqueue(frame, gw.K_UP, 0, seq, 1024, seq, sent)
+    frame, sent = tomb(20)
+    r.enqueue(frame, gw.K_TOMB, 0, 20, 0, 7, sent)
+    r._dequeue()
+    frame, sent = up(21, digest=21)
+    r.enqueue(frame, gw.K_UP, 0, 21, 1024, 21, sent)
+    rows.append({"policy": "BoundedFIFO", "check": "tail drop at max_queue; space reopens after dequeue",
+                 "status": "PASS" if r.drops["queue_drop"] == 5 and r.live_depth() == 16 else "FAIL",
+                 "detail": json.dumps({"queue_drop": r.drops["queue_drop"], "live": r.live_depth()})})
+
+    r = relay()
+    r.mode = gw.MODE_BOUNDED
+    r.max_queue = 0
+    for seq in range(3):
+        frame, sent = up(seq, digest=seq)
+        r.enqueue(frame, gw.K_UP, 0, seq, 1024, seq, sent)
+    rows.append({"policy": "BoundedFIFO", "check": "max_queue 0 means unbounded",
+                 "status": "PASS" if len(r.queue) == 3 and r.drops["queue_drop"] == 0 else "FAIL",
+                 "detail": json.dumps({"queue": len(r.queue)})})
+
+    r = relay()
+    configure(r, gw.MODE_STATIC, merge=True, priority=True, dedup=2)
+    r.global_topk = 16
+    r.ewma_dq = 10.0
+    for seq in range(64):
+        frame, sent = up(seq, digest=seq + 1, coverage=256)
+        r.enqueue(frame, gw.K_UP, 0, seq, 256, seq + 1, sent)
+    frame, sent = up(80, digest=9000, coverage=4096)
+    r.enqueue(frame, gw.K_UP, 0, 80, 4096, 9000, sent)
+    rows.append({"policy": "StaticTopK", "check": "k stays 16 under delay; long prefix admitted; no low_utility",
+                 "status": "PASS" if r.live_depth() == 16 and 9000 in r.topk_best and r.drops["low_utility"] == 0 else "FAIL",
+                 "detail": json.dumps({"live": r.live_depth(), "has_long": 9000 in r.topk_best, "low_utility": r.drops["low_utility"]})})
+
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="") as handle:
