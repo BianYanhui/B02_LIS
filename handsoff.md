@@ -28,47 +28,48 @@
 
 ## 可变交接
 
-更新时间：2026-10-07 12:11（UTC+8）。链路受限 smoke 已结束，代码已推送。没有实验进程。不要开正式矩阵，不要启动 `overnight.py` 或 `full_queue.py`。
+更新时间：2026-10-07 16:15（UTC+8）。Round 4b 里和现码对得上的准入、记账、链路回读已经提交并推送。短 smoke 已结束。没有实验进程。不要开正式矩阵，不要启动 `overnight.py` 或 `full_queue.py`。
 
 ### 正在做的事
 
-上一份交接里的实验代码已经在 `7e41dfa` 提交并推送。其后按根因意见改了网关准入，并跑了一格 10 Mbit 的短 smoke，看 Adaptive 在策略队列成为瓶颈时是否好于 FullSync / StaticSemantic。
+对照 Round 4b 改了现码里确实存在、而且会让上一格 smoke 读错的部分。没有做容量标定、`full_queue` 改写、批量读写、P2 工作负载，也没有启用 B1b。
 
-`f3a0058` 改了三处。`experiments/4t4/net/gateway_relay_4t4.py`：进队前按 coverage 做 O(limit) 的 top-k 拒绝，不再每帧拆整条 FIFO；拥塞要队列降到 `--adaptive-queue-exit`（默认 2）并保持 `--congestion-exit-hold`（默认 0.5 s）才清除；`recent` 用 `OrderedDict.popitem`；读循环每 256 帧 `sleep(0)`。`experiments/icc_kv/runtime.py` 的 `prepare_fixed_gateway(link_bit_s)` 接受一次固定天花板，默认仍是 1 Gbit。`experiments/icc_kv/e2e.py` 增加 `--link-bit`，0 表示 1 Gbit。单测 `experiments/4t4/test_policies.py` 已通过，输出在 `/tmp/icc_policy_checks.csv`。镜像 `b02-gw4t4` 为 `sha256:d95dcb1f13e9`，创建于 2026-10-06 09:20 UTC。
+代码在 `c741937`。`experiments/4t4/net/gateway_relay_4t4.py`、`experiments/4t4/test_policies.py`、`experiments/icc_kv/wire.py`、`runtime.py`、`split_path.py`、`e2e.py`。中间区间不再清掉拥塞进入计时；深度不计幽灵帧；top-k 用引用计数；`K_STATS2` 带上 `global_topk` 和拥塞时间；子进程拿到真实链路速率并回读 tc；`prepare_fixed_gateway` 带 `--rebuild` 并核对 `/opt/gateway_relay_4t4.py` 的 sha256。新增 `StaticTopK`、`BoundedFIFO16`、`BoundedFIFO64`。单测 24/24 PASS，输出 `/tmp/icc_policy_checks.csv`。摘要里的 `commit` 仍是 `5010848`，因为 smoke 跑在提交之前。
 
 ### 当前状态
 
 已完成，停着。没有 `experiments.icc_kv`、`overnight` 或 `full_queue` 进程。
 
-Smoke：`/tmp/icc_link_smoke/e2e_summary.json`，4 行，`failed_requests` 全是 0。命令是容量 8000、场景 ultrahigh、方法 Ideal,FullSync,StaticSemantic,Adaptive、种子 1、每格 20 条、到达率 0.237、噪声发送端 8、`--link-bit 10000000`。容器里 `tc class show dev eth0` 是 `rate 10Mbit`。摘要字段 `fixed_link_bit_s` 仍是 1000000000，因为 `ACTIVE_LINK_BIT_S` 写在父进程，子进程的 `meta()` 读到的是默认值。不要用这个字段判断天花板。`offered_noise_per_s` 约 14500，`forwarded_per_s` 约 8200–9400，`gateway_cpu` 约 0.49–0.64。顺序是 StaticSemantic、Ideal、FullSync、Adaptive。
+Smoke：`/tmp/icc_link_smoke2/e2e_summary.json`，7 行，`failed_requests` 全是 0。容量 8000，场景 ultrahigh，每格 20 条，到达率 0.237，噪声发送端 8，`--link-bit 10000000`。摘要 `fixed_link_bit_s` 和 `tc_link_bit_s` 都是 10000000，`stats2_missing` 全是 0，`ledger_balance_gap` 和 `ledger_ingress_gap` 都约等于 0。`offered_noise_per_s` 约 14600，`forwarded_per_s` 约 7800–9500，`gateway_cpu` 约 0.51–0.65。摘要里的 `commit` 仍是 `5010848`，因为这次跑的是未提交工作区；容器内源码哈希和仓库文件一致，都是 `6ed88fbebeee`。
 
-| 方法 | prefill | 假阴性 | 错放 | 前景 P95 | 前景送达 | 失效 P95 | 队列峰值 | 命中 TTFT |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Ideal | 2702 | 0 | 0 | — | 本地 | — | 582k | 1061 ms（7） |
-| FullSync | 2905 | 0.20 | 0.15 | 39.0 s | 12/20 | 25.7 s | 572k | 1378 ms（5） |
-| StaticSemantic | 3315 | 0.30 | 0.30 | 37.1 s | 6/20 | 14 ms | 552k | 4579 ms（3） |
-| Adaptive | 2497 | 0 | 0 | 14 ms | 20/20 | 12 ms | 17 | 1180 ms（8） |
+| 方法 | prefill | 假阴性 | 错放 | 前景 P95 | 前景送达 | 失效未送达 | 队列峰值 | global_topk 丢弃 | queue_drop | 命中 TTFT |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Ideal | 2702 | 0 | 0 | — | 本地 | 0 | 567k | 0 | 0 | 1330 ms（7） |
+| FullSync | 3317 | 0.25 | 0.25 | 38.1 s | 9/20 | 1 | 615k | 0 | 0 | 2424 ms（3） |
+| StaticSemantic | 3315 | 0.30 | 0.30 | 38.4 s | 7/20 | 0 | 564k | 0 | 0 | 4341 ms（3） |
+| BoundedFIFO16 | 3110 | 0.25 | 0.15 | 16 ms | 12/20 | 3 | 16 | 0 | 581k | 2250 ms（3） |
+| BoundedFIFO64 | 2907 | 0.15 | 0.15 | 22 ms | 11/20 | 1 | 64 | 0 | 569k | 1570 ms（5） |
+| StaticTopK | 2497 | 0 | 0 | 12 ms | 20/20 | 0 | 18 | 490k | 0 | 1147 ms（8） |
+| Adaptive | 2497 | 0 | 0 | 12 ms | 20/20 | 0 | 18 | 462k | 0 | 1234 ms（8） |
 
-假阴性是 `loose_false_negative_rate`，错放是 `wrong_placement_rate`。StaticSemantic 的失效走优先队列，所以失效仍是 14 ms，普通更新没有。Adaptive 的 `low_utility` 是 0，队列停在 17，说明丢掉的是 top-16 之外的噪声。收到 1304843、转发 844974、结束队列 0，`ledger_balance_gap` 约 0.35。STATS 帧没有 `global_topk` 栏，这 35% 就是那些丢弃，不是丢包。
+Adaptive 的 `congested_fraction`、`relay_congested_entries`、`relay_drop_low_utility` 都是 0。队列只有大约 16 帧，链路把它们排空的时间短于 0.2 s 的进入保持，所以拥塞没有锁住。这一格 Adaptive 和 StaticTopK 相同，都好于 FullSync / StaticSemantic。BoundedFIFO 把队列变短，但前景更新和墓碑会被尾丢，假阴性没有掉到 0。不要把 prefill 写成超过 Ideal 的服务时间优势，只有 20 条。上一次 `/tmp/icc_validate_smoke/e2e_b` 仍是单核打满的另一件事。`/tmp/icc_link_smoke/` 是改记账之前的 4 格，不要和这格混用。
 
-结论：这条 10 Mbit 链路上，Adaptive 的前景和失效都在十几毫秒，假阴性和错放为 0，与 Ideal 同侧；FullSync / StaticSemantic 的前景积压到约 37–39 秒。prefill 和端到端 TTFT 方向相同，但只有 20 条，而且 Adaptive 的 prefill 低于 Ideal，不能写成服务时间优势。命中服务 TTFT 是 Adaptive 1180 ms、Ideal 1061 ms。上一次 `/tmp/icc_validate_smoke/e2e_b`（约 44000 帧/秒、网关 CPU 约 1、前景 Adaptive 1.15 s）仍然成立，那是单核打满，不要和这格混成一个结论。`/tmp/icc_validate_smoke/e2e` 仍是序号 bug 之前的一行，不要用。
-
-机器：vLLM 仍是 127.0.0.1:8000–8003，pid 8000=`1375061`、8001=`1375062`、8002=`1375063`、8003=`1375064`，从 2026-09-28 08:52 UTC 起。四张 GPU 利用率 0，显存约 6.7 GiB / 15 GiB。网关容器 `71ce28c1209e`（`b02-gateway4t4`，Up 19 hours）只听 `127.0.0.1:9710`，HTB 仍是这次 smoke 留下的 10 Mbit。9711 没有监听。背景容器 `a81eb1b9461b`（`b02-bgserver4t4`）。没人要求就不要停这些进程。下一次不带 `--link-bit` 的 `prepare_fixed_gateway()` 会把天花板改回 1 Gbit。
+机器：vLLM 仍是 127.0.0.1:8000–8003，pid `1375061`–`1375064`。四张 GPU 利用率 0，显存约 6.7 GiB / 15 GiB。网关容器 `6bbed5838299`（`b02-gateway4t4`，Up 12 minutes）听 `127.0.0.1:9710`，HTB 仍是 10 Mbit。9711 没有监听。没人要求就不要停 vLLM。下一次不带 `--link-bit` 的 `prepare_fixed_gateway()` 会把天花板改回 1 Gbit，并重建镜像。
 
 ### 下一步
 
-用户说「继续」时，不要开正式矩阵，也不要重跑 smoke。只修两处记账：子进程 `meta()` 要报出真正的 HTB 天花板；STATS 帧要带上 `global_topk` 丢弃数。改完停下来等用户决定要不要加长这格。
+用户说「继续」时，不要开正式矩阵，也不要重跑这格。拥塞没有锁住是测到的事实；B1b 会改方法本身，没有用户点头不要加。等用户看完 `c741937` 再决定论文主张怎么写。
 
 ### 已经定下来的约束
 
-- 默认天花板仍是 1 Gbit，不要按 ρ 改 HTB、tau、效用系数。这次 10 Mbit 只是 `--link-bit 10000000` 的一格 smoke。Gateway `--cpus 1 --cpuset-cpus 0`。
-- 背景噪声 coverage 256，请求前缀 `U0000`–`U0015` coverage 4096。
+- 默认天花板仍是 1 Gbit，不要按 ρ 改 HTB、tau、效用系数。10 Mbit 只用于 `--link-bit 10000000`。Gateway `--cpus 1 --cpuset-cpus 0`。
+- 背景噪声 coverage 256，请求前缀 `U0000`–`U0015` coverage 4096。`StaticTopK` 和 Adaptive 的 k 都是 16，等于 `USEFUL_POOL`。
 - 不要把 4 张 GPU 写成大规模系统。不要把 0.73–3.04 updates/s 和 84.5×10³ updates/s 写成同一个瓶颈。
-- 正式结果不要写回 `e2e_full`、`scale_c13000`、`burst_c13000`、`ablation_c13000`，也不要写进 `/tmp/icc_validate_smoke/`。
+- 正式结果不要写回 `e2e_full`、`scale_c13000`、`burst_c13000`、`ablation_c13000`，也不要写进 `/tmp/icc_validate_smoke/` 或 `/tmp/icc_link_smoke/`。
 - Python：`/home/byh/B02/poc/.venv/bin/python`。`analysis/icc_kv/` 在 `.gitignore`。
 
 ### Git
 
-分支 `main`，与 `origin/main` 同步。HEAD 是 `f3a0058`（Drop frames that miss the coverage cap before they enter the queue.）。上一笔是 `7e41dfa`。不要 amend。
+分支 `main`。代码 HEAD 是 `c741937`（Keep congestion armed across a shallow dip and count every top-k drop.）。上一笔是 `5010848`。不要 amend。
 
-不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`。
+不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`、`/tmp/icc_link_smoke2/`。
