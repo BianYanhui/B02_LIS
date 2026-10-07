@@ -315,10 +315,10 @@ async def run_e2e(
     seeds: int, requests_per_run: int, concurrency: int, kv_tokens: int, out_dir: Path,
     open_loop: bool = True, arrival_rate: float = 1.25, invalidate_every: int = 8,
     noise_workers: int = 4, noise_senders: int = 4, warmup_requests: int = 0,
-    gpu_rho: float = 0.0,
+    gpu_rho: float = 0.0, link_bit_s: int = 0,
 ) -> None:
     formal = load_formal()
-    prepare_fixed_gateway()
+    prepare_fixed_gateway(link_bit_s or None)
     control = SplitControl(senders=noise_senders)
     pinned: list[tuple[int, set[int]]] = []
     vllm_roots: list[int] = []
@@ -783,6 +783,8 @@ def main() -> None:
     parser.add_argument("--noise-senders", type=int, default=4)
     parser.add_argument("--warmup-requests", type=int, default=0)
     parser.add_argument("--out-dir", type=Path, default=OUT / "e2e")
+    parser.add_argument("--link-bit", type=int, default=0,
+                        help="fixed HTB ceiling for every cell; 0 keeps 1 Gbit")
     args = parser.parse_args()
     asyncio.run(run_e2e(
         args.trace, args.capacity,
@@ -796,6 +798,7 @@ def main() -> None:
         noise_senders=args.noise_senders,
         warmup_requests=args.warmup_requests,
         gpu_rho=args.gpu_rho,
+        link_bit_s=args.link_bit,
     ))
 
 

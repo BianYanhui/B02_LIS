@@ -127,9 +127,14 @@ class Relay:
         self.queued_up: dict[tuple[int, int], bytes] = {}
         self.superseded_ids: set[int] = set()
         self.replicas: OrderedDict[int, set[int]] = OrderedDict()
-        self.recent: dict[int, float] = {}
+        self.recent: OrderedDict[int, float] = OrderedDict()
         self.ewma_dq = 0.0
         self.queue_high_since: float | None = None
+        self.queue_low_since: float | None = None
+        self.congested_latched = False
+        # digest -> coverage of the live unsent upsert. Bounded by global_topk.
+        self.topk_best: dict[int, int] = {}
+        self._read_batch = 0
         self.drops: Counter[str] = Counter()
         self.forwarded = 0
         self.received = 0
@@ -233,6 +238,10 @@ class Relay:
                     self.drops["stale_cell"] += 1
                     continue
                 self.enqueue(data, kind, instance, seq, coverage, digest, t_send)
+                self._read_batch += 1
+                if self._read_batch >= 256:
+                    self._read_batch = 0
+                    await asyncio.sleep(0)
         except (asyncio.IncompleteReadError, ConnectionResetError):
             pass
         finally:
@@ -250,13 +259,32 @@ class Relay:
         if self.ewma_dq > self.args.gate:
             return True
         now = time.monotonic()
-        if len(self.queue) >= self.args.adaptive_queue_gate:
+        high = int(self.args.adaptive_queue_gate)
+        low = int(getattr(self.args, "adaptive_queue_exit", 2))
+        enter_hold = float(getattr(self.args, "congestion_hold", 0.2))
+        exit_hold = float(getattr(self.args, "congestion_exit_hold", 0.5))
+        depth = len(self.queue)
+        if depth >= high:
+            self.queue_low_since = None
             if self.queue_high_since is None:
                 self.queue_high_since = now
-            hold = float(getattr(self.args, "congestion_hold", 0.2))
-            return now - self.queue_high_since >= hold
-        self.queue_high_since = None
-        return False
+            if now - self.queue_high_since >= enter_hold:
+                self.congested_latched = True
+        elif depth <= low:
+            self.queue_high_since = None
+            if self.congested_latched:
+                if self.queue_low_since is None:
+                    self.queue_low_since = now
+                if now - self.queue_low_since >= exit_hold:
+                    self.congested_latched = False
+                    self.queue_low_since = None
+        else:
+            # Between the two thresholds the previous decision stands.
+            # Dropping just under the enter gate must not clear the hold.
+            self.queue_low_since = None
+            if not self.congested_latched:
+                self.queue_high_since = None
+        return self.congested_latched
 
     def low_utility(self, coverage: int, t_send: float) -> bool:
         if not self.congested():
@@ -315,13 +343,20 @@ class Relay:
                              selected=False, reason="rate_limit", score=score)
             return
         if kind == K_UP:
-            if self.merge:
-                self._supersede_queued_up(instance, digest)
+            # Drop before merge, the replica map, and the queue. Those steps
+            # are the cost that used to cancel the savings of dropping noise.
             if self.low_utility(coverage, t_send):
                 self.drops["low_utility"] += 1
                 self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
                                  selected=False, reason="low_utility")
                 return
+            if self._topk_drop_new(coverage, digest):
+                self.drops["global_topk"] += 1
+                self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
+                                 selected=False, reason="low_utility")
+                return
+            if self.merge:
+                self._supersede_queued_up(instance, digest)
             if not self._admit_replica(instance, digest):
                 self.drops["replica_cap"] += 1
                 self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
@@ -335,6 +370,8 @@ class Relay:
             self.queue.append(data)
             if kind == K_UP and self.merge:
                 self.queued_up[(instance, digest)] = data
+            if kind == K_UP and self.global_topk:
+                self.topk_best[digest] = max(self.topk_best.get(digest, 0), coverage)
         self.emit_update("enqueued", kind, instance, cell, seq, coverage, digest, t_send,
                          selected=True, score=score)
         if kind == K_UP and self.global_topk:
@@ -342,32 +379,59 @@ class Relay:
         self.maxq = max(self.maxq, len(self.queue) + len(self.pqueue))
         self.queue_event.set()
 
-    def trim_global_topk(self) -> None:
-        """Keep only the highest-coverage distinct prefixes in the unsent FIFO.
+    def _topk_limit(self) -> int:
+        if not self.global_topk:
+            return 0
+        if self.congested():
+            return max(1, self.global_topk // 4)
+        return self.global_topk
 
-        The relay deliberately applies this at the shared bottleneck rather
-        than at sources: it sees all queued owners and can replace a lower
-        marginal prefix from one instance with a more valuable one from
-        another. Frames that have already entered the kernel are never
-        revoked, preserving TCP's causal ordering.
+    def _topk_worst(self) -> tuple[int, int] | None:
+        if not self.topk_best:
+            return None
+        # Lowest coverage leaves first. Equal coverage keeps the smaller digest.
+        digest, coverage = min(self.topk_best.items(), key=lambda item: (item[1], -item[0]))
+        return digest, coverage
+
+    def _topk_drop_new(self, coverage: int, digest: int) -> bool:
+        """Reject a digest that cannot enter the bounded coverage set. O(limit)."""
+        limit = self._topk_limit()
+        if limit <= 0 or digest in self.topk_best or len(self.topk_best) < limit:
+            return False
+        worst = self._topk_worst()
+        if worst is None:
+            return False
+        worst_digest, worst_coverage = worst
+        if coverage > worst_coverage:
+            return False
+        if coverage == worst_coverage and digest < worst_digest:
+            return False
+        return True
+
+    def trim_global_topk(self) -> None:
+        """Shrink the live digest set to the coverage limit.
+
+        The set is maintained as frames are admitted, so this only evicts the
+        current worst digest. It does not walk a queue that has grown without
+        bound. Frames already written to the kernel stay there.
         """
-        best: dict[int, int] = {}
-        for queued in self.queue:
-            qkind, _inst, _cell, _seq, qcoverage, qdigest, _sent = HDR.unpack(queued[:32])
-            if qkind == K_UP:
-                best[qdigest] = max(best.get(qdigest, 0), qcoverage)
-        # Adaptive mode changes state admission, not the physical link rate.
-        limit = max(1, self.global_topk // 4) if self.congested() else self.global_topk
-        keep = {digest for digest, _coverage in sorted(best.items(), key=lambda item: (-item[1], item[0]))[:limit]}
-        if len(keep) == len(best):
+        limit = self._topk_limit()
+        if limit <= 0:
             return
+        while len(self.topk_best) > limit:
+            worst = self._topk_worst()
+            if worst is None:
+                return
+            self._topk_evict(worst[0])
+
+    def _topk_evict(self, digest: int) -> None:
+        self.topk_best.pop(digest, None)
         retained: deque[bytes] = deque()
         for queued in self.queue:
             qkind, qinst, qcell, qseq, qcoverage, qdigest, qsent = HDR.unpack(queued[:32])
-            if qkind == K_UP and qdigest not in keep:
+            if qkind == K_UP and qdigest == digest and id(queued) not in self.superseded_ids:
                 self._forget_queued_up(queued)
                 self.drops["global_topk"] += 1
-                self.drops["low_utility"] += 1
                 self._forget_replica(qdigest, qinst)
                 self.emit_update("suppressed", qkind, qinst, qcell, qseq, qcoverage, qdigest, qsent,
                                  selected=False, reason="low_utility")
@@ -401,6 +465,8 @@ class Relay:
         kind, instance, _cell, _seq, _coverage, digest, _sent = HDR.unpack(data[:32])
         if kind == K_UP and self.queued_up.get((instance, digest)) is data:
             del self.queued_up[(instance, digest)]
+            if self.global_topk and not any(other == digest for _inst, other in self.queued_up):
+                self.topk_best.pop(digest, None)
 
     def _requeue_front(self, data: bytes) -> None:
         kind, instance, _cell, _seq, _coverage, digest, _sent = HDR.unpack(data[:32])
@@ -421,6 +487,9 @@ class Relay:
         self.inflight_event.set()
         self.ewma_dq = 0.0
         self.queue_high_since = None
+        self.queue_low_since = None
+        self.congested_latched = False
+        self.topk_best.clear()
         self.drops.clear()
         self.forwarded = 0
         self.received = 0
@@ -527,9 +596,9 @@ class Relay:
                              selected=True,
                              score=self.score(coverage, t_send) if self.agecov else None)
             self.recent[seq] = t_send
-            if len(self.recent) > RECENT_KEEP:
-                for old in list(self.recent)[: len(self.recent) - RECENT_KEEP]:
-                    self.recent.pop(old, None)
+            self.recent.move_to_end(seq)
+            while len(self.recent) > RECENT_KEEP:
+                self.recent.popitem(last=False)
             if kind == K_TOMB:
                 self._forget_replica(digest, instance)
 
@@ -594,6 +663,10 @@ def main() -> None:
                         help="queued upserts that trigger proactive adaptive admission")
     parser.add_argument("--congestion-hold", type=float, default=0.2,
                         help="seconds the pre-link queue must stay above the gate before adaptive admission treats it as congestion")
+    parser.add_argument("--congestion-exit-hold", type=float, default=0.5,
+                        help="seconds the queue must stay at or below --adaptive-queue-exit before congestion clears")
+    parser.add_argument("--adaptive-queue-exit", type=int, default=2,
+                        help="queue depth that can clear adaptive congestion after --congestion-exit-hold")
     parser.add_argument("--quiet", action="store_true",
                         help="do not print a JSON line per frame; counters and the 2s tick remain")
     args = parser.parse_args()

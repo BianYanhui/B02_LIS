@@ -29,6 +29,7 @@ RELAY_PORT = 9710
 DISPATCH_PORT = 9711
 # One fixed ceiling. Utilization is later L/C, never a new tc rate.
 FIXED_LINK_BIT_S = 1_000_000_000
+ACTIVE_LINK_BIT_S = FIXED_LINK_BIT_S
 MAX_QUEUE = 4096
 MAX_INFLIGHT = 0
 # Harness noise uses worker ids at or above this value. Those frames are
@@ -48,10 +49,17 @@ def bridge_ip() -> str:
     return out
 
 
-def prepare_fixed_gateway() -> str:
-    """Recreate the 4T4 gateway once: 1 CPU, fixed HTB ceiling, bounded logs."""
+def prepare_fixed_gateway(link_bit_s: int | None = None) -> str:
+    """Recreate the 4T4 gateway once: 1 CPU, one HTB ceiling, bounded logs.
+
+    link_bit_s stays at the 1 Gbit ceiling unless a run passes one lower
+    value for the whole matrix. It is not retuned per rho.
+    """
     sh(["bash", str(NET / "setup_net_4t4.sh")])
     ip = bridge_ip()
+    global ACTIVE_LINK_BIT_S
+    link = int(link_bit_s) if link_bit_s else FIXED_LINK_BIT_S
+    ACTIVE_LINK_BIT_S = link
     subprocess.check_call(["docker", "rm", "-f", "b02-gateway4t4"], stdout=subprocess.DEVNULL)
     subprocess.check_call([
         "docker", "run", "-d", "--name", "b02-gateway4t4", "--network", "b02-4t4-net",
@@ -63,15 +71,15 @@ def prepare_fixed_gateway() -> str:
         "--gate", "2", "--adaptive-queue-gate", "8",
         "--congestion-hold", "0.2", "--quiet",
     ])
-    half = FIXED_LINK_BIT_S // 2
+    half = link // 2
     subprocess.check_call(["docker", "exec", "b02-gateway4t4", "sh", "-c", f"""
       set -e
       ip link set dev eth0 mtu 296
       tc qdisc replace dev eth0 root handle 1: htb default 20
-      tc class add dev eth0 parent 1: classid 1:1 htb rate {FIXED_LINK_BIT_S}bit
-      tc class add dev eth0 parent 1:1 classid 1:10 htb rate {half}bit ceil {FIXED_LINK_BIT_S}bit
-      tc class add dev eth0 parent 1:1 classid 1:20 htb rate {half}bit ceil {FIXED_LINK_BIT_S}bit
-      tc class add dev eth0 parent 1:1 classid 1:30 htb rate {FIXED_LINK_BIT_S}bit ceil {FIXED_LINK_BIT_S}bit
+      tc class add dev eth0 parent 1: classid 1:1 htb rate {link}bit
+      tc class add dev eth0 parent 1:1 classid 1:10 htb rate {half}bit ceil {link}bit
+      tc class add dev eth0 parent 1:1 classid 1:20 htb rate {half}bit ceil {link}bit
+      tc class add dev eth0 parent 1:1 classid 1:30 htb rate {link}bit ceil {link}bit
       tc qdisc add dev eth0 parent 1:10 handle 10: bfifo limit 65536
       tc qdisc add dev eth0 parent 1:20 handle 20: bfifo limit 65536
       tc qdisc add dev eth0 parent 1:30 handle 30: bfifo limit 8192
@@ -350,7 +358,7 @@ class PathRuntime:
     def meta(self) -> dict:
         return {
             "commit": git_commit(),
-            "fixed_link_bit_s": FIXED_LINK_BIT_S,
+            "fixed_link_bit_s": ACTIVE_LINK_BIT_S,
             "gateway_cpus": 1,
             "gateway_cpuset": "0",
             "dispatcher_cpuset": "1",
