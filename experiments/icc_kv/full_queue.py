@@ -32,7 +32,7 @@ BLOCKS = {
     },
     "ksweep": {
         "scenarios": "ultrahigh",
-        "methods": "StaticTopK4,StaticTopK8,StaticTopK16,StaticTopK64,BoundedSemantic4,BoundedSemantic16,BoundedSemantic64,Ideal",
+        "methods": "StaticTopK4,StaticTopK8,StaticTopK16,StaticTopK32,StaticTopK64,BoundedSemantic4,BoundedSemantic16,BoundedSemantic64,Ideal",
         "seeds": 2,
         "workload": "ov30",
     },

@@ -1,14 +1,14 @@
 # PREREG：ICC KV 覆盖优先有界准入，正式实验预注册
 
 > 本文件用于预先固定分析与剔除规则。仓库中的 `docs/icc_formal/PREREG.md` 是**空白模板，不要修改仓库内的这份**。**正式 Run A 开始前**，先复制一份（`cp docs/icc_formal/PREREG.md ~/icc_formal/PREREG.md`），在副本里填好所有 `<…>`，再原样放进每个结果目录（`<A_DIR>/PREREG.md`、`<B_DIR>/PREREG.md`），并记录它的 sha256（见 RUN_GUIDE §1.8）。开跑后，填好的副本**只能追加**（追加到 §12「开跑后记录」），不允许修改 §1–§11。
-> 字段名与 CLI 均已对照 commit `3991559` 的源码核实（`experiments/icc_kv/{e2e,full_queue,path_capacity,capacity_window,runtime,wire}.py`）。无法核实的条目标为 **未核实**。
+> 字段名与 CLI 均已对照 commit `bc59945`（与 3991559 相同）的源码核实（`experiments/icc_kv/{e2e,full_queue,path_capacity,capacity_window,runtime,wire}.py`）。无法核实的条目标为 **未核实**。
 
 ## 0. 身份
 
 | 项 | 值 |
 |---|---|
 | 预注册日期（UTC+8） | `<YYYY-MM-DD HH:MM>`（必须早于 Run A 第一个 cell 的时间） |
-| 实验代码 sha（CODE_SHA） | `<CODE_SHA>`：`experiments/` 最后一次改动所在的 commit。不改 k32 时为 `3991559`；做了 StaticTopK32 一行改动时为那个 commit |
+| 实验代码 sha（CODE_SHA） | `bc59945`：`experiments/` 最后一次改动所在的 commit。已加入 StaticTopK32，相对 `3991559` 只改了 `full_queue.py` 中 ksweep methods 这一行 |
 | 运行时 HEAD（RUN_SHA） | `<RUN_SHA>`：开跑时的 `git rev-parse --short HEAD`，等于 summary 的 `commit` 字段。docs-only commit（加入 `docs/icc_formal/`）不改变实验代码，所以 RUN_SHA 可以与 CODE_SHA 不同 |
 | `git diff --stat <CODE_SHA> <RUN_SHA> -- experiments` 为空 | `<是/否>`（必须为是） |
 | `git rev-parse HEAD` 与 `origin/main` 一致 | `<是/否>` |
@@ -47,12 +47,12 @@
 | 噪声 | `--noise-senders 8`、`--noise-workers 4`（默认）、`--invalidate-every 8`（默认） | row `noise_senders`、`noise_workers`、`invalidate_every` |
 | 开环 | 是（full_queue 不传 `--closed-loop`） | row `open_loop` |
 
-### 2.1 各 block 设置（full_queue `BLOCKS`，3991559）
+### 2.1 各 block 设置（full_queue `BLOCKS`，bc59945）
 
 | block | 场景 | 方法 | seeds（本次） | workload | 输出子目录 |
 |---|---|---|---|---|---|
 | main | xhigh, ultrahigh, burst | FullSync, RateFIFO, BoundedFIFO16, BoundedPrio16, BoundedSemantic16, StaticSemantic, StaticTopK16, Ideal | 3（Run A `--seeds 3`） | base：pool 16，有用前缀全部 4096，噪声 256 | `main_base` |
-| ksweep | ultrahigh | StaticTopK4/8/16/(32)/64, BoundedSemantic4/16/64, Ideal | 3 | ov30 | `ksweep_ov30` |
+| ksweep | ultrahigh | StaticTopK4/8/16/32/64, BoundedSemantic4/16/64, Ideal | 3 | ov30 | `ksweep_ov30` |
 | overlap | ultrahigh | StaticTopK16, BoundedSemantic16, BoundedPrio16, StaticSemantic, Ideal | 3 | ov0 / ov10 / ov30 / ov60 | `overlap_ov0` … `overlap_ov60` |
 | ablation | ultrahigh, burst | StaticTopK16, StaticTopK16NoMerge, StaticTopK16NoDedup, StaticTopK16NoPriority, BoundedSemantic16, Adaptive, AdaptiveNoPriority | 2（Run B `--seeds 2`） | base | `ablation_base` |
 | rhoscan | normal, near, high, xhigh, ultrahigh | FullSync, BoundedFIFO16, BoundedSemantic16, StaticTopK16, Ideal | 2 | base | `rhoscan_base` |
@@ -60,7 +60,7 @@
 非 base workload 的参数：`--useful-pool 32 --useful-coverage-mix 1024:1,2048:1,4096:1`，噪声覆盖度分布如下：
 ov0=`256:1`；ov10=`256:90,1024:4,2048:3,4096:3`；ov30=`256:70,1024:10,2048:10,4096:10`；ov60=`256:40,1024:20,2048:20,4096:20`。
 
-StaticTopK32 是否纳入 ksweep：`<是/否>`（是 → `<CODE_SHA>` 相对 `3991559` 只改了 `full_queue.py` 中 ksweep methods 这一行；`git diff 3991559 <CODE_SHA> -- experiments` 应只显示这一行）。
+StaticTopK32 是否纳入 ksweep：是（`bc59945` 相对 `3991559` 只改了 `full_queue.py` 中 ksweep methods 这一行；`git diff 3991559 bc59945 -- experiments` 应只显示这一行）。
 
 seed 顺序：e2e 外层循环是 `for seed in range(N)`。cell 内方法顺序用 `Random(seed*1009+scenario_index*9176)` 打乱。Run A 用 seeds {0,1,2}，Run B 用 {0,1}。
 
