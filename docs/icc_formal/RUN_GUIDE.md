@@ -1,8 +1,8 @@
-# RUN_GUIDE：ICC KV 正式实验操作手册（实验代码 3991559）
+# RUN_GUIDE：ICC KV 正式实验操作手册（实验代码 bc59945）
 
-> 适用代码：`BianYanhui/B02_LIS` main 上的实验代码 `3991559`（2026-10-08 00:09:35 UTC+8 推送）。本手册所在的 `docs/icc_formal/` 由一个 **docs-only commit** 加入，该 commit 不改 `experiments/`，所以运行时的 HEAD（summary 的 `commit` 字段，记为 RUN_SHA）会是这个新 sha 或更晚的 sha，而实验代码仍等于 3991559（记为 CODE_SHA）。若做了 §1.3 的 StaticTopK32 改动，CODE_SHA 改为那个 commit。
+> 适用代码：`BianYanhui/B02_LIS` main 上的实验代码 `bc59945`。本手册所在的 `docs/icc_formal/` 由一个 **docs-only commit** 加入，该 commit 不改 `experiments/`，所以运行时的 HEAD（summary 的 `commit` 字段，记为 RUN_SHA）会是这个新 sha 或更晚的 sha，而实验代码仍等于 `bc59945`（记为 CODE_SHA）。`bc59945` 相对 `3991559` 只改了 `full_queue.py` 中 ksweep 的 StaticTopK32 一行。
 > 入口文件：`docs/icc_formal/START_HERE.md`。`docs/icc_formal/` 是临时目录，实验结束后会删除。
-> 所有 CLI flag 都已逐一对照 3991559 源码（`full_queue.py`、`e2e.py`、`path_capacity.py`、`capacity_window.py`、`test_harness.py`、`4t4/test_policies.py`）核实，**没有编造的 flag**。未核实项见文末 §5。
+> 所有 CLI flag 都已逐一对照 `bc59945`（与 3991559 相同）源码（`full_queue.py`、`e2e.py`、`path_capacity.py`、`capacity_window.py`、`test_harness.py`、`4t4/test_policies.py`）核实，**没有编造的 flag**。未核实项见文末 §5。
 > 占位符：`<RUN_SHA>` 运行时 HEAD 短 sha（等于脚本中的 `$SHA`）；`<CODE_SHA>` 实验代码 sha；`<C>` = `c_drain_per_s`；`<AR>` 到达率；`<CAP_FILE>` capacity_window.json 的绝对路径；`<A_DIR>` / `<B_DIR>` 结果目录。时间均为 UTC+8。
 
 ```bash
@@ -11,7 +11,7 @@ export ROOT=/home/byh/B02
 export PY=$ROOT/poc/.venv/bin/python
 export OUT=$ROOT/analysis/icc_kv
 export SHA=$(git -C $ROOT rev-parse --short HEAD)   # RUN_SHA：运行时 HEAD = summary 的 commit 字段
-export CODE_SHA=3991559             # 实验代码 sha；做了 §1.3 的 k32 改动时改为那个 commit
+export CODE_SHA=bc59945             # 实验代码 sha（ksweep 已含 StaticTopK32）
 export LINK=10000000
 export TOOLS=$HOME/icc_formal       # 放在仓库外：运行脚本、填好的 PREREG 副本、日志
 mkdir -p $TOOLS
@@ -60,24 +60,21 @@ git diff --stat $CODE_SHA HEAD -- experiments   # 必须无输出：实验代码
 ls docs/icc_formal/                      # START_HERE.md PREREG.md RUN_GUIDE.md check_smoke.py
 git log -1 --format='%H %ci %s'
 git status --porcelain --untracked-files=no -- experiments   # 必须无输出（与 runtime.git_dirty_files 判据相同）
-sha256sum experiments/4t4/net/gateway_relay_4t4.py          # 3991559 下应为 efc08e2e…8af45
+sha256sum experiments/4t4/net/gateway_relay_4t4.py          # bc59945（与 3991559 相同）应为 efc08e2e…8af45
 ```
 
 不得使用 `--allow-dirty` 或 `--allow-outside-window`，两者仅供调试。
 
-### 1.3（可选）ksweep 加入 StaticTopK32：一行改动，然后 commit 并 push
+### 1.3 ksweep 的 StaticTopK32 已在 bc59945 完成
 
-`wire.py` 里已有 `StaticTopK32`（`TOPK_SWEEP=(4,8,16,32,64)`），只需改 `full_queue.py` 中 ksweep 的 methods 这一行：
+`wire.py` 里已有 `StaticTopK32`（`TOPK_SWEEP=(4,8,16,32,64)`）。用户已确认加入 StaticTopK32，已在 `bc59945` 完成（只改了 `full_queue.py` 中 ksweep 那一行），无需再改代码。核对：
 
 ```bash
-sed -i 's/StaticTopK16,StaticTopK64,BoundedSemantic4/StaticTopK16,StaticTopK32,StaticTopK64,BoundedSemantic4/' experiments/icc_kv/full_queue.py
-git diff --stat            # 只应是 1 file changed, 1 insertion(+), 1 deletion(-)
+git diff 3991559 bc59945 -- experiments   # 只应是 full_queue.py 中 ksweep methods 这一行
 grep -n '"methods": "StaticTopK4' experiments/icc_kv/full_queue.py
-git commit -am "ksweep: add StaticTopK32" && git push origin main
-export SHA=$(git rev-parse --short HEAD); export CODE_SHA=$SHA     # 此后 RUN_SHA = CODE_SHA = 新 HEAD
 ```
 
-代价是多 3 个 cell（约 32 分钟）。是否修改都要写进 PREREG §2.1。**这一步必须在 path_capacity 之前完成**，保证整个流程用同一个 sha。
+代价是多 3 个 cell（约 32 分钟），已计入 §2.1。
 
 ### 1.4 测试（约 2 分钟）
 
@@ -187,7 +184,7 @@ python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d["arrival_rate
 ### 1.8 填写 PREREG
 
 1. `cp $ROOT/docs/icc_formal/PREREG.md $TOOLS/PREREG.md`，只编辑副本，不修改仓库里的模板。
-2. 填入 `<CODE_SHA>`、`<RUN_SHA>`（= `$SHA`）、`<CAP_FILE>`、`<CAP_SHA>`、`<C>`、`<CIN>`、`<RHOMAX>`、`<AR>`、是否加 k32、预注册时间，以及目录：`A_DIR=$OUT/formal_A_${SHA}`、`B_DIR=$OUT/formal_B_${SHA}`。
+2. 填入 `<RUN_SHA>`（= `$SHA`）、`<CAP_FILE>`、`<CAP_SHA>`、`<C>`、`<CIN>`、`<RHOMAX>`、`<AR>`、预注册时间，以及目录：`A_DIR=$OUT/formal_A_${SHA}`、`B_DIR=$OUT/formal_B_${SHA}`。CODE_SHA 已填为 `bc59945`，StaticTopK32 已纳入 ksweep，这两项不要改。
 3. 生成校验和：
    ```bash
    sha256sum $TOOLS/PREREG.md | tee $TOOLS/PREREG.sha256
@@ -216,8 +213,8 @@ nohup 备选：`nohup bash $TOOLS/run_A.sh > $TOOLS/run_A.out 2>&1 &`。脚本�
 |---|---|---|---|
 | A（`--seeds 3`） | main | 3 场景 × 8 方法 × 3 = 72 | 12.6 h |
 | | overlap | 4 ov × 5 方法 × 3 = 60 | 10.5 h |
-| | ksweep | 8（加 k32 为 9）× 3 = 24（27） | 4.2 h（4.7 h） |
-| | **A 合计** | 156（159） | **≈ 27.3 h（27.8 h）** |
+| | ksweep | 9 × 3 = 27 | 4.7 h |
+| | **A 合计** | 159 | **≈ 27.8 h** |
 | B（`--seeds 2`） | ablation | 2 × 7 × 2 = 28 | 4.9 h |
 | | rhoscan | 5 × 5 × 2 = 50 | 8.75 h |
 | | **B 合计** | 78 | **≈ 13.7 h** |
@@ -236,7 +233,7 @@ nohup 备选：`nohup bash $TOOLS/run_A.sh > $TOOLS/run_A.out 2>&1 &`。脚本�
 | Fri 10/09 ~01:40 | main 完成，进入 overlap |
 | Fri ~09:00 | 检查点 1：A 的进度与投影，**决定是否削减** |
 | Fri ~12:10 | overlap 完成，进入 ksweep |
-| Fri ~16:20（加 k32 约 16:50） | A 完成，对 A 的全部子目录跑 check_smoke |
+| Fri ~16:50 | A 完成，对 A 的全部子目录跑 check_smoke |
 | **Fri ~17:00** | 启动 Run B（启动前决定 B 是否削减） |
 | Fri ~22:00 | ablation 完成，进入 rhoscan |
 | Sat 10/10 ~02:20 | rhoscan seed 0 完成（25 cells） |
@@ -341,7 +338,7 @@ $CS $A/main_base/e2e_summary.json --methods FullSync,RateFIFO,BoundedFIFO16,Boun
 for ov in ov0 ov10 ov30 ov60; do
   $CS $A/overlap_$ov/e2e_summary.json --methods StaticTopK16,BoundedSemantic16,BoundedPrio16,StaticSemantic,Ideal
 done
-$CS $A/ksweep_ov30/e2e_summary.json --methods StaticTopK4,StaticTopK8,StaticTopK16,StaticTopK64,BoundedSemantic4,BoundedSemantic16,BoundedSemantic64,Ideal   # 加了 k32 则补上 StaticTopK32
+$CS $A/ksweep_ov30/e2e_summary.json --methods StaticTopK4,StaticTopK8,StaticTopK16,StaticTopK32,StaticTopK64,BoundedSemantic4,BoundedSemantic16,BoundedSemantic64,Ideal
 $CS $B/ablation_base/e2e_summary.json --methods StaticTopK16,StaticTopK16NoMerge,StaticTopK16NoDedup,StaticTopK16NoPriority,BoundedSemantic16,Adaptive,AdaptiveNoPriority
 $CS $B/rhoscan_base/e2e_summary.json --methods FullSync,BoundedFIFO16,BoundedSemantic16,StaticTopK16,Ideal
 ```
@@ -408,14 +405,14 @@ $CS $A/main_base/e2e_summary.json
 | 顺序 | 削减 | 节省 | 操作方法（无需改代码） |
 |---|---|---|---|
 | 1 | rhoscan 减为 1 seed | −4.4 h | B 启动前决定：把 B 拆成 B1 `--blocks ablation --seeds 2`（目录 `formal_B1_$SHA`）和 B2 `--blocks rhoscan`（不传 `--seeds`，使用默认值 1；目录 `formal_B2_$SHA`）。B 运行中决定：等 `rhoscan_base` 的 rows 达到 25（seed 0 完整）后按 Ctrl-C |
-| 2 | ksweep 减为 2 seeds | −1.4 h（加 k32 时 −1.6 h） | ksweep 是 A 的最后一个 block。rows 达到 16（加 k32 时 18）后按 Ctrl-C，之后**不再** resume A |
+| 2 | ksweep 减为 2 seeds | −1.6 h | ksweep 是 A 的最后一个 block。rows 达到 18 后按 Ctrl-C，之后**不再** resume A |
 | 3 | ablation 减为 1 seed | −2.5 h | B 启动前决定，B1 改用 `--seeds 1`。H6 的 n 从 4 变为 2，论文中要写明 |
 | 4 | overlap 去掉 ov10，或 main 去掉 RateFIFO/StaticSemantic | −2.6 h / −3.2 h | **需要改 `full_queue.py` 的 BLOCKS**，并使用新 commit、新目录，属于偏差。只有在落后超过 8 h 且该 block 尚未开始时才考虑。main 是第一个 block，因此 main 的削减实际做不到 |
 
 **不得削减**：
 - main block 的全部内容：StaticTopK16 vs Bounded*16 / FullSync / Ideal，3 seeds；
 - overlap 的 ov0、ov30、ov60；
-- ksweep 至少保留 3 个 k 值（现有 4 或 5 个，都不要删）；
+- ksweep 至少保留 3 个 k 值（现有 5 个 k 值，都不要删）；
 - rhoscan 的 normal（seed 0 必须完整）；
 - `--cell-seconds 600`：不得中途缩短，它属于身份，缩短后 cell 之间不可比。
 
@@ -486,7 +483,7 @@ print(ci(d))   # (mean Δ, CI 下界, CI 上界, Δ<0 的个数, n)；先按 PRE
   - path_capacity 没有重复次数 flag，要重复就跑两次，写到不同的 `--out-dir`；
   - capacity_window 只有 `--out` 一个 flag；
   - full_queue 没有 `--concurrency`、`--kv-cache-tokens`、`--scenarios`、`--methods`、`--useful-pool`，这些由 BLOCKS 或固定参数传入。
-- **不存在的字段**：3991559 的 summary 中没有 `cell_errors` 和 `requests_per_run`。分别用 `cell_errors.log` 和 `requests` 字段代替，check_smoke 已兼容。
+- **不存在的字段**：`bc59945`（与 3991559 相同）的 summary 中没有 `cell_errors` 和 `requests_per_run`。分别用 `cell_errors.log` 和 `requests` 字段代替，check_smoke 已兼容。
 - **服务器上的取值（未核实）**：
   - `<C>`、`<AR>`、`<GPU_RHO>`；
   - 验证 run 的确切路径和数值；

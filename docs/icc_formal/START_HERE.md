@@ -1,6 +1,6 @@
 # START_HERE：ICC KV 正式实验入口（给跑实验的操作者）
 
-> 这是临时目录：`docs/icc_formal/` 只服务于本轮正式实验，实验结束、仓库清理时会整体删除。本目录由一个 **docs-only commit** 加入，`experiments/` 与 `3991559` 完全相同。
+> 这是临时目录：`docs/icc_formal/` 只服务于本轮正式实验，实验结束、仓库清理时会整体删除。本目录由一个 **docs-only commit** 加入，`experiments/` 与 `bc59945` 完全相同（相对 `3991559` 只改了 ksweep 的 StaticTopK32 一行）。
 > 所有时间均为 UTC+8。数据冻结时间：**Mon 10/12 12:00**。
 
 ## 目的
@@ -38,13 +38,13 @@
 - [ ] **2. 核对版本**：
   - `git rev-parse HEAD origin/main` 两行一致；
   - `git status --porcelain --untracked-files=no -- experiments` 无输出；
-  - `git diff --stat 3991559 HEAD -- experiments` 无输出；
-  - 设好 `SHA=$(git rev-parse --short HEAD)` 和 `CODE_SHA=3991559`。（RUN_GUIDE §1.2）
+  - `git diff --stat bc59945 HEAD -- experiments` 无输出；
+  - 设好 `SHA=$(git rev-parse --short HEAD)` 和 `CODE_SHA=bc59945`。（RUN_GUIDE §1.2）
 - [ ] **3. 环境**：4 个 vLLM 端点（8000–8003）返回 200，网关容器 Up，GPU、磁盘、内存正常，没有其他实验在跑。（§1.1）
 - [ ] **4. 测试**：
   - `test_policies.py --output …`，40 项全部通过；
   - `python -m experiments.icc_kv.test_harness` 输出 `all passed`。（§1.4）
-- [ ] **5. StaticTopK32（待用户确认）**：是否把 StaticTopK32 加入 ksweep **由用户决定，未确认前不要改**。若用户确认要加，按 §1.3 改一行，commit 并 push，再把 `CODE_SHA` 设为新 HEAD。这一步必须在第 6 步之前完成。
+- [x] **5. StaticTopK32（已完成）**：用户已确认加入 StaticTopK32，已在 `bc59945` 完成（只改了 full_queue.py 中 ksweep 那一行），无需再改代码。
 - [ ] **6. 容量校准**：
   - 10 Mbit 下跑两遍 path_capacity，加一次 k64 诊断；
   - 用 capacity_window 推导容量窗口；
@@ -53,10 +53,10 @@
 - [ ] **7. 确定 AR**：沿用验证 run 的 `arrival_rate`，或者用 `e2e --calibrate-only` 校准一次。A 和 B 都显式传同一个 `--arrival-rate`，**不要用 `--gpu-rho`**。（§1.7）
 - [ ] **8. 填 PREREG**：
   - `cp docs/icc_formal/PREREG.md ~/icc_formal/PREREG.md`；
-  - 填写所有 `<…>`，包括 CODE_SHA、RUN_SHA、C、AR、CAP_FILE 等；
+  - 填写所有 `<…>`，包括 RUN_SHA、C、AR、CAP_FILE 等（CODE_SHA 已填为 `bc59945`）；
   - 计算 sha256；
   - Run A 启动后，把填好的副本和 sha256 放进结果目录。（§1.8）
-- [ ] **9. 启动 Run A**（约 27.3 h，加 k32 约 27.8 h）：
+- [ ] **9. 启动 Run A**（约 27.8 h）：
   - 参数：`--seeds 3 --blocks main,overlap,ksweep`；
   - 用 tmux 运行 `run_A.sh`；
   - 目标开跑时间 Thu 10/08 约 13:00。（§2.3）
@@ -64,7 +64,7 @@
 - [ ] **11. 监控**：
   - 每天 09:00 和 21:00 各一次，每次 block 切换后再一次；
   - 检查进程、进度、`cell_errors.log`、check_smoke、环境。（§2.5.2）
-- [ ] **12. Run A 完成**（约 Fri 16:20）：A 的每个子目录都跑一遍 check_smoke，并存档输出。
+- [ ] **12. Run A 完成**（约 Fri 16:50）：A 的每个子目录都跑一遍 check_smoke，并存档输出。
 - [ ] **13. 启动 Run B**（约 13.7 h）：`--seeds 2 --blocks ablation,rhoscan`；AR 和 CAP_FILE 与 A 相同。（§2.4）
 - [ ] **14. resume 注意**：
   - 每次非 resume 的启动都会**覆盖** `analysis/icc_kv/overload_latest.txt`；
@@ -88,13 +88,13 @@
 - 任一 cell 的 `stale_cache_hits` > 0：存在不安全复用，在 tmux 里 Ctrl-C 停止 runner。
 - 出现失败的 cell：`cell_errors.log` 非空，或 runner 以 `N cells failed` 退出，且两次自动 resume 后仍失败。
 - 容量窗口检查失败：e2e 报 `capacity window: …`，或 capacity_window 不满足第 6 步的条件。**禁止**用 `--allow-outside-window` 绕过。
-- dirty tree：`experiments/ has uncommitted changes`，或 `git diff 3991559 HEAD -- experiments` 非空（k32 已确认的情况除外）。**禁止**用 `--allow-dirty` 绕过。
+- dirty tree：`experiments/ has uncommitted changes`，或 `git diff bc59945 HEAD -- experiments` 非空。**禁止**用 `--allow-dirty` 绕过。
 - check_smoke 的硬门禁失败，包括 G1 commit/链路、G2 gap > 0.5%、G3 CPU 或 ρ 超限、G10 机制没有生效。block 未跑完时 G9 报缺失是正常的，不算失败。
 - 单个 cell 耗时超过 12 分钟：不用停，但要重算时间线并报告。
 
 ## 需要汇报给用户的内容
 
-- **开跑前**：HEAD 与 CODE_SHA；测试结果；两份 `capacity_window.json` 的关键字段（`c_drain_per_s`、`c_ingress_per_s`、`rho_max_in_window`、`c_drain_over_theory`）；AR 及其来源；填好的 PREREG 的 sha256；k32 是否加入。
+- **开跑前**：HEAD 与 CODE_SHA；测试结果；两份 `capacity_window.json` 的关键字段（`c_drain_per_s`、`c_ingress_per_s`、`rho_max_in_window`、`c_drain_over_theory`）；AR 及其来源；填好的 PREREG 的 sha256。
 - **前 3 个 cell 后**：`rows.py` 的输出和 check_smoke 的结论。
 - **每次监控**：进度（完成数/计划数）、预计完成时间、失败或无效 cell 的数量与原因、任何削减决定。
 - **停机事件**：触发的条件、`runner.log` 末尾、`cell_errors.log` 中的相关记录、你已做的环境修复。
@@ -103,5 +103,5 @@
 ## 注意
 
 - 结果目录在 `analysis/icc_kv/` 下，已被 `.gitignore` 忽略，**不要提交**任何结果文件、填好的 PREREG 或运行脚本。
-- 不要修改 `docs/icc_formal/` 中的文件，也不要修改 `experiments/` 中的任何文件（k32 已确认的情况除外）。
+- 不要修改 `docs/icc_formal/` 中的文件，也不要修改 `experiments/` 中的任何文件。
 - `docs/icc_formal/` 是临时目录，实验结束后会删除。
