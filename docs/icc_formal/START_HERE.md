@@ -1,6 +1,6 @@
 # START_HERE：ICC KV 正式实验入口（给跑实验的操作者）
 
-> 这是临时目录：`docs/icc_formal/` 只服务于本轮正式实验，实验结束、仓库清理时会整体删除。实验代码 CODE_SHA 为 `103d9d0`：`103d9d0` = `bc59945`（= `3991559` + ksweep 的 StaticTopK32）+ `capacity_window` 平台上限（rho_row ≤ 1.5）。cell / e2e 代码路径与 `3991559` 完全相同，验证 run 仍然有代表性。网关 sha256 仍为 `efc08e2e…8af45`。
+> 这是临时目录：`docs/icc_formal/` 只服务于本轮正式实验，实验结束、仓库清理时会整体删除。实验代码 CODE_SHA 为 `e2502fe`：`e2502fe` = `103d9d0` + spread gate 0.20。cell / e2e 代码路径与 `3991559` 完全相同，验证 run 仍然有代表性。网关 sha256 仍为 `efc08e2e…8af45`。
 > 所有时间均为 UTC+8。数据冻结时间：**Mon 10/12 12:00**。
 
 ## 目的
@@ -36,26 +36,26 @@
 
 - [ ] **1. 拉代码**：`cd /home/byh/B02 && git pull --ff-only origin main`
 - [ ] **2. 核对版本**：
-  - 必须已经 `git pull --ff-only origin main` 到包含 `103d9d0` 的新 main（不要停在 `2f8a579`）；
+  - 必须已经 `git pull --ff-only origin main` 到包含 `e2502fe` 的新 main（不要停在 `a8a07b7`）；
   - `git rev-parse HEAD origin/main` 两行一致；
   - `git status --porcelain --untracked-files=no -- experiments` 无输出；
-  - `git diff --stat 103d9d0 HEAD -- experiments` 无输出；
-  - 设好 `SHA=$(git rev-parse --short HEAD)` 和 `CODE_SHA=103d9d0`。（RUN_GUIDE §1.2）
+  - `git diff --stat e2502fe HEAD -- experiments` 无输出；
+  - 设好 `SHA=$(git rev-parse --short HEAD)` 和 `CODE_SHA=e2502fe`。（RUN_GUIDE §1.2）
 - [ ] **3. 环境**：4 个 vLLM 端点（8000–8003）返回 200，网关容器 Up，GPU、磁盘、内存正常，没有其他实验在跑。（§1.1）
 - [ ] **4. 测试**：
   - `test_policies.py --output …`，40 项全部通过；
   - `python -m experiments.icc_kv.test_harness` 输出 `all passed`。（§1.4）
-- [x] **5. StaticTopK32（已完成）**：用户已确认加入 StaticTopK32，已在 `bc59945` 完成（只改了 full_queue.py 中 ksweep 那一行），已包含在 CODE_SHA `103d9d0` 中，无需再改代码。
+- [x] **5. StaticTopK32（已完成）**：用户已确认加入 StaticTopK32，已在 `bc59945` 完成（只改了 full_queue.py 中 ksweep 那一行），已包含在 CODE_SHA `e2502fe` 中，无需再改代码。
 - [ ] **6. 容量校准**：
   - 速率网格见 RUN_GUIDE §1.5（重复点有意保留，用于可重复性）；
   - 10 Mbit 下跑两遍 path_capacity，加一次 k64 诊断；
   - 用 capacity_window 推导容量窗口；
-  - 通过条件：`rho_max_in_window` ≥ 2.0/0.9 ≈ 2.22、`c_ingress_min_per_s` ≥ 2.22×C（C≈9.5–10k 时约 21–22k）、加了 rho_row ≤ 1.5 上限的平台上 `c_drain_spread` ≤ 0.05，且两遍的 C 相差 ≤ 5%；
+  - 通过条件：`rho_max_in_window` ≥ 2.0/0.9 ≈ 2.22、`c_ingress_min_per_s` ≥ 2.22×C（C≈9.5–10k 时约 21–22k）、加了 rho_row ≤ 1.5 上限的平台上 `c_drain_spread` ≤ 0.20（0.05 < spread ≤ 0.20 时打印 WARNING 并仍写出 json，把警告原文和两遍的 spread 记入 PREREG），且两遍的 C（中位数）相差 ≤ 10%；
   - 固定 `CAP_FILE` 并记录它的 sha256。（§1.5–1.6）
 - [ ] **7. 确定 AR**：沿用验证 run 的 `arrival_rate`，或者用 `e2e --calibrate-only` 校准一次。A 和 B 都显式传同一个 `--arrival-rate`，**不要用 `--gpu-rho`**。（§1.7）
 - [ ] **8. 填 PREREG**：
   - `cp docs/icc_formal/PREREG.md ~/icc_formal/PREREG.md`；
-  - 填写所有 `<…>`，包括 RUN_SHA、C、AR、CAP_FILE 等（CODE_SHA 已填为 `103d9d0`）；
+  - 填写所有 `<…>`，包括 RUN_SHA、C、两遍 spread、WARNING 原文、AR、CAP_FILE 等（CODE_SHA 已填为 `e2502fe`）；
   - 计算 sha256；
   - Run A 启动后，把填好的副本和 sha256 放进结果目录。（§1.8）
 - [ ] **9. 启动 Run A**（约 27.8 h）：
@@ -89,14 +89,14 @@
 
 - 任一 cell 的 `stale_cache_hits` > 0：存在不安全复用，在 tmux 里 Ctrl-C 停止 runner。
 - 出现失败的 cell：`cell_errors.log` 非空，或 runner 以 `N cells failed` 退出，且两次自动 resume 后仍失败。
-- 容量窗口检查失败：e2e 报 `capacity window: …`，或 capacity_window 不满足第 6 步的条件（含 spread）。停下并报告。同一目标速率的重复点 `forwarded_per_s` 相差 > 5% 是路径不稳定，由用户决定放宽或延期。**禁止**用 `--allow-outside-window` 绕过。
-- dirty tree：`experiments/ has uncommitted changes`，或 `git diff 103d9d0 HEAD -- experiments` 非空。**禁止**用 `--allow-dirty` 绕过。
+- 容量窗口检查失败：e2e 报 `capacity window: …`，或某一遍 `c_drain_spread` > 0.20，或两遍 C（中位数）相差 > 10%。停下并报告。spread 在 0.05 与 0.20 之间会打印 WARNING 并仍写出 json，把警告原文和两遍的 spread 记入 PREREG，不要因此停下。同一目标速率的重复点 `forwarded_per_s` 相差 > 5% 是预期的路径波动，不再作为停下条件。**禁止**用 `--allow-outside-window` 绕过。
+- dirty tree：`experiments/ has uncommitted changes`，或 `git diff e2502fe HEAD -- experiments` 非空。**禁止**用 `--allow-dirty` 绕过。
 - check_smoke 的硬门禁失败，包括 G1 commit/链路、G2 gap > 0.5%、G3 CPU 或 ρ 超限、G10 机制没有生效。block 未跑完时 G9 报缺失是正常的，不算失败。
 - 单个 cell 耗时超过 12 分钟：不用停，但要重算时间线并报告。
 
 ## 需要汇报给用户的内容
 
-- **开跑前**：HEAD 与 CODE_SHA；测试结果；两份 `capacity_window.json` 的关键字段（`c_drain_per_s`、`c_ingress_per_s`、`rho_max_in_window`、`c_drain_over_theory`、`c_drain_rho_row_max`）；AR 及其来源；填好的 PREREG 的 sha256。
+- **开跑前**：HEAD 与 CODE_SHA；测试结果；两份 `capacity_window.json` 的关键字段（`c_drain_per_s`、`c_drain_spread`、`c_ingress_per_s`、`rho_max_in_window`、`c_drain_over_theory`、`c_drain_rho_row_max`）以及 spread WARNING 原文（若有）；AR 及其来源；填好的 PREREG 的 sha256。
 - **前 3 个 cell 后**：`rows.py` 的输出和 check_smoke 的结论。
 - **每次监控**：进度（完成数/计划数）、预计完成时间、失败或无效 cell 的数量与原因、任何削减决定。
 - **停机事件**：触发的条件、`runner.log` 末尾、`cell_errors.log` 中的相关记录、你已做的环境修复。

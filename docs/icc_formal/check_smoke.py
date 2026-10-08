@@ -4,7 +4,7 @@
 usage:
   check_smoke.py SUMMARY.json --head <run HEAD sha> --link-bit 10000000 [--main StaticTopK16]
                  [--methods FullSync,BoundedFIFO16,...] [--cpu 0.85] [--cpu-k64 0.85] [--gap 0.005]
-                 [--code-sha 103d9d0 --repo /home/byh/B02]
+                 [--code-sha e2502fe --repo /home/byh/B02]
 
 --head is the HEAD at run time (the summary "commit" field). With --code-sha,
 G1 also requires `git -C REPO diff --quiet CODE_SHA HEAD -- experiments`, i.e. a
