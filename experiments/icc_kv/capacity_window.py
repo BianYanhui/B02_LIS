@@ -26,6 +26,11 @@ def _num(row: dict, key: str, default: float) -> float:
     return float(value)
 
 
+# ACKs to senders share the HTB parent, so drain falls with ingress.
+# Plateau = link-limited service rate at row rho <= 1.5.
+PLATEAU_RHO_ROW_MAX = 1.5
+
+
 def derive_capacity(document: dict) -> dict:
     dirty = document.get("git_dirty_files") or []
     if dirty:
@@ -40,14 +45,19 @@ def derive_capacity(document: dict) -> dict:
         and _num(row, "queued_end", 0) >= 64
         and _num(row, "gateway_cpu", 1) < 0.85
         and _num(row, "ledger_ingress_gap", 1) <= 0.01
+        and _num(row, "sent_per_s", 0) <= PLATEAU_RHO_ROW_MAX * _num(row, "forwarded_per_s", 0)
     ]
     if len(fullsync) < 2:
-        raise SystemExit(f"need at least 2 saturated FullSync rows, found {len(fullsync)}")
+        raise SystemExit(
+            f"need at least 2 saturated FullSync rows with rho_row <= {PLATEAU_RHO_ROW_MAX}, found {len(fullsync)}"
+        )
     rates = [float(row["forwarded_per_s"]) for row in fullsync]
     drain = _median(rates)
     spread = (max(rates) - min(rates)) / drain if drain else 1.0
     if spread > 0.05:
-        raise SystemExit(f"FullSync drain is not a plateau: spread {spread:.3f}")
+        raise SystemExit(
+            f"FullSync drain is not a plateau: spread {spread:.3f} (rho_row <= {PLATEAU_RHO_ROW_MAX})"
+        )
     by_policy: dict[str, float] = {}
     for row in rows:
         if _num(row, "ledger_ingress_gap", 1) > 0.01:
@@ -67,6 +77,7 @@ def derive_capacity(document: dict) -> dict:
         "c_drain_per_s": drain,
         "c_drain_rows": len(fullsync),
         "c_drain_spread": spread,
+        "c_drain_rho_row_max": PLATEAU_RHO_ROW_MAX,
         "c_ingress_per_s": by_policy,
         "c_ingress_min_per_s": ingress_min,
         "c_link_theory_per_s": theory,

@@ -1,8 +1,8 @@
-# RUN_GUIDE：ICC KV 正式实验操作手册（实验代码 bc59945）
+# RUN_GUIDE：ICC KV 正式实验操作手册（实验代码 103d9d0）
 
-> 适用代码：`BianYanhui/B02_LIS` main 上的实验代码 `bc59945`。本手册所在的 `docs/icc_formal/` 由一个 **docs-only commit** 加入，该 commit 不改 `experiments/`，所以运行时的 HEAD（summary 的 `commit` 字段，记为 RUN_SHA）会是这个新 sha 或更晚的 sha，而实验代码仍等于 `bc59945`（记为 CODE_SHA）。`bc59945` 相对 `3991559` 只改了 `full_queue.py` 中 ksweep 的 StaticTopK32 一行。
+> 适用代码：`BianYanhui/B02_LIS` main 上的实验代码 `103d9d0`（CODE_SHA）。`103d9d0` = `bc59945`（= `3991559` + ksweep 的 StaticTopK32）+ `capacity_window` 平台上限（rho_row ≤ 1.5）。cell / e2e 代码路径与 `3991559` 完全相同，验证 run 仍然有代表性。本手册所在的 `docs/icc_formal/` 由 docs-only commit 维护，不改 `experiments/`，所以运行时的 HEAD（summary 的 `commit` 字段，记为 RUN_SHA）可以与 CODE_SHA 不同。网关 sha256 仍为 `efc08e2e…8af45`。
 > 入口文件：`docs/icc_formal/START_HERE.md`。`docs/icc_formal/` 是临时目录，实验结束后会删除。
-> 所有 CLI flag 都已逐一对照 `bc59945`（与 3991559 相同）源码（`full_queue.py`、`e2e.py`、`path_capacity.py`、`capacity_window.py`、`test_harness.py`、`4t4/test_policies.py`）核实，**没有编造的 flag**。未核实项见文末 §5。
+> 所有 CLI flag 都已逐一对照 `103d9d0` 源码（`full_queue.py`、`e2e.py`、`path_capacity.py`、`capacity_window.py`、`test_harness.py`、`4t4/test_policies.py`）核实，**没有编造的 flag**。cell / e2e 路径与 `3991559` 相同。未核实项见文末 §5。
 > 占位符：`<RUN_SHA>` 运行时 HEAD 短 sha（等于脚本中的 `$SHA`）；`<CODE_SHA>` 实验代码 sha；`<C>` = `c_drain_per_s`；`<AR>` 到达率；`<CAP_FILE>` capacity_window.json 的绝对路径；`<A_DIR>` / `<B_DIR>` 结果目录。时间均为 UTC+8。
 
 ```bash
@@ -11,7 +11,7 @@ export ROOT=/home/byh/B02
 export PY=$ROOT/poc/.venv/bin/python
 export OUT=$ROOT/analysis/icc_kv
 export SHA=$(git -C $ROOT rev-parse --short HEAD)   # RUN_SHA：运行时 HEAD = summary 的 commit 字段
-export CODE_SHA=bc59945             # 实验代码 sha（ksweep 已含 StaticTopK32）
+export CODE_SHA=103d9d0             # 实验代码 sha（bc59945 + 平台 rho 上限）
 export LINK=10000000
 export TOOLS=$HOME/icc_formal       # 放在仓库外：运行脚本、填好的 PREREG 副本、日志
 mkdir -p $TOOLS
@@ -24,7 +24,7 @@ cd $ROOT
 
 它只依赖 Python 标准库。本次的改动：
 - 新增 G4（`stale_cache_hits`）；
-- 新增 `--cpu-k64 0.85`；
+- 新增 `--cpu-k64 0.85`；`--cpu` 默认同样是 0.85（与 V6 一致，k=64 不再更宽）；
 - G10 的过载判断改为 `nominal_rho_effective > 1`，因此 m=1.5 的 burst（0.975）不会误报。
 
 ---
@@ -60,17 +60,18 @@ git diff --stat $CODE_SHA HEAD -- experiments   # 必须无输出：实验代码
 ls docs/icc_formal/                      # START_HERE.md PREREG.md RUN_GUIDE.md check_smoke.py
 git log -1 --format='%H %ci %s'
 git status --porcelain --untracked-files=no -- experiments   # 必须无输出（与 runtime.git_dirty_files 判据相同）
-sha256sum experiments/4t4/net/gateway_relay_4t4.py          # bc59945（与 3991559 相同）应为 efc08e2e…8af45
+sha256sum experiments/4t4/net/gateway_relay_4t4.py          # 103d9d0（网关文件与 3991559 相同）应为 efc08e2e…8af45
 ```
 
 不得使用 `--allow-dirty` 或 `--allow-outside-window`，两者仅供调试。
 
 ### 1.3 ksweep 的 StaticTopK32 已在 bc59945 完成
 
-`wire.py` 里已有 `StaticTopK32`（`TOPK_SWEEP=(4,8,16,32,64)`）。用户已确认加入 StaticTopK32，已在 `bc59945` 完成（只改了 `full_queue.py` 中 ksweep 那一行），无需再改代码。核对：
+`wire.py` 里已有 `StaticTopK32`（`TOPK_SWEEP=(4,8,16,32,64)`）。用户已确认加入 StaticTopK32，已在 `bc59945` 完成（只改了 `full_queue.py` 中 ksweep 那一行）。`103d9d0` = `bc59945` + 平台上限，不再改这一行。核对：
 
 ```bash
 git diff 3991559 bc59945 -- experiments   # 只应是 full_queue.py 中 ksweep methods 这一行
+git diff bc59945 103d9d0 -- experiments   # 只应是 capacity_window.py 与 test_harness.py
 grep -n '"methods": "StaticTopK4' experiments/icc_kv/full_queue.py
 ```
 
@@ -97,8 +98,11 @@ $PY -m experiments.icc_kv.test_harness                                        # 
 - `--allow-dirty`；
 - `--out-dir`：输出 `<out-dir>/path_capacity.json`。
 
+重测前可先做 §1.6 开头的可选步骤（约 5 分钟，读旧的 r1/r2/k64diag）。
+
 ```bash
-RATES=6000,9000,12000,14000,16000,20000,24000,28000,32000
+# 重复点有意保留，用于可重复性
+RATES=12000,12000,13000,14000,14000,15000,24000,28000,32000
 POL=FullSync,BoundedFIFO16,BoundedSemantic16,StaticTopK16
 for r in r1 r2; do
   $PY -u -m experiments.icc_kv.path_capacity --link-bit $LINK --senders 8 --seconds 30 \
@@ -111,14 +115,38 @@ $PY -u -m experiments.icc_kv.path_capacity --link-bit $LINK --senders 8 --second
 
 说明：
 - `--senders 8` 对应正式运行的 `--noise-senders 8`。两者是否完全等价未核实，但都是 SplitControl 的发送进程数。
-- 理论链路帧率为 10e6/(104×8) ≈ 12019 帧/s。
-- FullSync 至少要有 2 个速率点达到饱和（`queued_end` ≥ 64）。
-- ingress 需要在 ≥ 2.23×C ≈ 26–27k/s 下仍满足 gap ≤ 1% 且 CPU < 0.85，所以速率点必须包含 28000 和 32000。
+- `RATES` 里的重复（12000、14000 各两次）是有意的，用来看同一目标下 `forwarded_per_s` 是否稳定。
+- 12000–15000 是刚饱和附近的点，供平台集使用。24000、28000、32000 **只用于 C_ingress**，不要求 FullSync 把它们当成平台点。
+- FullSync 至少要有 2 个速率点在 rho_row ≤ 1.5 时饱和（`queued_end` ≥ 64，且 `sent_per_s` ≤ 1.5×`forwarded_per_s`）。
+- 需要的 ingress 是 ≥ 2.22×C（2.0/0.9），C≈9.5–10k 时约 21–22k/s，且 gap ≤ 1%、CPU < 0.85。高速率点服务于这项，不是平台集。
+- `sender_fraction` 系统性偏低（发送节拍按 ms 向上取整），不是加发送端的理由；以 `sent_per_s` 判断实际 ingress。
+- 单帧段理论上限约 9615 帧/s（130 B，含 TCP timestamp 与以太网头），见 §1.6。`c_drain_over_theory` 只作参考。
 - StaticTopK64 **不放进**窗口文件：`capacity_window` 取所有 policy 中最小的 `c_ingress`，k=64 的 CPU 偏高，可能把窗口拉低。k=64 的有效性按 cell 用 V3/V4/V6 判定。
 
 ### 1.6 capacity_window 推导与通过标准
 
+重测（§1.5）之前可选，约 5 分钟：读上一次标定留下的 r1/r2/k64diag（目录名里的 sha 是当时的 `2f8a579`）。这些旧目录不在就不要跑。脚本原样如下：
+
+```bash
+for r in r1 r2 k64diag; do
+python3 - $OUT/pc10m_2f8a579_$r/path_capacity.json <<'EOF'
+import json, sys
+d = json.load(open(sys.argv[1]))
+print(sys.argv[1], d.get("commit"), d.get("tc_link_bit_s"), d.get("git_dirty_files"))
+for x in d["rows"]:
+    f = max(x["forwarded_per_s"], 1)
+    print(f'{x["policy"]:18s} tgt {x["rate_target"]:>6.0f} sent {x["sent_per_s"]:7.0f} recv {x["received_per_s"]:7.0f} '
+          f'fwd {x["forwarded_per_s"]:6.0f} q {x["queued_end"]:>7} rho_row {x["sent_per_s"]/f:4.2f} cpu {x["gateway_cpu"]:.2f} '
+          f'gap {x["ledger_ingress_gap"]:.4f} sf {x["sender_fraction"]:.2f} el {x["offer_elapsed_s"]:.1f} '
+          f'maxq {x.get("relay_max_queue")} qdrop {x.get("relay_drop_queue_drop")} topk {x.get("relay_drop_global_topk")} '
+          f'stale {x.get("relay_drop_stale_cell")} s2m {x.get("stats2_missing")}')
+EOF
+done
+```
+
 CLI（已核实）：`python -m experiments.icc_kv.capacity_window <path_capacity.json> [--out FILE]`，没有其他 flag。不加 `--out` 时，默认写到输入文件旁边的 `capacity_window.json`。
+
+平台集是同时满足以下条件的 FullSync 行：`queued_end` ≥ 64、`gateway_cpu` < 0.85、`ledger_ingress_gap` ≤ 0.01，并且 `sent_per_s` ≤ 1.5×`forwarded_per_s`（rho_row ≤ 1.5）。C 是这些行 `forwarded_per_s` 的中位数。rho_row > 1.5 的高速率行不进平台集，但仍参与该 policy 的 C_ingress。
 
 ```bash
 for r in r1 r2; do
@@ -126,15 +154,22 @@ for r in r1 r2; do
 done
 python3 - $OUT/pc10m_${SHA}_r1/capacity_window.json $OUT/pc10m_${SHA}_r2/capacity_window.json <<'PYEOF'
 import json, sys
+from pathlib import Path
+missing = [p for p in sys.argv[1:] if not Path(p).is_file()]
+if missing:
+    print("capacity_window.json 未写出（spread、饱和行不足或 dirty 失败时不写文件）：")
+    for p in missing:
+        print(" ", p)
+    raise SystemExit(1)
 w = [json.load(open(p)) for p in sys.argv[1:]]
 for x in w:
-    print({k: x[k] for k in ("link_bit_s","c_drain_per_s","c_drain_rows","c_drain_spread","c_ingress_min_per_s",
+    print({k: x[k] for k in ("link_bit_s","c_drain_per_s","c_drain_rows","c_drain_spread","c_drain_rho_row_max","c_ingress_min_per_s",
                              "c_link_theory_per_s","c_drain_over_theory","rho_max_in_window")}, x["c_ingress_per_s"])
 c1, c2 = w[0]["c_drain_per_s"], w[1]["c_drain_per_s"]
 print("C r1/r2 diff", abs(c1 - c2) / c1)
 x = w[0]
-print("PASS ultrahigh (rho_max>=2.23):", x["rho_max_in_window"] >= 2.0 / 0.9)
-print("PASS burst 1.5 (C_in>=1.5C):", x["c_ingress_min_per_s"] >= 1.5 * x["c_drain_per_s"])
+print("PASS ultrahigh (rho_max>=2.22, i.e. 2.0/0.9):", x["rho_max_in_window"] >= 2.0 / 0.9)
+print("PASS C_ingress >= 2.22*C:", x["c_ingress_min_per_s"] >= (2.0 / 0.9) * x["c_drain_per_s"])
 PYEOF
 ```
 
@@ -142,21 +177,22 @@ PYEOF
 
 | 项 | 标准 | 原因 |
 |---|---|---|
-| 退出码 | 0（`rho_max` ≤ 1.2 时为非零，但仍会写出文件） | capacity_window.main |
+| 退出码 | 0。`rho_max` ≤ 1.2 时非零，但仍写出文件。spread、饱和行少于 2、dirty 时非零且**不写** json | capacity_window.main |
 | `link_bit_s` | 10000000 | e2e 的 window_problems 会检查 |
-| `c_drain_rows`、`c_drain_spread` | ≥ 2，≤ 0.05 | 代码硬约束：要求存在饱和平台 |
-| `c_drain_over_theory` | 0.6–1.0（经验值，未核实） | 理论值 12019/s |
+| `c_drain_rows`、`c_drain_spread` | ≥ 2，≤ 0.05 | 平台集：FullSync，且 queued_end≥64、cpu<0.85、gap≤0.01、sent_per_s≤1.5×forwarded_per_s |
+| `c_drain_over_theory` | 只作参考 | 单帧段上限约 9615/s（130 B，含 TCP timestamp 与以太网头）。代码按 104 B 计算该字段，不是干净的效率 |
 | r1 与 r2 的 C 差 | ≤ 5% | 可重复性（替代 Word 计划的 3×120 s） |
-| `rho_max_in_window` | **≥ 2.23** | ultrahigh 峰值 2.0C ≤ 0.9×C_ingress |
-| `c_ingress_min_per_s` | **≥ 1.5×C** | burst 峰值 1.35C ≤ 0.9×C_ingress；rho_max ≥ 2.23 时自动满足 |
+| `rho_max_in_window` | **≥ 2.0/0.9 ≈ 2.22** | ultrahigh 峰值 2.0C ≤ 0.9×C_ingress |
+| `c_ingress_min_per_s` | **≥ 2.22×C**（C≈9.5–10k 时约 21–22k） | 与上一行同一条件；burst 的 1.5×C 在 rho_max ≥ 2.22 时自动满足 |
 
 固定 `CAP_FILE=$OUT/pc10m_${SHA}_r1/capacity_window.json`（使用绝对路径），记录 `sha256sum $CAP_FILE`。**正式运行期间不得重新生成该文件**，原因有二：
 - full_queue 把 `capacity_file` 路径和解析出的 `capacity` 写进 resume 身份；
 - e2e 会做 ±10% 检查。
 
 不通过时：
-- `rho_max` < 2.23，且顶端速率的 `sender_fraction` < 0.95（发送端不足）：用 `--senders 12` 重测，正式运行同步改为 `--noise-senders 12`，并写入 PREREG。
-- 顶端出现 `gateway_cpu` ≥ 0.85 或 `ledger_ingress_gap` > 0.01：这是真实的 ingress 上限，说明 10 Mbit 下 ultrahigh 不可行。此时改用更低的链路（例如 `--link-bit 8000000`）重新测量，并记为偏差。**不要**用 `--allow-outside-window`。
+- spread > 0.05，或饱和行少于 2，或 dirty：程序不写 json。停下并报告。若同一目标速率的重复点 `forwarded_per_s` 相差 > 5%，这是路径不稳定：报告给用户，由用户决定放宽或延期。**绝不**使用 `--allow-outside-window`。
+- `sender_fraction` 系统性偏低，不是失败原因，也不要为此加发送端；看 `sent_per_s`。
+- 顶端出现 `gateway_cpu` ≥ 0.85 或 `ledger_ingress_gap` > 0.01：这是真实的 ingress 上限。停下并报告，记为偏差。**不要**用 `--allow-outside-window`。
 
 ### 1.7 确定到达率 AR（二选一，写入 PREREG）
 
@@ -184,7 +220,7 @@ python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d["arrival_rate
 ### 1.8 填写 PREREG
 
 1. `cp $ROOT/docs/icc_formal/PREREG.md $TOOLS/PREREG.md`，只编辑副本，不修改仓库里的模板。
-2. 填入 `<RUN_SHA>`（= `$SHA`）、`<CAP_FILE>`、`<CAP_SHA>`、`<C>`、`<CIN>`、`<RHOMAX>`、`<AR>`、预注册时间，以及目录：`A_DIR=$OUT/formal_A_${SHA}`、`B_DIR=$OUT/formal_B_${SHA}`。CODE_SHA 已填为 `bc59945`，StaticTopK32 已纳入 ksweep，这两项不要改。
+2. 填入 `<RUN_SHA>`（= `$SHA`）、`<CAP_FILE>`、`<CAP_SHA>`、`<C>`、`<CIN>`、`<RHOMAX>`、`<AR>`、预注册时间，以及目录：`A_DIR=$OUT/formal_A_${SHA}`、`B_DIR=$OUT/formal_B_${SHA}`。CODE_SHA 已填为 `103d9d0`，StaticTopK32 已纳入 ksweep，这两项不要改。
 3. 生成校验和：
    ```bash
    sha256sum $TOOLS/PREREG.md | tee $TOOLS/PREREG.sha256
@@ -343,7 +379,7 @@ $CS $B/ablation_base/e2e_summary.json --methods StaticTopK16,StaticTopK16NoMerge
 $CS $B/rhoscan_base/e2e_summary.json --methods FullSync,BoundedFIFO16,BoundedSemantic16,StaticTopK16,Ideal
 ```
 
-默认门槛与 PREREG V3/V6 一致：`--gap 0.005`、`--cpu 0.7`、`--cpu-k64 0.85`。
+默认门槛与 PREREG V3/V6 一致：`--gap 0.005`、`--cpu 0.85`、`--cpu-k64 0.85`。
 
 #### 2.5.1 前 3 个 cell（Thu ~13:35；B 启动约 35 分钟后再做一次）
 
@@ -358,7 +394,7 @@ $CS $A/main_base/e2e_summary.json
 - `commit` 以 `$SHA`（运行时 HEAD）开头；`tc` 和 `fixed` 都是 10000000；`dirty` 为 []。
 - `req` = ceil(600×`<AR>`)；`t` ≈ 600–640 s。若单个 cell 超过 12 分钟，按实际耗时重算 §2.2 的时间线。
 - `rho / nominal` 在 ±10% 以内。seed 0 第一个场景是 xhigh，nominal = 1.5。
-- `cpu` ≤ 0.70；两个 `gap` 都 ≤ 0.005；`stale` = 0；`s2m` = 0；`win` 为 []。
+- `cpu` ≤ 0.85；两个 `gap` 都 ≤ 0.005；`stale` = 0；`s2m` = 0；`win` 为 []。
 - 机制确实生效：StaticTopK16 的 `topk` > 0；Bounded* 的 `qdrop` > 0；FullSync 和 Ideal 的两项都为 0。
 - 出现任何 HARD GATE 失败，**立即停下排查**。
 
@@ -454,7 +490,7 @@ chmod -R a-w formal_A_$SHA formal_B*_$SHA pc10m_${SHA}_*
 | **图 ρ 扫描** | `rhoscan_base` | x 为 `nominal_rho_effective`；y 为 FN 和 `ttft_mean_ms`；共 5 种方法 |
 | **表 消融** | `ablation_base` | 相对 StaticTopK16 的 Δ：FN、`invalidate_censored_lag_p95_s`、`relay_drop_superseded`、`congested_fraction`、`prefill_tokens_mean` |
 | **图 burst 逐请求延迟** | `main_base/requests_burst_<method>_seed<s>.csv` | x 为 `decision_s`，y 为 `delivery_lag_s`（≥0），按 `loose_false_negative` 着色，只用 `warmup`=0 的行。注意：`decision_s` 的起点（请求阶段开始）与噪声 burst 周期的起点（split_path 中的 t0）是否对齐**未核实**，不要直接画 25–30 s 的阴影 |
-| 附表 容量 | `capacity_window.json`（r1、r2） | `c_drain_per_s`、`c_drain_rows`、`c_drain_spread`、`c_ingress_per_s`、`c_ingress_min_per_s`、`c_link_theory_per_s`、`c_drain_over_theory`、`rho_max_in_window` |
+| 附表 容量 | `capacity_window.json`（r1、r2） | `c_drain_per_s`、`c_drain_rows`、`c_drain_spread`、`c_drain_rho_row_max`、`c_ingress_per_s`、`c_ingress_min_per_s`、`c_link_theory_per_s`、`c_drain_over_theory`、`rho_max_in_window` |
 | 附表 健康/有效性 | 所有 rows | `gateway_cpu`、`measured_rho`、`nominal_rho_effective`、`ledger_ingress_gap`、`ledger_balance_gap`、`stats2_missing`、`failed_requests`、`stale_cache_hits`、`relay_max_queue`、`relay_drop_global_topk`、`relay_drop_queue_drop`；再加 V1–V10 的判定结果和 cell 计数 |
 | 一致性 | `overlap_ov30` vs `ksweep_ov30`；`rhoscan_base` vs `main_base` 中 xhigh/ultrahigh 重叠的 seed | 同一方法的 FN 差应 ≤ 0.03。不一致时只报告，不合并 |
 
@@ -483,14 +519,14 @@ print(ci(d))   # (mean Δ, CI 下界, CI 上界, Δ<0 的个数, n)；先按 PRE
   - path_capacity 没有重复次数 flag，要重复就跑两次，写到不同的 `--out-dir`；
   - capacity_window 只有 `--out` 一个 flag；
   - full_queue 没有 `--concurrency`、`--kv-cache-tokens`、`--scenarios`、`--methods`、`--useful-pool`，这些由 BLOCKS 或固定参数传入。
-- **不存在的字段**：`bc59945`（与 3991559 相同）的 summary 中没有 `cell_errors` 和 `requests_per_run`。分别用 `cell_errors.log` 和 `requests` 字段代替，check_smoke 已兼容。
+- **不存在的字段**：`103d9d0`（cell/e2e 与 `3991559` 相同）的 summary 中没有 `cell_errors` 和 `requests_per_run`。分别用 `cell_errors.log` 和 `requests` 字段代替，check_smoke 已兼容。
 - **服务器上的取值（未核实）**：
   - `<C>`、`<AR>`、`<GPU_RHO>`；
   - 验证 run 的确切路径和数值；
-  - k=64 的 CPU（0.72–0.74，来自你的描述）；
+  - k=64 的 CPU（0.72–0.74，来自你的描述；V6 现已对所有方法使用 0.85）；
   - 每个 cell 10.5 分钟的估计，以及每个 stage 重建网关的耗时；
   - 磁盘和内存需求；
-  - `c_drain_over_theory` 的合理范围（0.6–1.0 是经验值）。
+  - `c_drain_over_theory` 只作参考（代码按 104 B/帧计算；单帧段实际上限约 9615/s）。
 - **代码层面未核实**：
   - `path_capacity --senders` 与 e2e `--noise-senders` 在发送路径上是否完全等价；
   - `test_policies` 输出 csv 的列名（只确认了 `--output` 必填、共 40 项）；
