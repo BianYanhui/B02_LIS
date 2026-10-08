@@ -50,6 +50,67 @@ async def _connect_agent():
     raise RuntimeError(f"noise sender cannot reach the gateway: {last!r}")
 
 
+def _sender_rate(level: float, senders: int, scenario: str, burst_mult: float, elapsed: float) -> float:
+    """Per-sender offer rate at `elapsed` seconds into the cell.
+
+    Burst keeps the 25 s base window, then `burst_mult` for the last 5 s of
+    every 30 s. Other scenarios stay at `level / senders`.
+    """
+    rate = float(level) / max(1, int(senders))
+    if scenario == "burst" and (elapsed % 30.0) >= 25.0:
+        rate *= float(burst_mult)
+    return rate
+
+
+def _offered_deadline(
+    t0: float,
+    sent: int,
+    level: float,
+    senders: int,
+    scenario: str,
+    burst_mult: float,
+) -> float:
+    """Monotonic time by which `sent` events should already have been offered.
+
+    The next batch waits until this instant, the same absolute-deadline idea
+    as ``capacity.drive``. The target depends only on how many events have
+    been offered, so a sleep that runs long shortens the next wait instead of
+    accumulating.
+    """
+    rate = float(level) / max(1, int(senders))
+    if sent <= 0 or rate <= 0.0:
+        return t0
+    if scenario != "burst":
+        return t0 + sent / rate
+    burst_rate = rate * float(burst_mult)
+    per_cycle = rate * 25.0 + burst_rate * 5.0
+    if per_cycle <= 0.0:
+        return t0
+    cycles = int(sent // per_cycle)
+    rem = sent - cycles * per_cycle
+    if rem < 0.0:
+        rem = 0.0
+    base_chunk = rate * 25.0
+    if rem <= base_chunk or burst_rate <= 0.0:
+        return t0 + cycles * 30.0 + rem / rate
+    return t0 + cycles * 30.0 + 25.0 + (rem - base_chunk) / burst_rate
+
+
+async def _sleep_until(deadline: float, stop: mp.synchronize.Event) -> bool:
+    """Sleep until `deadline`. Remaining time is reread from the clock.
+
+    Returns False when `stop` is set before the deadline. Slices stay at 50 ms
+    so a stop request is noticed without subtracting the requested slice from
+    a pause that actually ran longer.
+    """
+    while not stop.is_set():
+        delay = deadline - time.monotonic()
+        if delay <= 0:
+            return True
+        await asyncio.sleep(min(delay, 0.05))
+    return False
+
+
 async def _send_until(writer: asyncio.StreamWriter, spec: dict, stop: mp.synchronize.Event) -> int:
     n = int(spec["n"])
     index = int(spec["index"])
@@ -61,21 +122,31 @@ async def _send_until(writer: asyncio.StreamWriter, spec: dict, stop: mp.synchro
     seconds = float(spec["seconds"])
     t0 = float(spec["t0"])
     scenario = str(spec["scenario"])
+    level = float(spec["level"])
+    burst_mult = float(spec.get("burst_mult", 5.0))
     sent = 0
     step = 0
     while not stop.is_set():
         elapsed = time.monotonic() - t0
         if seconds and elapsed >= seconds:
             break
-        level = float(spec["level"])
-        if scenario == "burst" and (elapsed % 30.0) >= 25.0:
-            level *= float(spec.get("burst_mult", 5.0))
-        rate = level / n
+        rate = _sender_rate(level, n, scenario, burst_mult, elapsed)
         if rate < 1.0:
             await asyncio.sleep(0.05)
             continue
+        # `step` is only the sequence counter. Wait until `sent` events are
+        # due on the absolute schedule, then offer the next batch.
+        if not await _sleep_until(
+            _offered_deadline(t0, sent, level, n, scenario, burst_mult), stop,
+        ):
+            break
+        elapsed = time.monotonic() - t0
+        if seconds and elapsed >= seconds:
+            break
+        rate = _sender_rate(level, n, scenario, burst_mult, elapsed)
+        if rate < 1.0:
+            continue
         batch = max(1, int(rate / 200)) if rate >= 200 else 1
-        started = time.perf_counter()
         now = time.time()
         for _offset in range(batch):
             if stop.is_set():
@@ -91,14 +162,6 @@ async def _send_until(writer: asyncio.StreamWriter, spec: dict, stop: mp.synchro
             sent += 1
         if not await _drain(writer, stop):
             return sent
-        # The sequence counter is `step`. A pause variable with the same name
-        # rewound it, so a sender that got ahead retransmitted its first batch
-        # for the rest of the cell.
-        pause = batch / rate - (time.perf_counter() - started)
-        while pause > 0 and not stop.is_set():
-            slice_s = min(pause, 0.05)
-            await asyncio.sleep(slice_s)
-            pause -= slice_s
     await _drain(writer, stop, timeout=1.0)
     return sent
 
