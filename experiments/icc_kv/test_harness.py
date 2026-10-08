@@ -49,7 +49,8 @@ def test_window() -> None:
     for rate, forwarded, queued, cpu, gap in (
         (6000, 6000, 0, 0.4, 0.0),
         (12000, 9000, 100, 0.5, 0.0),
-        (18000, 9100, 200, 0.6, 0.0),
+        (13000, 9100, 200, 0.6, 0.0),
+        (24000, 6500, 400000, 0.6, 0.0),
     ):
         rows.append({
             "policy": "FullSync", "sent_per_s": rate, "forwarded_per_s": forwarded,
@@ -61,7 +62,12 @@ def test_window() -> None:
     })
     derived = derive_capacity({"link_bit_s": 10_000_000, "rows": rows})
     check("drain plateau", abs(derived["c_drain_per_s"] - 9050) < 1, derived)
-    check("ingress min", derived["c_ingress_min_per_s"] == 18000, derived)
+    check("ingress min", derived["c_ingress_min_per_s"] == 20000, derived)
+    check(
+        "excluded row does not affect c_drain",
+        derived["c_drain_rows"] == 2 and abs(derived["c_drain_per_s"] - 9050) < 1,
+        derived,
+    )
     problems = window_problems(derived, link=10_000_000, capacity=9050, peaks={"ultrahigh": 20000})
     check("window rejects a peak above ingress", bool(problems), problems)
 
