@@ -1,8 +1,10 @@
-# RUN_GUIDE：ICC KV 正式实验操作手册（实验代码 e2502fe）
+# RUN_GUIDE：ICC KV 正式实验操作手册（实验代码 48b64f4）
 
-> 适用代码：`BianYanhui/B02_LIS` main 上的实验代码 `e2502fe`（CODE_SHA）。`e2502fe` = `103d9d0` + spread gate 0.20。cell / e2e 代码路径与 `3991559` 完全相同，验证 run 仍然有代表性。本手册所在的 `docs/icc_formal/` 由 docs-only commit 维护，不改 `experiments/`，所以运行时的 HEAD（summary 的 `commit` 字段，记为 RUN_SHA）可以与 CODE_SHA 不同。网关 sha256 仍为 `efc08e2e…8af45`。
+> 适用代码：`BianYanhui/B02_LIS` main 上的实验代码 `48b64f4`（CODE_SHA）。相对 `e2502fe`，`48b64f4` 只改了 `experiments/icc_kv/e2e.py`、`split_path.py`、`test_harness.py`。`e2e.py` 与 `split_path.py` 相对 `3991559` 也只有这一处改动，因此不要把 `topk_val_3991559` 当作当前噪声节拍或 stale 计数的代表。本手册所在的 `docs/icc_formal/` 由 docs-only commit 维护，不改 `experiments/`，所以运行时的 HEAD（summary 的 `commit` 字段，记为 RUN_SHA）可以与 CODE_SHA 不同。运行时 HEAD 是 `9a96e7f`，或其后只改 `docs/icc_formal/` 的 commit。网关 sha256 仍为 `efc08e2e…8af45`。
 > 入口文件：`docs/icc_formal/START_HERE.md`。`docs/icc_formal/` 是临时目录，实验结束后会删除。
-> 所有 CLI flag 都已逐一对照 `e2502fe` 源码（`full_queue.py`、`e2e.py`、`path_capacity.py`、`capacity_window.py`、`test_harness.py`、`4t4/test_policies.py`）核实，**没有编造的 flag**。cell / e2e 路径与 `3991559` 相同。未核实项见文末 §5。
+> 所有 CLI flag 都已逐一对照 `48b64f4` 源码（`full_queue.py`、`e2e.py`、`path_capacity.py`、`capacity_window.py`、`split_path.py`、`test_harness.py`、`4t4/test_policies.py`）核实，**没有编造的 flag**。未核实项见文末 §5。
+>
+> **作废的部分 Run A**（2026-10-08，见 PREREG §11.1）：commit `2b12640`、seed 0、`main_base` 14/72。无效。不得 resume，不得引用，结果目录保持原样。按下面的命名，该目录是 `$OUT/formal_A_2b12640`。重跑是新目录，CODE_SHA 为 `48b64f4`。
 > 占位符：`<RUN_SHA>` 运行时 HEAD 短 sha（等于脚本中的 `$SHA`）；`<CODE_SHA>` 实验代码 sha；`<C>` = `c_drain_per_s`；`<AR>` 到达率；`<CAP_FILE>` capacity_window.json 的绝对路径；`<A_DIR>` / `<B_DIR>` 结果目录。时间均为 UTC+8。
 
 ```bash
@@ -11,7 +13,7 @@ export ROOT=/home/byh/B02
 export PY=$ROOT/poc/.venv/bin/python
 export OUT=$ROOT/analysis/icc_kv
 export SHA=$(git -C $ROOT rev-parse --short HEAD)   # RUN_SHA：运行时 HEAD = summary 的 commit 字段
-export CODE_SHA=e2502fe             # 实验代码 sha（103d9d0 + spread gate 0.20）
+export CODE_SHA=48b64f4             # 实验代码 sha（相对 e2502fe 只改 e2e.py、split_path.py、test_harness.py）
 export LINK=10000000
 export TOOLS=$HOME/icc_formal       # 放在仓库外：运行脚本、填好的 PREREG 副本、日志
 mkdir -p $TOOLS
@@ -22,10 +24,11 @@ cd $ROOT
 - `--head $SHA`：检查 summary 的 `commit` 是否等于运行时 HEAD（前缀匹配）。
 - `--code-sha $CODE_SHA --repo $ROOT`：额外检查 `git diff CODE_SHA <commit> -- experiments` 为空，即 docs-only HEAD 跑的确实是 CODE_SHA 的实验代码。
 
-它只依赖 Python 标准库。本次的改动：
-- 新增 G4（`stale_cache_hits`）；
-- 新增 `--cpu-k64 0.85`；`--cpu` 默认同样是 0.85（与 V6 一致，k=64 不再更宽）；
-- G10 的过载判断改为 `nominal_rho_effective > 1`，因此 m=1.5 的 burst（0.975）不会误报。
+它只依赖 Python 标准库。门禁相对上一版手册没有放宽：
+- G4 仍是 `stale_cache_hits` == 0。计入条件与 `e2e.py` 的 `is_stale_cache_hit` 相同：`cached_tokens` ≥ 512、`routed_truth` == 0、`version` > 0，且同一 cell 里此前没有把同一 slot、同一 version 发给该 worker。第一次请求仍然计入。
+- G3 的 `measured_rho` 仍须在名义值的 10% 以内（burst 用 `nominal_rho_effective`，m=1.5 时为 0.975）。不放宽。
+- `--cpu` 与 `--cpu-k64` 默认都是 0.85（与 V6 一致）。
+- G10 的过载判断是 `nominal_rho_effective > 1`，因此 m=1.5 的 burst（0.975）不会误报。
 
 ---
 
@@ -55,24 +58,25 @@ free -g; df -h $ROOT/analysis; nproc; uptime
 
 ```bash
 git fetch origin
-git rev-parse HEAD origin/main          # 两行必须相同（应为加入 docs/icc_formal/ 的 commit 或更晚），且以 $SHA 开头
+git rev-parse HEAD origin/main          # 两行必须相同，且以 $SHA 开头。应为 9a96e7f，或其后只改 docs/icc_formal/ 的 commit
 git diff --stat $CODE_SHA HEAD -- experiments   # 必须无输出：实验代码与 CODE_SHA 完全相同
 ls docs/icc_formal/                      # START_HERE.md PREREG.md RUN_GUIDE.md check_smoke.py
 git log -1 --format='%H %ci %s'
 git status --porcelain --untracked-files=no -- experiments   # 必须无输出（与 runtime.git_dirty_files 判据相同）
-sha256sum experiments/4t4/net/gateway_relay_4t4.py          # e2502fe（网关文件与 3991559 相同）应为 efc08e2e…8af45
+sha256sum experiments/4t4/net/gateway_relay_4t4.py          # 网关文件与 3991559 相同，应为 efc08e2e…8af45
 ```
 
 不得使用 `--allow-dirty` 或 `--allow-outside-window`，两者仅供调试。
 
 ### 1.3 ksweep 的 StaticTopK32 已在 bc59945 完成
 
-`wire.py` 里已有 `StaticTopK32`（`TOPK_SWEEP=(4,8,16,32,64)`）。用户已确认加入 StaticTopK32，已在 `bc59945` 完成（只改了 `full_queue.py` 中 ksweep 那一行）。`e2502fe` = `103d9d0` + spread gate 0.20，不再改这一行。核对：
+`wire.py` 里已有 `StaticTopK32`（`TOPK_SWEEP=(4,8,16,32,64)`）。用户已确认加入 StaticTopK32，已在 `bc59945` 完成（只改了 `full_queue.py` 中 ksweep 那一行）。`48b64f4` 不改这一行。核对：
 
 ```bash
 git diff 3991559 bc59945 -- experiments   # 只应是 full_queue.py 中 ksweep methods 这一行
 git diff bc59945 103d9d0 -- experiments   # 只应是 capacity_window.py 与 test_harness.py
-git diff 103d9d0 e2502fe -- experiments   # 只应是 capacity_window.py
+git diff 103d9d0 e2502fe -- experiments   # 祖先，不是当前 CODE_SHA。只应是 capacity_window.py
+git diff e2502fe 48b64f4 -- experiments   # 只应是 e2e.py、split_path.py、test_harness.py
 grep -n '"methods": "StaticTopK4' experiments/icc_kv/full_queue.py
 ```
 
@@ -120,7 +124,7 @@ $PY -u -m experiments.icc_kv.path_capacity --link-bit $LINK --senders 8 --second
 - 12000–15000 是刚饱和附近的点，供平台集使用。24000、28000、32000 **只用于 C_ingress**，不要求 FullSync 把它们当成平台点。
 - FullSync 至少要有 2 个速率点在 rho_row ≤ 1.5 时饱和（`queued_end` ≥ 64，且 `sent_per_s` ≤ 1.5×`forwarded_per_s`）。
 - 需要的 ingress 是 ≥ 2.22×C（2.0/0.9），C≈9.5–10k 时约 21–22k/s，且 gap ≤ 1%、CPU < 0.85。高速率点服务于这项，不是平台集。
-- `sender_fraction` 系统性偏低（发送节拍按 ms 向上取整），不是加发送端的理由；以 `sent_per_s` 判断实际 ingress。
+- 发送端数保持 8，不要加发送端。`_send_until` 按已发出条数的绝对截止时间等待（与 `capacity.drive` 同一思路），offered rate 跟上 `level`，burst 仍是 25 s / 5 s。`sender_fraction` 偏低不是加发送端的理由；以 `sent_per_s` 判断实际 ingress。
 - 单帧段理论上限约 9615 帧/s（130 B，含 TCP timestamp 与以太网头），见 §1.6。`c_drain_over_theory` 只作参考。
 - StaticTopK64 **不放进**窗口文件：`capacity_window` 取所有 policy 中最小的 `c_ingress`，k=64 的 CPU 偏高，可能把窗口拉低。k=64 的有效性按 cell 用 V3/V4/V6 判定。
 
@@ -195,7 +199,7 @@ PYEOF
 
 不通过时：
 - spread > 0.20，或饱和行少于 2，或 dirty：程序不写 json。停下并报告。spread 在 0.05 与 0.20 之间会打印 WARNING 并仍写出 json：把警告原文和两遍的 `c_drain_spread` 记入 PREREG。同一目标速率的重复点 `forwarded_per_s` 相差 > 5% 是预期的路径波动，不再因此停下。只有某一遍 spread > 0.20，或两遍 C（中位数）相差 > 10%，才停下。**绝不**使用 `--allow-outside-window`。
-- `sender_fraction` 系统性偏低，不是失败原因，也不要为此加发送端；看 `sent_per_s`。
+- `sender_fraction` 偏低不是失败原因，也不要为此加发送端；看 `sent_per_s`。发送端数保持 8。
 - 顶端出现 `gateway_cpu` ≥ 0.85 或 `ledger_ingress_gap` > 0.01：这是真实的 ingress 上限。停下并报告，记为偏差。**不要**用 `--allow-outside-window`。
 
 ### 1.7 确定到达率 AR（二选一，写入 PREREG）
@@ -224,7 +228,7 @@ python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));print(d["arrival_rate
 ### 1.8 填写 PREREG
 
 1. `cp $ROOT/docs/icc_formal/PREREG.md $TOOLS/PREREG.md`，只编辑副本，不修改仓库里的模板。
-2. 填入 `<RUN_SHA>`（= `$SHA`）、`<CAP_FILE>`、`<CAP_SHA>`、`<C>`、`<CIN>`、`<RHOMAX>`、`<AR>`、两遍 `c_drain_spread`、WARNING 原文、预注册时间，以及目录：`A_DIR=$OUT/formal_A_${SHA}`、`B_DIR=$OUT/formal_B_${SHA}`。CODE_SHA 已填为 `e2502fe`，StaticTopK32 已纳入 ksweep，这两项不要改。
+2. 填入 `<RUN_SHA>`（= `$SHA`）、`<CAP_FILE>`、`<CAP_SHA>`、`<C>`、`<CIN>`、`<RHOMAX>`、`<AR>`、两遍 `c_drain_spread`、WARNING 原文、预注册时间，以及目录：`A_DIR=$OUT/formal_A_${SHA}`、`B_DIR=$OUT/formal_B_${SHA}`。CODE_SHA 已填为 `48b64f4`，StaticTopK32 已纳入 ksweep，§11.1 的 2026-10-08 偏差已经写在模板里，这三项不要改。目录必须是新的：不要把 `formal_A_2b12640` 当作 `<A_DIR>`。
 3. 生成校验和：
    ```bash
    sha256sum $TOOLS/PREREG.md | tee $TOOLS/PREREG.sha256
@@ -268,8 +272,9 @@ nohup 备选：`nohup bash $TOOLS/run_A.sh > $TOOLS/run_A.out 2>&1 &`。脚本�
 | 时间 | 事件 |
 |---|---|
 | Thu 10/08 11:30–13:00 | 第一部分 |
-| **Thu ~13:00** | 启动 Run A |
-| Thu ~13:35 | 检查前 3 个 cell（§2.5.1） |
+| **Thu ~13:00** | 启动 Run A（新目录，CODE_SHA `48b64f4`） |
+| Thu ~13:11 | 第一个 cell 完成：立刻核对 `measured_rho`（§2.5.0）。超出 ±10% 则停机 |
+| Thu ~13:35 | 检查前 3 个 cell（§2.5.1）。§2.5.0 未通过则不要到这一步 |
 | Fri 10/09 ~01:40 | main 完成，进入 overlap |
 | Fri ~09:00 | 检查点 1：A 的进度与投影，**决定是否削减** |
 | Fri ~12:10 | overlap 完成，进入 ksweep |
@@ -315,8 +320,10 @@ tmux new -s icc_A "$TOOLS/run_A.sh 2>&1 | tee -a $TOOLS/run_A.out"
 - `--capacity-file`：只给这个参数时，`capacity` 自动取文件里的 `c_drain_per_s`。
 - `--cell-seconds 600`，`--requests` 保持默认 0：full_queue 会向 e2e 传 `--cell-seconds 600 --requests 1`。
 - `--burst-mult 1.5` 必须显式传，默认值是 5.0。
-- `--noise-senders 8`：默认值就是 8，显式写出是为了记录清楚。
+- `--noise-senders 8`：full_queue 的默认值就是 8，显式写出是为了记录清楚。不要改成更大的数。
 - `--invalidate-every 8`、`--noise-workers 4` 使用默认值。
+
+噪声节拍（已对照 `48b64f4`）：`control.begin_noise` 的 `level` 是 `rho * capacity`（`e2e.py:469`），整段 cell 不预乘 `burst_mult`。`_send_until`（`split_path.py:114`）先等到 `_offered_deadline`（`split_path.py:65`）再发下一批。截止时间只由已发出条数、`level`、发送端数和 burst 窗口决定，与 `capacity.drive` 里 `started + begin / rate` 同一思路。burst 仍是每个 30 s 周期的前 25 s 为基线、后 5 s 乘 `burst_mult`（`_sender_rate`，`split_path.py:60`，`elapsed % 30.0 >= 25.0`）。`measured_rho` 仍是 `noise_sent / noise_window / capacity`（`e2e.py:849`）。V4 / G3 的 ±10% 不变。
 - `--concurrency 4` 和 `--kv-cache-tokens 104544` 由 full_queue 固定传给 e2e，**full_queue 本身没有这两个 flag**。
 
 输出目录：
@@ -385,7 +392,23 @@ $CS $B/rhoscan_base/e2e_summary.json --methods FullSync,BoundedFIFO16,BoundedSem
 
 默认门槛与 PREREG V3/V6 一致：`--gap 0.005`、`--cpu 0.85`、`--cpu-k64 0.85`。
 
+#### 2.5.0 第一个完成的 cell（Run A 继续之前）
+
+`main_base/e2e_summary.json` 里出现第一行之后立刻执行，不要等满 3 个 cell：
+
+```bash
+python3 $TOOLS/rows.py $A/main_base/e2e_summary.json
+```
+
+只看这一行的 `rho` 与名义值。`|measured_rho / nominal_rho_effective − 1|` 必须 ≤ 0.10。seed 0 的场景顺序是 `xhigh,ultrahigh,burst`（`full_queue.py` 的 main block），第一个场景是 xhigh，名义值 1.5。burst cell 的名义值是 0.975，但第一个 cell 不是 burst。
+
+超出 10%：**在 tmux 里 Ctrl-C 停机并报告**。不要放宽 ±10%，不要把 `--noise-senders` 改成大于 8，不要 resume 这次目录把后面的 cell 跑完。这次目录也不是正式 Run A。
+
+通过之后才让 runner 继续，并按 §2.5.1 检查前 3 个 cell。
+
 #### 2.5.1 前 3 个 cell（Thu ~13:35；B 启动约 35 分钟后再做一次）
+
+§2.5.0 已经通过才做本节。±10% 在这里仍然是硬门槛，不是只看第一个 cell。
 
 ```bash
 tail -n 5 $A/runner.log
@@ -416,11 +439,13 @@ $CS $A/main_base/e2e_summary.json
    ```
 4. **check_smoke**：对正在跑的 block 和刚完成的 block 各运行一次，并存档：`… | tee <DIR>/<sub>/check_smoke_$(date +%m%d_%H%M).txt`。
 5. **环境**：4 个端点返回 200；`docker ps` 中网关没有异常重启；`nvidia-smi` 正常；`df -h`；`uptime` 显示无外部负载。
-6. **`stale_cache_hits` > 0**：**停机**（PREREG H7）。在 tmux 中按 Ctrl-C，然后排查。
+6. **`stale_cache_hits` > 0**：**停机**（PREREG H7）。在 tmux 中按 Ctrl-C，然后排查。门槛仍是 0。谓词是 `cached_tokens` ≥ 512、`routed_truth` == 0、`version` > 0，且同一 cell 里此前没有把同一 slot、同一 version 发给该 worker；第一次请求仍然计入。逐请求 CSV 的 `stale_cache_hit` 用同一谓词。
 
 ### 2.6 失败处理与 `--resume`
 
-以下行为均已核实：
+**不要 resume 作废的部分 Run A。** commit `2b12640`、seed 0、`main_base` 14/72 的那一次无效。不要把 `$OUT/overload_latest.txt` 指回 `$OUT/formal_A_2b12640`，不要对那个目录加 `--resume`，不要引用它的 rows，也不要改写或删除该目录。正式重跑是新的 `$OUT/formal_A_$SHA`，CODE_SHA 为 `48b64f4`。
+
+以下行为均已核实，适用于这个新目录：
 - **单个 cell 失败**：写入 `cell_errors.log`，并烧掉该 cell id。该 stage 会跑完其余 cell，然后以 `N cells failed` 非零退出。**整个 runner 随之终止**，后续 block 不会运行。
 - **`--resume` 读哪个目录**：读取 `$OUT/overload_latest.txt` 所指的目录，忽略 `--out-dir`。
 - **身份必须一致**：身份必须与 `run_config.json` 完全一致，包括 `link_bit`、`capacity`、`capacity_file`、`arrival_rate`、`gpu_rho`、`cell_seconds`、`requests`、`warmup_requests`、`burst_mult`、`invalidate_every`、`noise_workers`、`noise_senders`、`seeds_override`。
@@ -523,7 +548,7 @@ print(ci(d))   # (mean Δ, CI 下界, CI 上界, Δ<0 的个数, n)；先按 PRE
   - path_capacity 没有重复次数 flag，要重复就跑两次，写到不同的 `--out-dir`；
   - capacity_window 只有 `--out` 一个 flag；
   - full_queue 没有 `--concurrency`、`--kv-cache-tokens`、`--scenarios`、`--methods`、`--useful-pool`，这些由 BLOCKS 或固定参数传入。
-- **不存在的字段**：`e2502fe`（cell/e2e 与 `3991559` 相同）的 summary 中没有 `cell_errors` 和 `requests_per_run`。分别用 `cell_errors.log` 和 `requests` 字段代替，check_smoke 已兼容。
+- **不存在的字段**：`48b64f4` 的 summary 中没有 `cell_errors` 和 `requests_per_run`。分别用 `cell_errors.log` 和 `requests` 字段代替，check_smoke 已兼容。逐请求 CSV 的 `stale_cache_hit` 与 summary 的 `stale_cache_hits` 使用同一谓词。
 - **服务器上的取值（未核实）**：
   - `<C>`、`<AR>`、`<GPU_RHO>`；
   - 验证 run 的确切路径和数值；

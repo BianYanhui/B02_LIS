@@ -1,7 +1,9 @@
 # START_HERE：ICC KV 正式实验入口（给跑实验的操作者）
 
-> 这是临时目录：`docs/icc_formal/` 只服务于本轮正式实验，实验结束、仓库清理时会整体删除。实验代码 CODE_SHA 为 `e2502fe`：`e2502fe` = `103d9d0` + spread gate 0.20。cell / e2e 代码路径与 `3991559` 完全相同，验证 run 仍然有代表性。网关 sha256 仍为 `efc08e2e…8af45`。
+> 这是临时目录：`docs/icc_formal/` 只服务于本轮正式实验，实验结束、仓库清理时会整体删除。实验代码 CODE_SHA 为 `48b64f4`。相对 `e2502fe`，`48b64f4` 只改了 `experiments/icc_kv/e2e.py`、`split_path.py`、`test_harness.py`（stale 谓词，以及噪声发送端按绝对截止时间等待）。spread gate 0.20、平台 rho_row ≤ 1.5、V6 cpu 0.85 不变。网关 sha256 仍为 `efc08e2e…8af45`。运行时 HEAD 是 `9a96e7f`，或其后只改 `docs/icc_formal/` 的 commit；`git diff --stat 48b64f4 HEAD -- experiments` 必须为空。
 > 所有时间均为 UTC+8。数据冻结时间：**Mon 10/12 12:00**。
+>
+> **作废的部分 Run A**：commit `2b12640`、seed 0、`main_base` 完成 14/72 的那一次已经停下，无效。不得 resume，不得引用，结果目录保持原样（按本手册命名是 `$OUT/formal_A_2b12640`）。重跑用新目录，CODE_SHA 为 `48b64f4`。偏差日期 2026-10-08，见 PREREG §11.1。
 
 ## 目的
 
@@ -36,16 +38,16 @@
 
 - [ ] **1. 拉代码**：`cd /home/byh/B02 && git pull --ff-only origin main`
 - [ ] **2. 核对版本**：
-  - 必须已经 `git pull --ff-only origin main` 到包含 `e2502fe` 的新 main（不要停在 `a8a07b7`）；
+  - 必须已经 `git pull --ff-only origin main`。运行时 HEAD 是 `9a96e7f`，或其后只改 `docs/icc_formal/` 的 commit。不要停在 `2b12640`，也不要停在 `a8a07b7`；
   - `git rev-parse HEAD origin/main` 两行一致；
   - `git status --porcelain --untracked-files=no -- experiments` 无输出；
-  - `git diff --stat e2502fe HEAD -- experiments` 无输出；
-  - 设好 `SHA=$(git rev-parse --short HEAD)` 和 `CODE_SHA=e2502fe`。（RUN_GUIDE §1.2）
+  - `git diff --stat 48b64f4 HEAD -- experiments` 无输出；
+  - 设好 `SHA=$(git rev-parse --short HEAD)` 和 `CODE_SHA=48b64f4`。（RUN_GUIDE §1.2）
 - [ ] **3. 环境**：4 个 vLLM 端点（8000–8003）返回 200，网关容器 Up，GPU、磁盘、内存正常，没有其他实验在跑。（§1.1）
 - [ ] **4. 测试**：
   - `test_policies.py --output …`，40 项全部通过；
   - `python -m experiments.icc_kv.test_harness` 输出 `all passed`。（§1.4）
-- [x] **5. StaticTopK32（已完成）**：用户已确认加入 StaticTopK32，已在 `bc59945` 完成（只改了 full_queue.py 中 ksweep 那一行），已包含在 CODE_SHA `e2502fe` 中，无需再改代码。
+- [x] **5. StaticTopK32（已完成）**：用户已确认加入 StaticTopK32，已在 `bc59945` 完成（只改了 full_queue.py 中 ksweep 那一行），已包含在 CODE_SHA `48b64f4` 中，无需再改代码。
 - [ ] **6. 容量校准**：
   - 速率网格见 RUN_GUIDE §1.5（重复点有意保留，用于可重复性）；
   - 10 Mbit 下跑两遍 path_capacity，加一次 k64 诊断；
@@ -55,14 +57,16 @@
 - [ ] **7. 确定 AR**：沿用验证 run 的 `arrival_rate`，或者用 `e2e --calibrate-only` 校准一次。A 和 B 都显式传同一个 `--arrival-rate`，**不要用 `--gpu-rho`**。（§1.7）
 - [ ] **8. 填 PREREG**：
   - `cp docs/icc_formal/PREREG.md ~/icc_formal/PREREG.md`；
-  - 填写所有 `<…>`，包括 RUN_SHA、C、两遍 spread、WARNING 原文、AR、CAP_FILE 等（CODE_SHA 已填为 `e2502fe`）；
+  - 填写所有 `<…>`，包括 RUN_SHA、C、两遍 spread、WARNING 原文、AR、CAP_FILE 等（CODE_SHA 已填为 `48b64f4`；§11.1 的 2026-10-08 偏差已经写在模板里，不要删）；
   - 计算 sha256；
   - Run A 启动后，把填好的副本和 sha256 放进结果目录。（§1.8）
 - [ ] **9. 启动 Run A**（约 27.8 h）：
   - 参数：`--seeds 3 --blocks main,overlap,ksweep`；
   - 用 tmux 运行 `run_A.sh`；
   - 目标开跑时间 Thu 10/08 约 13:00。（§2.3）
-- [ ] **10. 前 3 个 cell 后**（开跑约 35 分钟）：运行 `rows.py`，以及 `check_smoke.py --head $SHA --code-sha $CODE_SHA --repo $ROOT …`，逐项核对 §2.5.1。
+  - 新目录，不要指向作废的 `formal_A_2b12640`。发送端数保持 `--noise-senders 8`，不要加发送端。
+- [ ] **9b. 第一个 cell 完成后**（约 11 分钟，不要等到前 3 个 cell）：用 `rows.py` 确认这一行的 `measured_rho` 在 `nominal_rho_effective` 的 10% 以内。不在则立刻停机。不要放宽 ±10%，不要加发送端。（§2.5.0）
+- [ ] **10. 前 3 个 cell 后**（开跑约 35 分钟）：运行 `rows.py`，以及 `check_smoke.py --head $SHA --code-sha $CODE_SHA --repo $ROOT …`，逐项核对 §2.5.1。9b 已通过才继续到这里。
 - [ ] **11. 监控**：
   - 每天 09:00 和 21:00 各一次，每次 block 切换后再一次；
   - 检查进程、进度、`cell_errors.log`、check_smoke、环境。（§2.5.2）
@@ -87,16 +91,18 @@
 
 ## 必须立即停下的情况（停下后报告用户，不要自行绕过）
 
-- 任一 cell 的 `stale_cache_hits` > 0：存在不安全复用，在 tmux 里 Ctrl-C 停止 runner。
+- 任一 cell 的 `stale_cache_hits` > 0：存在不安全复用，在 tmux 里 Ctrl-C 停止 runner。H7 / G4 仍是 `stale_cache_hits` == 0，不放宽。计入规则见 PREREG §11.1：`cached_tokens` ≥ 512、`routed_truth` == 0、`version` > 0，且同一 cell 里此前没有把同一 slot、同一 version 发给该 worker。该 worker 上这一 `(slot, version)` 的第一次请求仍然计入。
+- 第一个完成的 cell 上 `|measured_rho / nominal_rho_effective − 1|` > 0.10：停机。不要放宽 ±10%，不要加发送端。
 - 出现失败的 cell：`cell_errors.log` 非空，或 runner 以 `N cells failed` 退出，且两次自动 resume 后仍失败。
 - 容量窗口检查失败：e2e 报 `capacity window: …`，或某一遍 `c_drain_spread` > 0.20，或两遍 C（中位数）相差 > 10%。停下并报告。spread 在 0.05 与 0.20 之间会打印 WARNING 并仍写出 json，把警告原文和两遍的 spread 记入 PREREG，不要因此停下。同一目标速率的重复点 `forwarded_per_s` 相差 > 5% 是预期的路径波动，不再作为停下条件。**禁止**用 `--allow-outside-window` 绕过。
-- dirty tree：`experiments/ has uncommitted changes`，或 `git diff e2502fe HEAD -- experiments` 非空。**禁止**用 `--allow-dirty` 绕过。
+- dirty tree：`experiments/ has uncommitted changes`，或 `git diff 48b64f4 HEAD -- experiments` 非空。**禁止**用 `--allow-dirty` 绕过。
 - check_smoke 的硬门禁失败，包括 G1 commit/链路、G2 gap > 0.5%、G3 CPU 或 ρ 超限、G10 机制没有生效。block 未跑完时 G9 报缺失是正常的，不算失败。
 - 单个 cell 耗时超过 12 分钟：不用停，但要重算时间线并报告。
 
 ## 需要汇报给用户的内容
 
 - **开跑前**：HEAD 与 CODE_SHA；测试结果；两份 `capacity_window.json` 的关键字段（`c_drain_per_s`、`c_drain_spread`、`c_ingress_per_s`、`rho_max_in_window`、`c_drain_over_theory`、`c_drain_rho_row_max`）以及 spread WARNING 原文（若有）；AR 及其来源；填好的 PREREG 的 sha256。
+- **第一个 cell 后**：这一行的 `measured_rho` 和 `nominal_rho_effective`。超出 10% 就停，不要放宽。
 - **前 3 个 cell 后**：`rows.py` 的输出和 check_smoke 的结论。
 - **每次监控**：进度（完成数/计划数）、预计完成时间、失败或无效 cell 的数量与原因、任何削减决定。
 - **停机事件**：触发的条件、`runner.log` 末尾、`cell_errors.log` 中的相关记录、你已做的环境修复。
@@ -104,6 +110,7 @@
 
 ## 注意
 
+- commit `2b12640` 的部分 Run A（main_base 14/72，seed 0）无效。不得 resume，不得引用，不得改写或删除该结果目录（按本手册命名是 `$OUT/formal_A_2b12640`）。
 - 结果目录在 `analysis/icc_kv/` 下，已被 `.gitignore` 忽略，**不要提交**任何结果文件、填好的 PREREG 或运行脚本。
 - 不要修改 `docs/icc_formal/` 中的文件，也不要修改 `experiments/` 中的任何文件。
 - `docs/icc_formal/` 是临时目录，实验结束后会删除。

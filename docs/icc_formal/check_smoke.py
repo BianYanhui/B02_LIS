@@ -4,7 +4,7 @@
 usage:
   check_smoke.py SUMMARY.json --head <run HEAD sha> --link-bit 10000000 [--main StaticTopK16]
                  [--methods FullSync,BoundedFIFO16,...] [--cpu 0.85] [--cpu-k64 0.85] [--gap 0.005]
-                 [--code-sha e2502fe --repo /home/byh/B02]
+                 [--code-sha 48b64f4 --repo /home/byh/B02]
 
 --head is the HEAD at run time (the summary "commit" field). With --code-sha,
 G1 also requires `git -C REPO diff --quiet CODE_SHA HEAD -- experiments`, i.e. a
@@ -15,8 +15,13 @@ Exit 0 only if the hard gates pass:
       clean tree, link fixed and read back,
       no failed requests, STATS2 present, no cell errors (summary or cell_errors.log)
   G2  ledger: ingress gap and balance gap <= --gap for every row
-  G3  gateway core <= --cpu (<= --cpu-k64 for k=64 methods); measured_rho within 10% of the nominal (burst included)
-  G4  stale_cache_hits == 0 (unsafe reuse)
+  G3  gateway core <= --cpu (<= --cpu-k64 for k=64 methods); measured_rho within 10% of the nominal (burst included).
+      The ±10% band is not relaxed. measured_rho stays noise_sent / noise_window / capacity.
+  G4  stale_cache_hits == 0 (unsafe reuse). A hit counts only when cached_tokens >= 512,
+      routed_truth == 0, version > 0, and no earlier request in the same cell with the
+      same slot and version was already sent to that worker. The first request of a
+      (slot, version) on a worker still counts. Per-request stale_cache_hit uses the
+      same predicate. Do not relax this gate.
   G8  noise windows within 10% inside one (seed, scenario, workload)
   G9  every (seed, scenario) has every method in --methods (if given)
   G10 mechanism engaged in overload (nominal rho > 1): StaticTopK* has global_topk drops,
