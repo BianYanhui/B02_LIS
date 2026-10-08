@@ -45,6 +45,40 @@ USEFUL_COVERAGE = 4096
 NOISE_COVERAGE = 256
 
 
+def note_worker_dispatch(seen: set[tuple[int, int, int]], slot: int, version: int, worker: int) -> bool:
+    """Record a send of this slot and version to worker.
+
+    Returns whether an earlier request in the same cell was already sent to
+    that worker. Call this in send order, before the response is known.
+    `seen` is the cell's set of (slot, version, worker) dispatches.
+    """
+    key = (slot, version, worker)
+    earlier = key in seen
+    seen.add(key)
+    return earlier
+
+
+def is_stale_cache_hit(
+    cached_tokens: int,
+    routed_truth: int,
+    version: int,
+    earlier_same_slot_version_on_worker: bool,
+) -> bool:
+    """Leftover KV: a hit on a worker that had not yet been sent this version.
+
+    Truth is written only after the response returns, so a later in-flight
+    request of the same slot and version still sees routed_truth == 0. That
+    hit is the sibling's prefix. The first request of the (slot, version) on
+    that worker still counts.
+    """
+    return (
+        cached_tokens >= 512
+        and routed_truth == 0
+        and version > 0
+        and not earlier_same_slot_version_on_worker
+    )
+
+
 def load_formal():
     path = ROOT / "experiments/4t4/run_formal4t4.py"
     spec = importlib.util.spec_from_file_location("formal4t4_icc_e2e", path)
@@ -466,6 +500,7 @@ async def run_e2e(
                         fresh_tombs: set[tuple[int, int]] = set()
                         installed_at: dict[tuple[int, int], float] = {}
                         tomb_at: dict[tuple[int, int], float] = {}
+                        sent_slot_version_worker: set[tuple[int, int, int]] = set()
 
                         def flush_emits() -> None:
                             batch = pending_emits[:]
@@ -534,6 +569,9 @@ async def run_e2e(
                                     placement.rr += 1
                                     placement.loads[routed] += 1
                                     routed_truth = truth.get((routed, digest), 0)
+                                    earlier_same = note_worker_dispatch(
+                                        sent_slot_version_worker, slot, version, routed,
+                                    )
                                     truth_cov = max((truth.get((worker, digest), 0) for worker in range(4)), default=0)
                                     view_cov_max = max((tested.get((worker, digest), 0) for worker in range(4)), default=0)
                                     view_cov = tested.get((routed, digest), 0)
@@ -565,6 +603,7 @@ async def run_e2e(
                                         "ideal_cov": ideal_cov,
                                         "routed": routed,
                                         "routed_truth": routed_truth,
+                                        "earlier_same_slot_version_on_worker": earlier_same,
                                         "loose_false_negative": int(truth_cov >= 512 and view_cov_max < 512),
                                         "loose_false_positive": int(
                                             view_cov >= 512 and view_cov > routed_truth and (routed, digest) not in fresh_tombs
@@ -595,7 +634,13 @@ async def run_e2e(
                                         return
                                     cached = int(response["vllm_cached_tokens"] or 0)
                                     regret = max(0, decision["ideal_cov"] - decision["routed_truth"])
-                                    if cached >= 512 and decision["routed_truth"] == 0 and decision["version"] > 0:
+                                    stale = is_stale_cache_hit(
+                                        cached,
+                                        decision["routed_truth"],
+                                        decision["version"],
+                                        decision["earlier_same_slot_version_on_worker"],
+                                    )
+                                    if stale:
                                         stale_cache_hits += 1
                                     evicted = shadows[routed].insert(digest_text[slot], slot_cov[slot])
                                     truth[(routed, decision["digest"])] = slot_cov[slot]
@@ -637,7 +682,7 @@ async def run_e2e(
                                         "coverage_shortfall": decision["coverage_shortfall"],
                                         "loose_false_negative": decision["loose_false_negative"],
                                         "loose_false_positive": decision["loose_false_positive"],
-                                        "stale_cache_hit": int(cached >= 512 and decision["routed_truth"] == 0 and decision["version"] > 0),
+                                        "stale_cache_hit": int(stale),
                                         "delivery_lag_s": decision["delivery_lag_s"],
                                         "state_age_s": decision["state_age_s"],
                                         "missing_age_s": decision["missing_age_s"],

@@ -4,8 +4,9 @@ from __future__ import annotations
 import asyncio
 
 from experiments.icc_kv.capacity_window import derive_capacity, window_problems
-from experiments.icc_kv.e2e import gather_or_cancel
+from experiments.icc_kv.e2e import gather_or_cancel, is_stale_cache_hit, note_worker_dispatch
 from experiments.icc_kv.runtime import parse_tc_rate, require_clean_tree
+from experiments.icc_kv.split_path import _offered_deadline, _sender_rate
 from experiments.icc_kv.wire import CFG, FRAME, POLICIES, POLICY_MAX_QUEUE, TOPK_SWEEP, config_frame
 from experiments.icc_kv.workload import burst_nominal_rho, interleave, noise_overlap, useful_slots
 
@@ -97,6 +98,67 @@ def test_cancel() -> None:
     check("cancelled siblings", cancelled == 2, cancelled)
 
 
+def test_stale_predicate() -> None:
+    """Sibling reuse is not leftover KV. The first hit of a version still is."""
+    seen: set[tuple[int, int, int]] = set()
+
+    def hit(cached: int, truth: int, version: int, slot: int, worker: int) -> bool:
+        earlier = note_worker_dispatch(seen, slot, version, worker)
+        return is_stale_cache_hit(cached, truth, version, earlier)
+
+    check("first hit of a version is stale", hit(4128, 0, 2, 3, 1) is True)
+    check("later sibling on that worker is not", hit(4128, 0, 2, 3, 1) is False)
+    check("same version on another worker still is", hit(512, 0, 2, 3, 0) is True)
+    check("other slot on the same worker still is", hit(512, 0, 2, 4, 1) is True)
+    check("version 0 is not stale", hit(4128, 0, 0, 3, 1) is False)
+    check("routed truth blocks the count", hit(4128, 4096, 1, 5, 2) is False)
+    check("cached below 512 is not stale", hit(511, 0, 1, 6, 2) is False)
+    check("new version on the same worker counts again", hit(4128, 0, 3, 3, 1) is True)
+    check("second request of the new version does not", hit(4128, 0, 3, 3, 1) is False)
+
+
+def test_offered_deadline() -> None:
+    """Absolute offer times track level, including the 25 s / 5 s burst window."""
+    t0 = 1000.0
+    level, senders = 4000.0, 4
+    rate = level / senders
+    for sent, offset in ((0, 0.0), (1, 1.0 / rate), (rate, 1.0), (25 * rate, 25.0)):
+        got = _offered_deadline(t0, int(sent), level, senders, "xhigh", 5.0)
+        check(f"steady deadline sent={sent}", abs(got - (t0 + offset)) < 1e-9, got)
+    check(
+        "steady rate ignores the burst window",
+        _sender_rate(level, senders, "xhigh", 5.0, 27.0) == rate,
+    )
+    burst_mult = 1.5
+    base = _sender_rate(level, senders, "burst", burst_mult, 24.999)
+    burst = _sender_rate(level, senders, "burst", burst_mult, 25.0)
+    check("burst base window", base == rate and _sender_rate(level, senders, "burst", burst_mult, 0.0) == rate)
+    check("burst high window", burst == rate * burst_mult)
+    check("burst window repeats", _sender_rate(level, senders, "burst", burst_mult, 30.0) == rate)
+    per_cycle = base * 25.0 + burst * 5.0
+    end = _offered_deadline(t0, int(per_cycle), level, senders, "burst", burst_mult)
+    check("burst cycle ends at 30s", abs(end - (t0 + 30.0)) < 1e-6, end)
+    at_25 = _offered_deadline(t0, int(base * 25.0), level, senders, "burst", burst_mult)
+    check("burst base chunk ends at 25s", abs(at_25 - (t0 + 25.0)) < 1e-6, at_25)
+    one_into_burst = _offered_deadline(t0, int(base * 25.0) + 1, level, senders, "burst", burst_mult)
+    check(
+        "first burst event is on the multiplied rate",
+        abs(one_into_burst - (t0 + 25.0 + 1.0 / burst)) < 1e-6,
+        one_into_burst,
+    )
+    # Oversleep does not move the target for a given count, so the next wait
+    # shortens by the time actually lost. 1000 events at `rate` are due at 1s.
+    now = t0
+    sent = 0
+    batch = max(1, int(rate / 200))
+    while sent < int(rate):
+        target = _offered_deadline(t0, sent, level, senders, "xhigh", 5.0)
+        now = target + 0.001 if now < target else now
+        sent += batch
+        now += 0.0002
+    check("oversleep stays on the schedule", now - t0 < 1.05, now - t0)
+
+
 def test_dirty_allowed() -> None:
     dirty = require_clean_tree(allow_dirty=True)
     check("dirty list", isinstance(dirty, list), dirty)
@@ -108,6 +170,8 @@ def main() -> None:
     test_tc()
     test_window()
     test_cancel()
+    test_stale_predicate()
+    test_offered_deadline()
     test_dirty_allowed()
     check("frame size", FRAME == 64)
     print("all passed")
