@@ -1,19 +1,22 @@
 # PREREG：ICC KV 覆盖优先有界准入，正式实验预注册
 
 > 本文件用于预先固定分析与剔除规则。仓库中的 `docs/icc_formal/PREREG.md` 是**空白模板，不要修改仓库内的这份**。**正式 Run A 开始前**，先复制一份（`cp docs/icc_formal/PREREG.md ~/icc_formal/PREREG.md`），在副本里填好所有 `<…>`，再原样放进每个结果目录（`<A_DIR>/PREREG.md`、`<B_DIR>/PREREG.md`），并记录它的 sha256（见 RUN_GUIDE §1.8）。开跑后，填好的副本**只能追加**（追加到 §12「开跑后记录」），不允许修改 §1–§11。
-> 字段名与 CLI 均已对照 commit `103d9d0` 的源码核实（`experiments/icc_kv/{e2e,full_queue,path_capacity,capacity_window,runtime,wire}.py`）。`103d9d0` = `bc59945`（= `3991559` + ksweep 的 StaticTopK32）+ `capacity_window` 平台上限。cell / e2e 代码路径与 `3991559` 完全相同，验证 run 仍然有代表性。无法核实的条目标为 **未核实**。
+> 字段名与 CLI 均已对照 commit `e2502fe` 的源码核实（`experiments/icc_kv/{e2e,full_queue,path_capacity,capacity_window,runtime,wire}.py`）。`e2502fe` = `103d9d0` + spread gate 0.20。cell / e2e 代码路径与 `3991559` 完全相同，验证 run 仍然有代表性。无法核实的条目标为 **未核实**。
 
 ## 0. 身份
 
 | 项 | 值 |
 |---|---|
 | 预注册日期（UTC+8） | `<YYYY-MM-DD HH:MM>`（必须早于 Run A 第一个 cell 的时间） |
-| 实验代码 sha（CODE_SHA） | `103d9d0`：`experiments/` 最后一次改动所在的 commit。`103d9d0` = `bc59945`（= `3991559` + ksweep 的 StaticTopK32）+ capacity_window 平台集 rho_row ≤ 1.5。cell / e2e 与 `3991559` 相同 |
+| 实验代码 sha（CODE_SHA） | `e2502fe`：`experiments/` 最后一次改动所在的 commit。`e2502fe` = `103d9d0` + spread gate 0.20。cell / e2e 与 `3991559` 相同 |
 | 运行时 HEAD（RUN_SHA） | `<RUN_SHA>`：开跑时的 `git rev-parse --short HEAD`，等于 summary 的 `commit` 字段。docs-only commit（加入 `docs/icc_formal/`）不改变实验代码，所以 RUN_SHA 可以与 CODE_SHA 不同 |
 | `git diff --stat <CODE_SHA> <RUN_SHA> -- experiments` 为空 | `<是/否>`（必须为是） |
 | `git rev-parse HEAD` 与 `origin/main` 一致 | `<是/否>` |
 | capacity 文件 | `<CAP_FILE>`（绝对路径），sha256 `<CAP_SHA>` |
-| C（`c_drain_per_s`） | `<C>` frames/s |
+| C（`c_drain_per_s`） | `<C>` frames/s（中位数） |
+| r1 `c_drain_spread` | `<SPREAD_R1>`（门禁 ≤ 0.20；作为该遍 C 的不确定度） |
+| r2 `c_drain_spread` | `<SPREAD_R2>`（门禁 ≤ 0.20；作为该遍 C 的不确定度） |
+| spread WARNING 原文 | `<两遍打印的 WARNING 行；spread ≤ 0.05 则写无>` |
 | C_ingress_min（`c_ingress_min_per_s`） | `<CIN>` frames/s |
 | `rho_max_in_window` | `<RHOMAX>`（必须 ≥ 2.0/0.9 ≈ 2.22） |
 | 到达率 AR | `<AR>` req/s（来源：`<校准 json 路径或验证 run 路径>`） |
@@ -47,7 +50,7 @@
 | 噪声 | `--noise-senders 8`、`--noise-workers 4`（默认）、`--invalidate-every 8`（默认） | row `noise_senders`、`noise_workers`、`invalidate_every` |
 | 开环 | 是（full_queue 不传 `--closed-loop`） | row `open_loop` |
 
-### 2.1 各 block 设置（full_queue `BLOCKS`，与 `bc59945` 相同；`103d9d0` 未改 full_queue）
+### 2.1 各 block 设置（full_queue `BLOCKS`，与 `bc59945` 相同；`e2502fe` 未改 full_queue）
 
 | block | 场景 | 方法 | seeds（本次） | workload | 输出子目录 |
 |---|---|---|---|---|---|
@@ -60,7 +63,7 @@
 非 base workload 的参数：`--useful-pool 32 --useful-coverage-mix 1024:1,2048:1,4096:1`，噪声覆盖度分布如下：
 ov0=`256:1`；ov10=`256:90,1024:4,2048:3,4096:3`；ov30=`256:70,1024:10,2048:10,4096:10`；ov60=`256:40,1024:20,2048:20,4096:20`。
 
-StaticTopK32 是否纳入 ksweep：是（`bc59945` 相对 `3991559` 只改了 `full_queue.py` 中 ksweep methods 这一行；`git diff 3991559 bc59945 -- experiments` 应只显示这一行。`103d9d0` 不改这一行）。
+StaticTopK32 是否纳入 ksweep：是（`bc59945` 相对 `3991559` 只改了 `full_queue.py` 中 ksweep methods 这一行；`git diff 3991559 bc59945 -- experiments` 应只显示这一行。`e2502fe` 不改这一行）。
 
 seed 顺序：e2e 外层循环是 `for seed in range(N)`。cell 内方法顺序用 `Random(seed*1009+scenario_index*9176)` 打乱。Run A 用 seeds {0,1,2}，Run B 用 {0,1}。
 
@@ -202,7 +205,7 @@ seed 顺序：e2e 外层循环是 `for seed in range(N)`。cell 内方法顺序�
 | CPU-bound 容量 | 10 Mbit HTB 固定链路瓶颈（link-bound） | "We fix a 10 Mbit/s HTB-shaped control link so that the bottleneck is bandwidth, not gateway CPU (gateway pinned to one core, utilization ≤ 0.85)." |
 | trace 回放 / K 扩展 | 合成噪声，不做 K 扩展 | "Background control traffic is synthetic; we do not claim scaling in the number of instances." |
 | 使用 Exp 0 trace | 未使用；有用前缀为 Zipf(1.2) | "Useful prefixes follow a Zipf(1.2) popularity over a pool of 16 (32 in overlap/k-sweep)." |
-| 容量 120 s × 3 次 | path_capacity 每点 30 s，跑 2 次，每次 `<n>` 个速率点 | "Capacity is the FullSync link-limited service rate over rows with rho_row ≤ 1.5, measured in two independent runs (spread ≤ 5%)." |
+| 容量 120 s × 3 次 | path_capacity 每点 30 s，跑 2 次，每次 `<n>` 个速率点 | "Capacity is the FullSync link-limited service rate over rows with rho_row ≤ 1.5, measured in two independent runs (medians within 10%)." |
 | ρ 0.5/0.8/1.0/1.2，5 seeds | 0.5/0.9/1.2/1.5/2.0，rhoscan 2 seeds | "ρ ∈ {0.5, 0.9, 1.2, 1.5, 2.0}; two seeds per point in the scan." |
 | burst：平均 <1，测恢复时间 | m=1.5（平均 0.975，峰值 1.35）；无恢复 / 队列时间序列，改为逐请求 lag 随时间 | "Bursts raise offered load to 1.35 C during the last 5 s of every 30 s window (mean 0.975 C)."（已核实：`split_path.py:71` 中 `elapsed % 30 >= 25` 时 ×`burst_mult`） |
 | e2e Normal / Near | main block 用 xhigh/ultrahigh/burst；normal/near 只在 rhoscan 中 | "Low-load behaviour is reported in the ρ scan." |
@@ -216,6 +219,7 @@ seed 顺序：e2e 外层循环是 `for seed in range(N)`。cell 内方法顺序�
 | C 的定义 | FullSync 在 rho_row ≤ 1.5 的行上的链路受限服务率（任何正式结果之前决定） | "C is the FullSync link-limited service rate on rows with rho_row ≤ 1.5, fixed before any formal cell." |
 | 测试床：ACK 与父类共用 | 网关发往发送端的 TCP ACK（sport 9710，HTB class 1:30）与 10 Mbit 父类共用，重度 ingress（rho_row≈2–3）下有效服务率降至约 0.65C；所有方法同样受影响，作为 limitation 报告 | "Gateway ACKs to the senders share the 10 Mbit HTB parent, so under heavy ingress (rho_row ≈ 2–3) the effective service rate falls to about 0.65 C. This hits every method equally and is reported as a limitation." |
 | V6 CPU | 任何正式 cell 之前由 0.70 放宽到 0.85。原因：容量测量显示高 offer 下网关 CPU 为 0.69–0.81 | "The CPU validity gate is 0.85 for every method, relaxed from 0.70 before any formal cell because capacity runs showed gateway CPU 0.69–0.81 at high offer." |
+| (4) spread 门槛 | 任何正式 cell 之前，平台 spread 硬门槛由 0.05 放宽到 0.20，两遍 C（中位数）容差由 5% 放宽到 10%。原因：在 `a8a07b7` 上重测，刚饱和的 FullSync 平台本身在相同 offered load 下波动 6–15%（r1 spread 0.120，9063–10195 fps；r2 spread 0.152，8755–10178 fps；同一目标的重复点最多相差 11.1%）。C 取中位数；把每遍的 spread 作为 C 的不确定度报告。0.05–0.20 之间打印 WARNING 并仍写出 json，警告原文与两遍 spread 记入本预注册 | "The 10 Mbit/s path's sustained forwarding rate varied by 6–15% across repeated measurements at identical offered load, so C is the median of the just-saturated plateau and we report the observed spread as its uncertainty." |
 
 ## 12. 开跑后记录（只追加）
 
