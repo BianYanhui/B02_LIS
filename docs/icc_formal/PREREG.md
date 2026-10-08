@@ -1,14 +1,14 @@
 # PREREG：ICC KV 覆盖优先有界准入，正式实验预注册
 
 > 本文件用于预先固定分析与剔除规则。仓库中的 `docs/icc_formal/PREREG.md` 是**空白模板，不要修改仓库内的这份**。**正式 Run A 开始前**，先复制一份（`cp docs/icc_formal/PREREG.md ~/icc_formal/PREREG.md`），在副本里填好所有 `<…>`，再原样放进每个结果目录（`<A_DIR>/PREREG.md`、`<B_DIR>/PREREG.md`），并记录它的 sha256（见 RUN_GUIDE §1.8）。开跑后，填好的副本**只能追加**（追加到 §12「开跑后记录」），不允许修改 §1–§11。
-> 字段名与 CLI 均已对照 commit `e2502fe` 的源码核实（`experiments/icc_kv/{e2e,full_queue,path_capacity,capacity_window,runtime,wire}.py`）。`e2502fe` = `103d9d0` + spread gate 0.20。cell / e2e 代码路径与 `3991559` 完全相同，验证 run 仍然有代表性。无法核实的条目标为 **未核实**。
+> 字段名与 CLI 均已对照 commit `48b64f4` 的源码核实（`experiments/icc_kv/{e2e,full_queue,path_capacity,capacity_window,runtime,wire,split_path}.py`）。`48b64f4` 相对 `e2502fe` 只改 `e2e.py`、`split_path.py`、`test_harness.py`。`e2e.py` 与 `split_path.py` 相对 `3991559` 也只有这一处改动。网关文件未改。无法核实的条目标为 **未核实**。2026-10-08 的预注册偏差已写在 §11.1，早于任何新的正式 cell。
 
 ## 0. 身份
 
 | 项 | 值 |
 |---|---|
 | 预注册日期（UTC+8） | `<YYYY-MM-DD HH:MM>`（必须早于 Run A 第一个 cell 的时间） |
-| 实验代码 sha（CODE_SHA） | `e2502fe`：`experiments/` 最后一次改动所在的 commit。`e2502fe` = `103d9d0` + spread gate 0.20。cell / e2e 与 `3991559` 相同 |
+| 实验代码 sha（CODE_SHA） | `48b64f4`：`experiments/` 最后一次改动所在的 commit。相对 `e2502fe` 只改了 `experiments/icc_kv/e2e.py`、`split_path.py`、`test_harness.py`。运行时 HEAD 是 `9a96e7f`，或其后只改 `docs/icc_formal/` 的 commit |
 | 运行时 HEAD（RUN_SHA） | `<RUN_SHA>`：开跑时的 `git rev-parse --short HEAD`，等于 summary 的 `commit` 字段。docs-only commit（加入 `docs/icc_formal/`）不改变实验代码，所以 RUN_SHA 可以与 CODE_SHA 不同 |
 | `git diff --stat <CODE_SHA> <RUN_SHA> -- experiments` 为空 | `<是/否>`（必须为是） |
 | `git rev-parse HEAD` 与 `origin/main` 一致 | `<是/否>` |
@@ -50,7 +50,7 @@
 | 噪声 | `--noise-senders 8`、`--noise-workers 4`（默认）、`--invalidate-every 8`（默认） | row `noise_senders`、`noise_workers`、`invalidate_every` |
 | 开环 | 是（full_queue 不传 `--closed-loop`） | row `open_loop` |
 
-### 2.1 各 block 设置（full_queue `BLOCKS`，与 `bc59945` 相同；`e2502fe` 未改 full_queue）
+### 2.1 各 block 设置（full_queue `BLOCKS`，与 `bc59945` 相同；`48b64f4` 未改 full_queue）
 
 | block | 场景 | 方法 | seeds（本次） | workload | 输出子目录 |
 |---|---|---|---|---|---|
@@ -63,7 +63,7 @@
 非 base workload 的参数：`--useful-pool 32 --useful-coverage-mix 1024:1,2048:1,4096:1`，噪声覆盖度分布如下：
 ov0=`256:1`；ov10=`256:90,1024:4,2048:3,4096:3`；ov30=`256:70,1024:10,2048:10,4096:10`；ov60=`256:40,1024:20,2048:20,4096:20`。
 
-StaticTopK32 是否纳入 ksweep：是（`bc59945` 相对 `3991559` 只改了 `full_queue.py` 中 ksweep methods 这一行；`git diff 3991559 bc59945 -- experiments` 应只显示这一行。`e2502fe` 不改这一行）。
+StaticTopK32 是否纳入 ksweep：是（`bc59945` 相对 `3991559` 只改了 `full_queue.py` 中 ksweep methods 这一行；`git diff 3991559 bc59945 -- experiments` 应只显示这一行。`48b64f4` 不改这一行）。
 
 seed 顺序：e2e 外层循环是 `for seed in range(N)`。cell 内方法顺序用 `Random(seed*1009+scenario_index*9176)` 打乱。Run A 用 seeds {0,1,2}，Run B 用 {0,1}。
 
@@ -104,7 +104,9 @@ seed 顺序：e2e 外层循环是 `for seed in range(N)`。cell 内方法顺序�
 - 若 Adaptive 明显更好（mean ΔFN ≤ −0.03，且 4/4 同号），必须在论文中如实写出，并讨论为何仍以 StaticTopK16 为主方法（简单、无需拥塞检测）。不得删去该结果。
 - 若 Adaptive 的 `congested_fraction` 在过载下 ≈0（<0.05），要写明「拥塞检测未触发，所以 Adaptive 实际退化为无 top-k」。
 
-**H7（安全性，硬约束）**：所有 cell 的 `stale_cache_hits` = 0；同时报告 `loose_false_positive_rate`。任一 cell >0 → 停止实验并排查（见 §5），不是简单剔除。
+**H7（安全性，硬约束）**：所有 cell 的 `stale_cache_hits` = 0；同时报告 `loose_false_positive_rate`。任一 cell >0 → 停止实验并排查（见 §5），不是简单剔除。这道门不放宽。
+
+一次命中计入 `stale_cache_hits`，当且仅当 `cached_tokens` ≥ 512、`routed_truth` == 0、`version` > 0，并且同一 cell 里此前没有把同一 slot、同一 version 发给该 worker（`e2e.py` 的 `is_stale_cache_hit`；发送顺序上由 `note_worker_dispatch` 记录，先于响应）。该 worker 上这一 `(slot, version)` 的第一次请求仍然计入。逐请求字段 `stale_cache_hit` 使用同一谓词。truth 在响应返回之后才写入，所以同一 slot+version 的后续在途请求仍会看到 `routed_truth` == 0；那是 sibling 的前缀，不计入。见 §11.1。
 
 ## 4. 指标
 
@@ -142,8 +144,8 @@ seed 顺序：e2e 外层循环是 `for seed in range(N)`。cell 内方法顺序�
 | V1 | `failed_requests` == 0 | row |
 | V2 | STATS2 存在：`stats2_missing` == 0，且没有 `stats_error` 键 | row |
 | V3 | `ledger_ingress_gap` ≤ 0.005，且 `ledger_balance_gap` ≤ 0.005 | row |
-| V4 | \|`measured_rho` / `nominal_rho_effective` − 1\| ≤ 0.10（burst 用 0.975） | row |
-| V5 | `stale_cache_hits` == 0（违反时**停机**，见 H7） | row |
+| V4 | \|`measured_rho` / `nominal_rho_effective` − 1\| ≤ 0.10（burst 用 0.975）。公式仍是 `noise_sent / noise_window / capacity`。±10% 不放宽。Run A 的第一个完成 cell 就要满足，否则停机（RUN_GUIDE §2.5.0） | row |
+| V5 | `stale_cache_hits` == 0（违反时**停机**，见 H7）。谓词见 H7，不放宽 | row |
 | V6 | `gateway_cpu` ≤ 0.85（所有方法，与 capacity_window 的接受条件一致；k=64 同样是 0.85，不再单独放宽） | row |
 | V7 | 干净代码树：summary 顶层 `git_dirty_files` == [] | summary meta |
 | V8 | summary 顶层 `commit` == `<RUN_SHA>`（运行时 HEAD，短 sha 前缀匹配），且 `git diff <CODE_SHA> <RUN_SHA> -- experiments` 为空（check_smoke `--code-sha` 自动检查） | summary meta + git |
@@ -207,7 +209,7 @@ seed 顺序：e2e 外层循环是 `for seed in range(N)`。cell 内方法顺序�
 | 使用 Exp 0 trace | 未使用；有用前缀为 Zipf(1.2) | "Useful prefixes follow a Zipf(1.2) popularity over a pool of 16 (32 in overlap/k-sweep)." |
 | 容量 120 s × 3 次 | path_capacity 每点 30 s，跑 2 次，每次 `<n>` 个速率点 | "Capacity is the FullSync link-limited service rate over rows with rho_row ≤ 1.5, measured in two independent runs (medians within 10%)." |
 | ρ 0.5/0.8/1.0/1.2，5 seeds | 0.5/0.9/1.2/1.5/2.0，rhoscan 2 seeds | "ρ ∈ {0.5, 0.9, 1.2, 1.5, 2.0}; two seeds per point in the scan." |
-| burst：平均 <1，测恢复时间 | m=1.5（平均 0.975，峰值 1.35）；无恢复 / 队列时间序列，改为逐请求 lag 随时间 | "Bursts raise offered load to 1.35 C during the last 5 s of every 30 s window (mean 0.975 C)."（已核实：`split_path.py:71` 中 `elapsed % 30 >= 25` 时 ×`burst_mult`） |
+| burst：平均 <1，测恢复时间 | m=1.5（平均 0.975，峰值 1.35）；无恢复 / 队列时间序列，改为逐请求 lag 随时间。噪声 `level` 是 `rho * capacity`（`e2e.py:469`），整段 cell 不预乘 `burst_mult` | "Bursts raise offered load to 1.35 C during the last 5 s of every 30 s window (mean 0.975 C)."（已核实：`split_path.py:60` 的 `_sender_rate` 在 `elapsed % 30.0 >= 25.0` 时 ×`burst_mult`；绝对截止时间在 `_offered_deadline`，`split_path.py:65`） |
 | e2e Normal / Near | main block 用 xhigh/ultrahigh/burst；normal/near 只在 rhoscan 中 | "Low-load behaviour is reported in the ρ scan." |
 | ≥500 请求，24 warmup | 每 cell 600 s，ceil(600×`<AR>`) 请求，10 warmup | "Each cell runs 600 s open-loop (≈`<N>` requests, first 10 discarded)." |
 | owner validation / fallback | 无；安全性靠带版本 salt 的缓存键加 `stale_cache_hits` | "Correctness does not rely on the control plane: cache keys are version-salted, and we observe zero stale hits." |
@@ -219,9 +221,28 @@ seed 顺序：e2e 外层循环是 `for seed in range(N)`。cell 内方法顺序�
 | C 的定义 | FullSync 在 rho_row ≤ 1.5 的行上的链路受限服务率（任何正式结果之前决定） | "C is the FullSync link-limited service rate on rows with rho_row ≤ 1.5, fixed before any formal cell." |
 | 测试床：ACK 与父类共用 | 网关发往发送端的 TCP ACK（sport 9710，HTB class 1:30）与 10 Mbit 父类共用，重度 ingress（rho_row≈2–3）下有效服务率降至约 0.65C；所有方法同样受影响，作为 limitation 报告 | "Gateway ACKs to the senders share the 10 Mbit HTB parent, so under heavy ingress (rho_row ≈ 2–3) the effective service rate falls to about 0.65 C. This hits every method equally and is reported as a limitation." |
 | V6 CPU | 任何正式 cell 之前由 0.70 放宽到 0.85。原因：容量测量显示高 offer 下网关 CPU 为 0.69–0.81 | "The CPU validity gate is 0.85 for every method, relaxed from 0.70 before any formal cell because capacity runs showed gateway CPU 0.69–0.81 at high offer." |
-| (4) spread 门槛 | 任何正式 cell 之前，平台 spread 硬门槛由 0.05 放宽到 0.20，两遍 C（中位数）容差由 5% 放宽到 10%。原因：在 `a8a07b7` 上重测，刚饱和的 FullSync 平台本身在相同 offered load 下波动 6–15%（r1 spread 0.120，9063–10195 fps；r2 spread 0.152，8755–10178 fps；同一目标的重复点最多相差 11.1%）。C 取中位数；把每遍的 spread 作为 C 的不确定度报告。0.05–0.20 之间打印 WARNING 并仍写出 json，警告原文与两遍 spread 记入本预注册 | "The 10 Mbit/s path's sustained forwarding rate varied by 6–15% across repeated measurements at identical offered load, so C is the median of the just-saturated plateau and we report the observed spread as its uncertainty." |
+| (4) spread 门槛 | 任何正式 cell 之前，平台 spread 硬门槛由 0.05 放宽到 0.20，两遍 C（中位数）容差由 5% 放宽到 10%。原因：在 `a8a07b7` 上重测，刚饱和的 FullSync 平台本身在相同 offered load 下波动 6–15%（r1 spread 0.120，9063–10195 fps；r2 spread 0.152，8755–10178 fps；同一目标的重复点最多相差 11.1%）。C 取中位数；把每遍的 spread 作为 C 的不确定度报告。0.05–0.20 之间打印 WARNING 并仍写出 json，警告原文与两遍 spread 记入本预注册。本轮不改回 0.05 | "The 10 Mbit/s path's sustained forwarding rate varied by 6–15% across repeated measurements at identical offered load, so C is the median of the just-saturated plateau and we report the observed spread as its uncertainty." |
+| (5)(6) 2026-10-08 代码偏差与作废的部分 Run A | 见 §11.1。任何新的正式 cell 之前写入。H7 仍是 `stale_cache_hits` == 0；V4 的 ±10% 不放宽；发送端数仍为 8 | "See the 2026-10-08 preregistration deviation: the stale-hit predicate excludes a later in-flight sibling, noise is paced to an absolute deadline, and the partial Run A at 2b12640 is not cited. The gates stay at zero stale hits and ±10% measured ρ." |
+
+### 11.1 2026-10-08 预注册偏差（任何新的正式 cell 之前）
+
+日期：2026-10-08。这两条在任何使用 CODE_SHA `48b64f4` 的正式 cell 之前写入本模板。复制后的 PREREG 保留本节，不要改写成开跑之后的补记。
+
+**(1) stale 谓词。** 一次缓存命中计入 stale，当且仅当 `cached_tokens` ≥ 512、`routed_truth` == 0、`version` > 0，并且同一 cell 里此前没有把同一 slot、同一 version 发给该 worker。该 worker 上这一 `(slot, version)` 的第一次请求仍然计入。逐请求 `stale_cache_hit` 与 cell 级 `stale_cache_hits` 使用同一谓词（`e2e.py:61` `is_stale_cache_hit`，`e2e.py:685`，汇总在 `e2e.py:644` / `e2e.py:824`）。H7、V5、check_smoke G4 仍是 `stale_cache_hits` == 0，不放宽。
+
+原因：在 commit `2b12640` 上停下的 Run A 报了 9 次 stale hit，9 次都是同一 worker 上同一 slot+version 的后续在途请求。truth 只在响应返回之后写入（`e2e.py:646`），所以这次在途请求仍看到 `routed_truth` == 0；命中的是 sibling 的前缀，不是更早版本留下的 KV。
+
+**(2) 噪声绝对截止时间。** `_send_until`（`split_path.py:114`）在发出下一批之前等到 `_offered_deadline`（`split_path.py:65`）。截止时间由已发出条数、`level`、发送端数和 burst 窗口决定，思路与 `capacity.drive`（`capacity.py` 里 `started + begin / rate`）相同：一次 sleep 跑长了，下一次等待变短，而不是把少减掉的时间累加进去。因此 offered rate 跟上 `level`。burst 仍是每 30 s 中前 25 s 为基线、后 5 s 乘 `burst_mult`（`_sender_rate`，`split_path.py:60`）。发送端数仍是 8（full_queue 的 `--noise-senders` 默认 8，正式命令也显式传 8）。不要加发送端。`measured_rho` 仍是 `noise_sent / noise_window / capacity`（`e2e.py:849`）。V4 / G3 的 ±10% 不变，不放宽。
+
+原因：那次 Run A 每一个已完成 cell 的 `measured_rho` 大约比名义值低 15–16%。旧的按批 sleep 会少发。
+
+**作废的部分 Run A。** commit `2b12640`、seed 0、`main_base` 完成 14/72 的那一次无效。不得 resume，不得引用，不得把其中的 cell 写进论文或 §12。结果目录保持原样，不要改写、不要删除（按 RUN_GUIDE 的命名是 `$OUT/formal_A_2b12640`）。重跑是新目录，实验代码是本文件的 CODE_SHA `48b64f4`。
+
+容量规则保持不变：平台 spread 硬门槛 0.20，V6 `gateway_cpu` ≤ 0.85，平台集 rho_row ≤ 1.5，不得使用 `--allow-dirty`。
 
 ## 12. 开跑后记录（只追加）
+
+§11.1 的部分 Run A 不是本节的一条结果，不要补写进去当作可引用的运行。下面只记 CODE_SHA `48b64f4` 的新目录。
 
 | 时间（UTC+8） | 事件 | 说明 |
 |---|---|---|
