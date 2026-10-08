@@ -3,8 +3,8 @@
 
 usage:
   check_smoke.py SUMMARY.json --head <run HEAD sha> --link-bit 10000000 [--main StaticTopK16]
-                 [--methods FullSync,BoundedFIFO16,...] [--cpu 0.7] [--cpu-k64 0.85] [--gap 0.005]
-                 [--code-sha bc59945 --repo /home/byh/B02]
+                 [--methods FullSync,BoundedFIFO16,...] [--cpu 0.85] [--cpu-k64 0.85] [--gap 0.005]
+                 [--code-sha 103d9d0 --repo /home/byh/B02]
 
 --head is the HEAD at run time (the summary "commit" field). With --code-sha,
 G1 also requires `git -C REPO diff --quiet CODE_SHA HEAD -- experiments`, i.e. a
@@ -83,7 +83,7 @@ def main() -> None:
     ap.add_argument("--main", default="StaticTopK16")
     ap.add_argument("--methods", default="", help="expected methods per (seed, scenario); empty = no G9")
     ap.add_argument("--gap", type=float, default=0.005)
-    ap.add_argument("--cpu", type=float, default=0.7)
+    ap.add_argument("--cpu", type=float, default=0.85)
     ap.add_argument("--cpu-k64", type=float, default=0.85, help="CPU gate for k=64 methods (ksweep)")
     ap.add_argument("--code-sha", default="", help="commit whose experiments/ tree must equal the run HEAD")
     ap.add_argument("--repo", default=".", help="git checkout used for --code-sha (default: cwd)")
