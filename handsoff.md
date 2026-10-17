@@ -28,31 +28,29 @@
 
 ## 可变交接
 
-更新时间：2026-10-17 01:00（UTC+8）。根目录 README 已改成当前 ICC KV 正式实验的入口说明。没有改 `experiments/`。没有实验进程。不要开正式矩阵，不要启动 `overnight.py` 或 `full_queue.py`。
+更新时间：2026-10-17 16:30（UTC+8）。P0-A1 历史审计写完。没有新 Cell，没有改 `experiments/`，没有改论文。
 
 ### 正在做的事
 
-替换过期的根目录 `README.md`。旧文还停在 2026-07 的语义 State Sketch 动机实验。新文指向 `docs/icc_formal/`，写明主方法 `StaticTopK16`、五个 block，以及不入库的本地产物。`handsoff.md` 分隔线以下按这次查看过的机器状态重写。
+P0-A1：四卡真实 KV metadata 压力是否足以支撑控制面问题。结论写在 `analysis/p0_pressure_realism/a1_baseline_audit/P0_A1_BASELINE_AUDIT.md`。Ideal 基线：Original 中位 2.071 upsert/s（1.53–2.97），Reuse 中位 1.071 upsert/s（0.85–1.40），tombstone 为 0。全部是 `publish_state()` 在请求完成后发的 wrapper UPSERT。`sig_bit_per_s = Ideal offered / ρ`，大约 1–5 kbit/s，是按 ρ 设的 HTB。相对 10 Mbit 下约 9400 frame/s 的排空，自然 ρ 约 0.00022。下一轮选 Option B，不要自动开。
 
 ### 当前状态
 
-停着。没有 `experiments.icc_kv`、`experiments.4t4`、`overnight` 或 `full_queue` 进程。`127.0.0.1:8000–8003` 没有在听，vLLM 没起来。网关容器 `b02-gateway4t4` 已 Up 6 天，`127.0.0.1:9710` 在听，9711 没有。同机还有 edgevisor、lhjj、gitlab 等无关容器，不要动。
-
-正式实验入口是 `docs/icc_formal/START_HERE.md`。实验代码 CODE_SHA 仍是 `48b64f4`。改文档之前 `git diff --stat 48b64f4 HEAD -- experiments` 为空。
+停着。`127.0.0.1:8000–8003` 没有在听。网关容器 `b02-gateway4t4` Up 7 天，`127.0.0.1:9710` 在听。同机 edgevisor、lhjj、gitlab 不要动。本轮标过：短时验证不需要；vLLM 没起来，若硬要跑也是 `LIVE_VALIDATION_DEFERRED`。
 
 ### 下一步
 
-用户说「继续」时，不要开正式矩阵。先等用户决定要不要把 vLLM 拉起来。开跑仍按 `docs/icc_formal/RUN_GUIDE.md`，并且先核对 `experiments/` 相对 `48b64f4` 没有 diff。
+用户明确说做 P0-A2 时，按 `NEXT_ITERATION_RECOMMENDATION.md`：用已测速率对一个事先写明来源的容量做 N/4 放大，算出 ρ=1 的逻辑 worker 数。不要重跑四卡，不要加噪声，不要开 16/32/64 正式矩阵。P0-B 的 2×2 也不要开；那条审计在分支 `p0-b1-activation-audit`。
 
 ### 已经定下来的约束
 
-- 默认天花板仍是 1 Gbit。10 Mbit 只用于 `--link-bit 10000000`。Gateway `--cpus 1 --cpuset-cpus 0`。
-- 主方法是 `StaticTopK16`。`Adaptive` 是消融。k 敏感性、覆盖度重叠、ρ 扫描的划分以 `experiments/icc_kv/full_queue.py` 的 `BLOCKS` 和 `docs/icc_formal/PREREG.md` 为准。
-- 不要把 4 张 GPU 写成大规模系统。
-- Python：`/home/byh/B02/poc/.venv/bin/python`。`analysis/icc_kv/` 在 `.gitignore`。
+- 四卡自然负载不能写成顶满 10 Mbit。formal4t4 的 kbit/s 链路是 ρ 缩放，不是测到的物理容量。
+- `offered_wire_bit_per_s` 只乘 UPSERT，104 字节是记账约定。
+- fan-in 的 N=32/64 不是 GPU 数。ρ_ctrl≥1 还依赖 `MU=200` 和每秒全表刷新假设（`r_sync=21.8821`）。
+- 原生 EVICT 没有观测。shadow tombstone 在基线里是 0。
 
 ### Git
 
-分支 `main`，跟踪 `origin/main`。这次提交只含 `README.md` 和 `handsoff.md`。不要 amend。
+审计在分支 `p0-a1-pressure-realism`，从 `main` 的 `c44ab85` 拉出。不要合并到 `main`，除非用户明确说。`p0-b1-activation-audit` 保持独立。
 
-不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`、`/tmp/icc_link_smoke2/`。
+不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`、`/tmp/icc_link_smoke2/`。`analysis/icc_kv/` 在 `.gitignore`。
