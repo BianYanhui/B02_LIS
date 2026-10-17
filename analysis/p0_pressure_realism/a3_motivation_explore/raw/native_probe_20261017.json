@@ -1,0 +1,336 @@
+{
+  "block_size": 16,
+  "kv_cache_tokens": 104544,
+  "phases": [
+    {
+      "name": "gpu0_cold_then_repeat",
+      "cold_s": 8.61,
+      "cold_usage": {
+        "prompt_tokens": 2055,
+        "total_tokens": 2059,
+        "completion_tokens": 4,
+        "prompt_tokens_details": null
+      },
+      "cold_metric_delta": {
+        "vllm:prefix_cache_queries_total": 0.0,
+        "vllm:prefix_cache_hits_total": 0.0,
+        "vllm:prompt_tokens_total": 0.0,
+        "vllm:generation_tokens_total": 0.0,
+        "vllm:request_success_total": 0.0,
+        "vllm:kv_cache_usage_perc": 0.0,
+        "vllm:num_preemptions_total": 0.0
+      },
+      "repeat_s": 0.224,
+      "repeat_usage": {
+        "prompt_tokens": 2055,
+        "total_tokens": 2059,
+        "completion_tokens": 4,
+        "prompt_tokens_details": {
+          "cached_tokens": 2048
+        }
+      },
+      "repeat_metric_delta": {
+        "vllm:prefix_cache_queries_total": 0.0,
+        "vllm:prefix_cache_hits_total": 0.0,
+        "vllm:prompt_tokens_total": 0.0,
+        "vllm:generation_tokens_total": 0.0,
+        "vllm:request_success_total": 0.0,
+        "vllm:kv_cache_usage_perc": 0.0,
+        "vllm:num_preemptions_total": 0.0
+      }
+    },
+    {
+      "name": "four_gpu_16_unique_2048w",
+      "wall_s": 22.738,
+      "per_request_s": [
+        7.5,
+        17.049,
+        16.878,
+        16.966,
+        7.592,
+        17.141,
+        16.969,
+        17.059,
+        7.661,
+        17.21,
+        17.037,
+        17.128,
+        7.699,
+        22.626,
+        22.556,
+        22.721
+      ],
+      "usages": [
+        {
+          "prompt_tokens": 2061,
+          "total_tokens": 2065,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2061,
+          "total_tokens": 2065,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2061,
+          "total_tokens": 2065,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2061,
+          "total_tokens": 2065,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2061,
+          "total_tokens": 2065,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2061,
+          "total_tokens": 2065,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2061,
+          "total_tokens": 2065,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2061,
+          "total_tokens": 2065,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2061,
+          "total_tokens": 2065,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2061,
+          "total_tokens": 2065,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2062,
+          "total_tokens": 2066,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2062,
+          "total_tokens": 2066,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2062,
+          "total_tokens": 2066,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2062,
+          "total_tokens": 2066,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2062,
+          "total_tokens": 2066,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        },
+        {
+          "prompt_tokens": 2062,
+          "total_tokens": 2066,
+          "completion_tokens": 4,
+          "prompt_tokens_details": null
+        }
+      ],
+      "cluster_metric_delta": {
+        "vllm:prefix_cache_queries_total": 0.0,
+        "vllm:prefix_cache_hits_total": 0.0,
+        "vllm:prompt_tokens_total": 0.0,
+        "vllm:generation_tokens_total": 0.0,
+        "vllm:request_success_total": 0.0,
+        "vllm:kv_cache_usage_perc": 0.0,
+        "vllm:num_preemptions_total": 0.0
+      },
+      "query_tokens_per_s": 0.0,
+      "prompt_tokens_per_s": 0.0,
+      "implied_blocks_per_s": 0.0
+    },
+    {
+      "name": "gpu0_fill_until_0.90",
+      "n_fill": 70,
+      "wall_s": 33.598,
+      "trace_every_10": [
+        {
+          "i": 0,
+          "s": 1.837,
+          "usage_after": 0.0,
+          "prompt_tokens": 1564,
+          "cached_tokens": null,
+          "queries": 0.0,
+          "hits": 0.0
+        },
+        {
+          "i": 10,
+          "s": 0.447,
+          "usage_after": 0.0,
+          "prompt_tokens": 1565,
+          "cached_tokens": null,
+          "queries": 0.0,
+          "hits": 0.0
+        },
+        {
+          "i": 20,
+          "s": 0.411,
+          "usage_after": 0.0,
+          "prompt_tokens": 1565,
+          "cached_tokens": null,
+          "queries": 0.0,
+          "hits": 0.0
+        },
+        {
+          "i": 30,
+          "s": 0.446,
+          "usage_after": 0.0,
+          "prompt_tokens": 1565,
+          "cached_tokens": null,
+          "queries": 0.0,
+          "hits": 0.0
+        },
+        {
+          "i": 40,
+          "s": 0.419,
+          "usage_after": 0.0,
+          "prompt_tokens": 1565,
+          "cached_tokens": null,
+          "queries": 0.0,
+          "hits": 0.0
+        },
+        {
+          "i": 50,
+          "s": 0.451,
+          "usage_after": 0.0,
+          "prompt_tokens": 1565,
+          "cached_tokens": null,
+          "queries": 0.0,
+          "hits": 0.0
+        },
+        {
+          "i": 60,
+          "s": 0.458,
+          "usage_after": 0.0,
+          "prompt_tokens": 1565,
+          "cached_tokens": null,
+          "queries": 0.0,
+          "hits": 0.0
+        }
+      ],
+      "last": {
+        "i": 69,
+        "s": 0.462,
+        "usage_after": 0.0,
+        "prompt_tokens": 1565,
+        "cached_tokens": null,
+        "queries": 0.0,
+        "hits": 0.0
+      },
+      "saturated_unique": [
+        {
+          "i": 0,
+          "s": 0.469,
+          "usage_before": 0.0,
+          "usage_after": 0.0,
+          "queries": 0.0,
+          "hits": 0.0,
+          "prompt_tokens": 1564,
+          "cached_tokens": null
+        },
+        {
+          "i": 1,
+          "s": 0.474,
+          "usage_before": 0.0,
+          "usage_after": 0.0,
+          "queries": 0.0,
+          "hits": 0.0,
+          "prompt_tokens": 1564,
+          "cached_tokens": null
+        },
+        {
+          "i": 2,
+          "s": 0.475,
+          "usage_before": 0.0,
+          "usage_after": 0.0,
+          "queries": 0.0,
+          "hits": 0.0,
+          "prompt_tokens": 1564,
+          "cached_tokens": null
+        },
+        {
+          "i": 3,
+          "s": 0.459,
+          "usage_before": 0.0,
+          "usage_after": 0.0,
+          "queries": 0.0,
+          "hits": 0.0,
+          "prompt_tokens": 1564,
+          "cached_tokens": null
+        },
+        {
+          "i": 4,
+          "s": 0.474,
+          "usage_before": 0.0,
+          "usage_after": 0.0,
+          "queries": 0.0,
+          "hits": 0.0,
+          "prompt_tokens": 1564,
+          "cached_tokens": null
+        },
+        {
+          "i": 5,
+          "s": 0.474,
+          "usage_before": 0.0,
+          "usage_after": 0.0,
+          "queries": 0.0,
+          "hits": 0.0,
+          "prompt_tokens": 1564,
+          "cached_tokens": null
+        },
+        {
+          "i": 6,
+          "s": 0.474,
+          "usage_before": 0.0,
+          "usage_after": 0.0,
+          "queries": 0.0,
+          "hits": 0.0,
+          "prompt_tokens": 1564,
+          "cached_tokens": null
+        },
+        {
+          "i": 7,
+          "s": 0.462,
+          "usage_before": 0.0,
+          "usage_after": 0.0,
+          "queries": 0.0,
+          "hits": 0.0,
+          "prompt_tokens": 1564,
+          "cached_tokens": null
+        }
+      ]
+    }
+  ]
+}

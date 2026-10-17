@@ -1,0 +1,83 @@
+{
+  "note": "queries_total is tokens, per the metric HELP text",
+  "pair": {
+    "cold_s": 0.36,
+    "cold_prompt": 1028,
+    "cold_cached": null,
+    "cold_dq": 1028.0,
+    "cold_dh": 0.0,
+    "cold_usage_perc": 0.0,
+    "hot_s": 0.058,
+    "hot_prompt": 1028,
+    "hot_cached": 1024,
+    "hot_dq": 1028.0,
+    "hot_dh": 1024.0
+  },
+  "evict": {
+    "plant": [
+      {
+        "s": 0.278,
+        "prompt": 1030,
+        "cached": null
+      },
+      {
+        "s": 0.318,
+        "prompt": 1030,
+        "cached": null
+      },
+      {
+        "s": 0.279,
+        "prompt": 1030,
+        "cached": null
+      },
+      {
+        "s": 0.277,
+        "prompt": 1030,
+        "cached": null
+      }
+    ],
+    "flood_n": 90,
+    "flood_prompt_tokens": 92780,
+    "flood_s": 26.306,
+    "flood_prompt_tok_per_s": 3526.901465828407,
+    "implied_new_blocks_per_s": 220.43134161427542,
+    "replay": [
+      {
+        "i": 0,
+        "s": 0.057,
+        "prompt": 1030,
+        "cached": 1024
+      },
+      {
+        "i": 1,
+        "s": 0.095,
+        "prompt": 1030,
+        "cached": 1024
+      },
+      {
+        "i": 2,
+        "s": 0.049,
+        "prompt": 1030,
+        "cached": 1024
+      },
+      {
+        "i": 3,
+        "s": 0.048,
+        "prompt": 1030,
+        "cached": 1024
+      }
+    ],
+    "usage_after": 0.0
+  },
+  "cluster": {
+    "n": 32,
+    "wall_s": 5.869,
+    "prompt_tokens": 33142,
+    "prompt_tok_per_s": 5646.721502049946,
+    "query_delta": 33142.0,
+    "hit_delta": 0.0,
+    "query_tok_per_s": 5646.721502049946,
+    "implied_blocks_per_s": 352.92009387812163,
+    "new_blocks_per_s_from_uncached": 352.92009387812163
+  }
+}

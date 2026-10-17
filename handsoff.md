@@ -28,15 +28,15 @@
 
 ## 可变交接
 
-更新时间：2026-10-17 17:30（UTC+8）。P0-A2 缩放核算写完。没有开 GPU，没有改 `experiments/`，没有改论文。
+更新时间：2026-10-17 17:40（UTC+8）。四条 motivation 补强路径在 4×T4 上探过。vLLM 已停，GPU 空闲。没有改 `experiments/`，没有改论文。
 
 ### 正在做的事
 
-P0-A2：用 P0-A1 的 2.071 和 1.071 upsert/s 做 N=4..64 线性外推，对 C1=9408 frame/s（10 Mbit tc 排空）和 C2=200 frame/s（`--drain-fps` 默认值）算 ρ。报告在 `analysis/p0_pressure_realism/a2_realism_gate/P0_A2_REALISM_GATE.md`。只计已测 UPSERT 时，N≤64 的 ρ 最大是 Original 对 C2 的 0.166，对 C1 最大 0.0035。`anchor_L_of_N.csv` 的全表刷新没有在正式基线发生。决策是 C：论文定位为预算约束下的协调，收窄普遍拥塞的 motivation。不要自动改论文，不要开测量。
+P0-A2 决策仍是 C。随后在空闲的四张 T4 上探过 motivation 还能不能从别的口径立住。记录在 `analysis/p0_pressure_realism/a3_motivation_explore/MOTIVATION_POSSIBILITIES.md`。vLLM 用现有 `restart_4t4.sh` 拉起（KV cache 104544 token，block 16），探针结束已停。四卡 unique prefill 的 prefix-cache 查询是 353 block/s（5,647 token/s）；单卡 220 block/s。按 104 字节记账约 0.3 Mbit/s，四倍单卡外推约 0.7 Mbit/s，仍低于 10 Mbit 排空（9408 frame/s），但高于写死的 200 frame/s。热缓存 1028 token 是 0.058 s，冷的是 0.360 s。缓存打满后早期前缀会变成 miss，正式负载打不满这块缓存。`kv_cache_usage_perc` 全程是 0，不能当驻留证据。
 
 ### 当前状态
 
-停着。2026-10-17 17:30 再次确认 `127.0.0.1:8000–8003` 没有在听，`127.0.0.1:9710` 在听。同机 edgevisor、lhjj、gitlab 不要动。本轮按任务没有启动 vLLM。
+停着。探针用的四台 vLLM 已按 pid 文件停掉。2026-10-17 17:40 `nvidia-smi` 四张 T4 显存 0。`127.0.0.1:9710` 上的网关容器还在，不要动 edgevisor、lhjj、gitlab。
 
 ### 下一步
 
@@ -47,10 +47,10 @@ P0-A2：用 P0-A1 的 2.071 和 1.071 upsert/s 做 N=4..64 线性外推，对 C1
 - 四卡自然负载不能写成顶满 10 Mbit。formal4t4 的 kbit/s 链路是 ρ 缩放，不是测到的物理容量。
 - `offered_wire_bit_per_s` 只乘 UPSERT，104 字节是记账约定。
 - fan-in 的 N=32/64 不是 GPU 数。ρ_ctrl≥1 还依赖 `MU=200` 和每秒全表刷新假设（`r_sync=21.8821`）。
-- 原生 EVICT 没有观测。shadow tombstone 在基线里是 0。
+- 原生 block 查询测到过：四卡 unique prefill 约 353 block/s。正式基线的 shadow tombstone 仍是 0，因为工作集打不满 104544 token。缓存打满后的真实驱逐只在 2026-10-17 的探针里看到一次 miss，没有 tombstone 速率。
 
 ### Git
 
-P0-A1 在 `p0-a1-pressure-realism`（`8c8b391`）。P0-A2 在 `p0-a2-realism-gate`，从前者拉出。不要合并到 `main`，除非用户明确说。`p0-b1-activation-audit` 保持独立。
+P0-A1 在 `p0-a1-pressure-realism`。P0-A2 在 `p0-a2-realism-gate`。这次探索在 `p0-a3-motivation-explore`，从 A2 拉出。不要合并到 `main`，除非用户明确说。`p0-b1-activation-audit` 保持独立。
 
 不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`、`/tmp/icc_link_smoke2/`。`analysis/icc_kv/` 在 `.gitignore`。
