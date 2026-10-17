@@ -28,19 +28,19 @@
 
 ## 可变交接
 
-更新时间：2026-10-17 16:30（UTC+8）。P0-A1 历史审计写完。没有新 Cell，没有改 `experiments/`，没有改论文。
+更新时间：2026-10-17 17:30（UTC+8）。P0-A2 缩放核算写完。没有开 GPU，没有改 `experiments/`，没有改论文。
 
 ### 正在做的事
 
-P0-A1：四卡真实 KV metadata 压力是否足以支撑控制面问题。结论写在 `analysis/p0_pressure_realism/a1_baseline_audit/P0_A1_BASELINE_AUDIT.md`。Ideal 基线：Original 中位 2.071 upsert/s（1.53–2.97），Reuse 中位 1.071 upsert/s（0.85–1.40），tombstone 为 0。全部是 `publish_state()` 在请求完成后发的 wrapper UPSERT。`sig_bit_per_s = Ideal offered / ρ`，大约 1–5 kbit/s，是按 ρ 设的 HTB。相对 10 Mbit 下约 9400 frame/s 的排空，自然 ρ 约 0.00022。下一轮选 Option B，不要自动开。
+P0-A2：用 P0-A1 的 2.071 和 1.071 upsert/s 做 N=4..64 线性外推，对 C1=9408 frame/s（10 Mbit tc 排空）和 C2=200 frame/s（`--drain-fps` 默认值）算 ρ。报告在 `analysis/p0_pressure_realism/a2_realism_gate/P0_A2_REALISM_GATE.md`。只计已测 UPSERT 时，N≤64 的 ρ 最大是 Original 对 C2 的 0.166，对 C1 最大 0.0035。`anchor_L_of_N.csv` 的全表刷新没有在正式基线发生。决策是 C：论文定位为预算约束下的协调，收窄普遍拥塞的 motivation。不要自动改论文，不要开测量。
 
 ### 当前状态
 
-停着。`127.0.0.1:8000–8003` 没有在听。网关容器 `b02-gateway4t4` Up 7 天，`127.0.0.1:9710` 在听。同机 edgevisor、lhjj、gitlab 不要动。本轮标过：短时验证不需要；vLLM 没起来，若硬要跑也是 `LIVE_VALIDATION_DEFERRED`。
+停着。2026-10-17 17:30 再次确认 `127.0.0.1:8000–8003` 没有在听，`127.0.0.1:9710` 在听。同机 edgevisor、lhjj、gitlab 不要动。本轮按任务没有启动 vLLM。
 
 ### 下一步
 
-用户明确说做 P0-A2 时，按 `NEXT_ITERATION_RECOMMENDATION.md`：用已测速率对一个事先写明来源的容量做 N/4 放大，算出 ρ=1 的逻辑 worker 数。不要重跑四卡，不要加噪声，不要开 16/32/64 正式矩阵。P0-B 的 2×2 也不要开；那条审计在分支 `p0-b1-activation-audit`。
+停在 P0-A2 的决策 C。用户明确要求改论文表述时，再按报告第 7 节收窄 motivation，并附上 L_A 的 ρ 表。不要开原生事件测量，除非用户改口要保留“自然负载会拥塞”并接受事先写明的 K 判定线（C1、N=64、Original 为 284）。不要重跑四卡，不要加噪声，不要开 16/32/64 正式矩阵。P0-B 的 2×2 也不要开；那条审计在分支 `p0-b1-activation-audit`。
 
 ### 已经定下来的约束
 
@@ -51,6 +51,6 @@ P0-A1：四卡真实 KV metadata 压力是否足以支撑控制面问题。结�
 
 ### Git
 
-审计在分支 `p0-a1-pressure-realism`，从 `main` 的 `c44ab85` 拉出。不要合并到 `main`，除非用户明确说。`p0-b1-activation-audit` 保持独立。
+P0-A1 在 `p0-a1-pressure-realism`（`8c8b391`）。P0-A2 在 `p0-a2-realism-gate`，从前者拉出。不要合并到 `main`，除非用户明确说。`p0-b1-activation-audit` 保持独立。
 
 不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`、`/tmp/icc_link_smoke2/`。`analysis/icc_kv/` 在 `.gitignore`。
