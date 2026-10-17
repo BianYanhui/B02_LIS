@@ -1,0 +1,5 @@
+mark,vllm:prefix_cache_queries_total,vllm:prefix_cache_hits_total,vllm:kv_cache_usage_perc,vllm:prompt_tokens_total
+start,157.0,0.0,0.0,157.0
+after_A,21374.0,304.0,0.0,21374.0
+after_B,30851.0,8624.0,0.0,30851.0
+after_C,158264.0,10544.0,0.0,158264.0

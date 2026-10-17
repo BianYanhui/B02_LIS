@@ -1,0 +1,14 @@
+signal,class,where,what_it_counts,this_round
+BlockStored,DIRECT_NATIVE_EVENT,vllm/v1/core/block_pool.py cache_full_blocks,one event when one or more full blocks are newly inserted; payload is block hashes plus parent hash; token ids are present on the wire and were hashed then dropped,observed over ZMQ
+BlockRemoved,DIRECT_NATIVE_EVENT,vllm/v1/core/block_pool.py _maybe_evict_cached_block,one event per cached block taken off the free list for a new allocation,observed over ZMQ; starts once the 6534-block pool is full
+AllBlocksCleared,DIRECT_NATIVE_EVENT,vllm/v1/core/block_pool.py reset_prefix_cache,prefix cache reset,observed; caused by our POST /reset_prefix_cache between scenarios
+block allocation before the block is full,NOT_EMITTED,get_new_blocks,a free block is allocated with no event,no direct event
+prefix-cache hit / block reuse,NOT_EMITTED,block_pool.touch,reference-count increment,no direct event; seen only as cached_tokens and the hit counter
+block free at request end,NOT_EMITTED,block_pool.free_blocks,block returns to the free list,no event until a later allocation evicts it
+vllm:prefix_cache_queries_total,ENGINE_INTERNAL_COUNTER,v1 metrics logger,queried tokens,observed; equals prompt tokens in this run
+vllm:prefix_cache_hits_total,ENGINE_INTERNAL_COUNTER,v1 metrics logger,hit tokens,observed; +16 per request after the shared chat prefix is cached
+vllm:kv_cache_usage_perc,ENGINE_INTERNAL_COUNTER,v1 metrics logger,reported usage fraction,stayed 0.0 through allocation and eviction; not used as residence evidence
+prompt_tokens/16,DERIVED_FROM_TOKENS,client arithmetic,block-equivalents of queried tokens,not an event count; the earlier 353 block/s figure is this kind
+API cached_tokens,ENGINE_INTERNAL_COUNTER,chat completion usage,block-aligned cached prompt tokens,observed; 1040 on a warm 1053-token prompt
+publish_state UPSERT,WRAPPER_GENERATED,experiments/4t4/run_formal4t4.py,one message per completion,not emitted here; Model C counts one per completion offline
+ShadowCache tombstone,SHADOW_MODEL_INFERRED,run_formal4t4.py ShadowCache.insert,LRU past 104544 tokens,not used; eviction evidence is BlockRemoved

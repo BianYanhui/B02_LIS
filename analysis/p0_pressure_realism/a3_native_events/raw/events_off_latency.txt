@@ -1,0 +1,11 @@
+events_off same server flags except no --kv-events-config
+reset then one cold and six warm copies of the reuse-same 1024-token prompt, max_tokens 4
+cold 9.014s cached empty  (first request after process start, includes engine warmup)
+warm 1.587s cached 1040
+warm 0.197s cached 1040
+warm 0.143s cached 1040
+warm 0.138s cached 1040
+warm 0.137s cached 1040
+warm 0.143s cached 1040
+steady warm median of the last four: 0.1405s
+events_on scenario B steady warm median: 0.139s
