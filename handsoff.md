@@ -28,31 +28,34 @@
 
 ## 可变交接
 
-更新时间：2026-10-17 01:00（UTC+8）。根目录 README 已改成当前 ICC KV 正式实验的入口说明。没有改 `experiments/`。没有实验进程。不要开正式矩阵，不要启动 `overnight.py` 或 `full_queue.py`。
+更新时间：2026-10-17 15:20（UTC+8）。P0-B1 历史审计已写完，放在分支 `p0-b1-activation-audit`。没有改 `experiments/`，没有开 smoke，没有做 2×2。不要把网关改动提交到 `main`。不要开正式矩阵，不要启动 `overnight.py` 或 `full_queue.py`。
 
 ### 正在做的事
 
-替换过期的根目录 `README.md`。旧文还停在 2026-07 的语义 State Sketch 动机实验。新文指向 `docs/icc_formal/`，写明主方法 `StaticTopK16`、五个 block，以及不入库的本地产物。`handsoff.md` 分隔线以下按这次查看过的机器状态重写。
+审计 Pressure-Triggered Filtering 在已有实验里是否真的被激活。报告是 `analysis/p0_filtering_ablation/P0_B1_ACTIVATION_AUDIT.md`，逐格表是同目录的 `activation_cells.csv`。
+
+已由历史数据证实：10 Mbit Run B 的 Adaptive `congested_fraction` 和 `low_utility` 都是 0，Top-K 把队列压在约 18 帧。formal4t4 Reuse-intensive 上效用准入只删了 1024-token 更新；Original-compatible 的 `relay_drop_low_utility` 是 `1dc24ec` 里缩容误记。161 ± 85 ms 是 Reuse 上 Adaptive 相对 StaticSemantic 的联合 TTFT 差，不能写成效用过滤的独立收益。
 
 ### 当前状态
 
-停着。没有 `experiments.icc_kv`、`experiments.4t4`、`overnight` 或 `full_queue` 进程。`127.0.0.1:8000–8003` 没有在听，vLLM 没起来。网关容器 `b02-gateway4t4` 已 Up 6 天，`127.0.0.1:9710` 在听，9711 没有。同机还有 edgevisor、lhjj、gitlab 等无关容器，不要动。
+停着。没有为这次审计重新拉起 vLLM。01:00 时 `127.0.0.1:8000–8003` 没有在听，网关容器 `b02-gateway4t4` 在听 `127.0.0.1:9710`。同机的 edgevisor、lhjj、gitlab 等容器不要动。
 
-正式实验入口是 `docs/icc_formal/START_HERE.md`。实验代码 CODE_SHA 仍是 `48b64f4`。改文档之前 `git diff --stat 48b64f4 HEAD -- experiments` 为空。
+`main` 上 `experiments/` 相对 `48b64f4` 仍然为空。审计分支也不改实验代码。
 
 ### 下一步
 
-用户说「继续」时，不要开正式矩阵。先等用户决定要不要把 vLLM 拉起来。开跑仍按 `docs/icc_formal/RUN_GUIDE.md`，并且先核对 `experiments/` 相对 `48b64f4` 没有 diff。
+用户说「继续」时，不要开 10 Mbit 的 2×2，也不要为了让过滤触发去改 tau、λ 或 queue gate。若用户要改论文句子，按审计报告 G 节替换，不要加长篇幅。只有用户明确要求拆 161 ms 时，才在 formal4t4 的 Reuse-intensive、ρ∈{0.8,1.0,1.2} 上另开分支设计小规模因子实验。
 
 ### 已经定下来的约束
 
 - 默认天花板仍是 1 Gbit。10 Mbit 只用于 `--link-bit 10000000`。Gateway `--cpus 1 --cpuset-cpus 0`。
-- 主方法是 `StaticTopK16`。`Adaptive` 是消融。k 敏感性、覆盖度重叠、ρ 扫描的划分以 `experiments/icc_kv/full_queue.py` 的 `BLOCKS` 和 `docs/icc_formal/PREREG.md` 为准。
+- 主方法是 `StaticTopK16`。`Adaptive` 是消融。旧的 `adaptive=1` 必须继续同时表示效用过滤和 K//4 缩容，已有单测不能改语义。
+- 论文里相对 StaticSemantic 的 161 ± 85 ms 不能写成效用过滤的独立收益。
 - 不要把 4 张 GPU 写成大规模系统。
 - Python：`/home/byh/B02/poc/.venv/bin/python`。`analysis/icc_kv/` 在 `.gitignore`。
 
 ### Git
 
-分支 `main`，跟踪 `origin/main`。这次提交只含 `README.md` 和 `handsoff.md`。不要 amend。
+`main` 仍是 `c44ab85`，跟踪 `origin/main`。P0-B1 审计在分支 `p0-b1-activation-audit`，只含报告、逐格表和这份交接。不要 amend。不要把该分支合并进 `main`，除非用户明确要求。
 
 不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`、`/tmp/icc_link_smoke2/`。
