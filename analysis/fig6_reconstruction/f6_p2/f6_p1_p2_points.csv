@@ -1,0 +1,37 @@
+condition,cell,seed,snapshot_id,confirmation,loads,delta_load,regret_ms,best_owner_hidden,selected_changed,forwarded_ads,dropped_ads,full_is_model_argmin
+F6-P1 Forward idle,F6-P1,1,A0,ENGINE_CONFIRMED,0;0;0;0,0,0.0,0,0,2,2,1
+F6-P1 Forward,F6-P1,1,B0,HARNESS_ONLY,1;0;0;0,0,0.0,0,0,2,2,1
+F6-P1 Forward,F6-P1,1,B1,ENGINE_CONFIRMED,1;1;0;0,1,2.0,1,1,2,2,1
+F6-P1 Forward,F6-P1,1,B2,ENGINE_CONFIRMED,1;1;1;0,1,2.0,1,1,2,2,1
+F6-P1 Forward,F6-P1,1,B3,ENGINE_CONFIRMED,1;1;1;1,0,0.0,0,0,2,2,1
+F6-P1 Forward,F6-P1,1,B4,HARNESS_ONLY,2;1;1;1,0,0.0,0,0,2,2,1
+F6-P1 Forward,F6-P1,1,B5,HARNESS_ONLY,2;2;1;1,1,2.0,1,1,2,2,1
+F6-P1 Forward,F6-P1,1,B6,HARNESS_ONLY,2;2;2;1,1,2.0,1,1,2,2,1
+F6-P1 Forward,F6-P1,1,B7,HARNESS_ONLY,2;2;2;2,0,0.0,0,0,2,2,1
+F6-P2 idle,A-reverse,1,A-reverse:idle:-1,ENGINE_CONFIRMED,0;0;0;0,0,0.0,0,0,2,2,1
+F6-P2 Reverse,A-reverse,1,A-reverse:ramp:0,ENGINE_CONFIRMED,0;0;0;1,0,0.0,0,0,2,2,1
+F6-P2 Reverse,A-reverse,1,A-reverse:ramp:1,ENGINE_CONFIRMED,0;0;1;1,-1,0.0,0,0,2,2,1
+F6-P2 Reverse,A-reverse,1,A-reverse:ramp:2,ENGINE_CONFIRMED,0;1;1;1,-1,0.0,0,0,2,2,1
+F6-P2 Reverse,A-reverse,1,A-reverse:ramp:3,ENGINE_CONFIRMED,1;1;1;1,0,0.0,0,0,2,2,1
+F6-P2 Reverse,A-reverse,1,A-reverse:ramp:4,HARNESS_ONLY,1;1;1;2,0,0.0,0,0,2,2,1
+F6-P2 Reverse,A-reverse,1,A-reverse:ramp:5,HARNESS_ONLY,1;1;2;2,-1,0.0,0,0,2,2,1
+F6-P2 Reverse,A-reverse,1,A-reverse:ramp:6,HARNESS_ONLY,1;2;2;2,-1,0.0,0,0,2,2,1
+F6-P2 Reverse,A-reverse,1,A-reverse:ramp:7,HARNESS_ONLY,2;2;2;2,0,0.0,0,0,2,2,1
+F6-P2 idle,B-interleaved,1,B-interleaved:idle:-1,ENGINE_CONFIRMED,0;0;0;0,0,0.0,0,0,2,2,1
+F6-P2 Interleaved,B-interleaved,1,B-interleaved:ramp:0,ENGINE_CONFIRMED,1;0;0;0,0,0.0,0,0,2,2,1
+F6-P2 Interleaved,B-interleaved,1,B-interleaved:ramp:1,ENGINE_CONFIRMED,1;0;1;0,0,0.0,0,0,2,2,1
+F6-P2 Interleaved,B-interleaved,1,B-interleaved:ramp:2,ENGINE_CONFIRMED,1;1;1;0,1,2.0,1,1,2,2,1
+F6-P2 Interleaved,B-interleaved,1,B-interleaved:ramp:3,ENGINE_CONFIRMED,1;1;1;1,0,0.0,0,0,2,2,1
+F6-P2 Interleaved,B-interleaved,1,B-interleaved:ramp:4,ENGINE_CONFIRMED,1;1;2;1,0,0.0,0,0,2,2,1
+F6-P2 Interleaved,B-interleaved,1,B-interleaved:ramp:5,ENGINE_CONFIRMED,2;1;2;1,0,0.0,0,0,2,2,1
+F6-P2 Interleaved,B-interleaved,1,B-interleaved:ramp:6,ENGINE_CONFIRMED,2;1;2;2,-1,0.0,0,0,2,2,1
+F6-P2 Interleaved,B-interleaved,1,B-interleaved:ramp:7,ENGINE_CONFIRMED,2;2;2;2,0,0.0,0,0,2,2,1
+F6-P2 idle,C-forward-seed2,2,C-forward-seed2:idle:-1,ENGINE_CONFIRMED,0;0;0;0,0,0.0,0,0,2,2,1
+F6-P2 Forward Reproduction,C-forward-seed2,2,C-forward-seed2:ramp:0,ENGINE_CONFIRMED,1;0;0;0,0,0.0,0,0,2,2,1
+F6-P2 Forward Reproduction,C-forward-seed2,2,C-forward-seed2:ramp:1,ENGINE_CONFIRMED,1;1;0;0,1,2.0,1,1,2,2,1
+F6-P2 Forward Reproduction,C-forward-seed2,2,C-forward-seed2:ramp:2,ENGINE_CONFIRMED,1;1;1;0,1,2.0,1,1,2,2,1
+F6-P2 Forward Reproduction,C-forward-seed2,2,C-forward-seed2:ramp:3,ENGINE_CONFIRMED,1;1;1;1,0,0.0,0,0,2,2,1
+F6-P2 Forward Reproduction,C-forward-seed2,2,C-forward-seed2:ramp:4,ENGINE_CONFIRMED,2;1;1;1,0,0.0,0,0,2,2,1
+F6-P2 Forward Reproduction,C-forward-seed2,2,C-forward-seed2:ramp:5,ENGINE_CONFIRMED,2;2;1;1,1,2.0,1,1,2,2,1
+F6-P2 Forward Reproduction,C-forward-seed2,2,C-forward-seed2:ramp:6,ENGINE_CONFIRMED,2;2;2;1,1,2.0,1,1,2,2,1
+F6-P2 Forward Reproduction,C-forward-seed2,2,C-forward-seed2:ramp:7,ENGINE_CONFIRMED,2;2;2;2,0,0.0,0,0,2,2,1
