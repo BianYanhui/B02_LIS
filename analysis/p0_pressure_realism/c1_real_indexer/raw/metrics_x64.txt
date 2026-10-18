@@ -1,0 +1,100 @@
+# HELP dynamo_kvindexer_listeners Number of ZMQ listeners by status
+# TYPE dynamo_kvindexer_listeners gauge
+dynamo_kvindexer_listeners{status="active"} 1
+dynamo_kvindexer_listeners{status="failed"} 0
+dynamo_kvindexer_listeners{status="paused"} 0
+dynamo_kvindexer_listeners{status="pending"} 0
+# HELP dynamo_kvindexer_models Number of active model+routing-group indexers
+# TYPE dynamo_kvindexer_models gauge
+dynamo_kvindexer_models 1
+# HELP dynamo_kvindexer_request_duration_seconds HTTP request latency
+# TYPE dynamo_kvindexer_request_duration_seconds histogram
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.0001"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.0002"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.0004"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.0008"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.0016"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.0032"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.0064"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.0128"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.0256"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.0512"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.1024"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.2048"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.4096"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="0.8192"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="1.6384"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="3.2768"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="6.5536"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="13.1072"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="26.2144"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="52.4288"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/health",le="+Inf"} 1
+dynamo_kvindexer_request_duration_seconds_sum{endpoint="/health"} 0.000073795
+dynamo_kvindexer_request_duration_seconds_count{endpoint="/health"} 1
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.0001"} 0
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.0002"} 0
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.0004"} 0
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.0008"} 0
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.0016"} 63
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.0032"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.0064"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.0128"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.0256"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.0512"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.1024"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.2048"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.4096"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="0.8192"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="1.6384"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="3.2768"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="6.5536"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="13.1072"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="26.2144"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="52.4288"} 79
+dynamo_kvindexer_request_duration_seconds_bucket{endpoint="/query",le="+Inf"} 79
+dynamo_kvindexer_request_duration_seconds_sum{endpoint="/query"} 0.12468236999999997
+dynamo_kvindexer_request_duration_seconds_count{endpoint="/query"} 79
+# HELP dynamo_kvindexer_requests_total Total HTTP requests
+# TYPE dynamo_kvindexer_requests_total counter
+dynamo_kvindexer_requests_total{endpoint="/health",method="GET"} 1
+dynamo_kvindexer_requests_total{endpoint="/query",method="POST"} 79
+# HELP dynamo_kvindexer_workers Number of registered worker instances
+# TYPE dynamo_kvindexer_workers gauge
+dynamo_kvindexer_workers 1
+# HELP dynamo_kvrouter_ckf_mutation_total Total number of CKF block-level mutation outcomes
+# TYPE dynamo_kvrouter_ckf_mutation_total counter
+dynamo_kvrouter_ckf_mutation_total{outcome="capacity_exhausted"} 0
+dynamo_kvrouter_ckf_mutation_total{outcome="unknown_remove"} 0
+# HELP dynamo_kvrouter_kv_cache_event_warnings Total number of suspicious KV cache events seen by the router indexer
+# TYPE dynamo_kvrouter_kv_cache_event_warnings counter
+dynamo_kvrouter_kv_cache_event_warnings{warning_kind="duplicate_store"} 342
+# HELP dynamo_kvrouter_kv_cache_events_applied Total number of KV cache events applied to index
+# TYPE dynamo_kvrouter_kv_cache_events_applied counter
+dynamo_kvrouter_kv_cache_events_applied{event_type="cleared",status="allocation_failed"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="cleared",status="block_not_found"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="cleared",status="capacity_exhausted"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="cleared",status="indexer_invariant_violation"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="cleared",status="invalid_block"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="cleared",status="ok"} 43
+dynamo_kvrouter_kv_cache_events_applied{event_type="cleared",status="ownership_degree_overflow"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="cleared",status="parent_block_not_found"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="cleared",status="unsupported_residency_domain"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="removed",status="allocation_failed"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="removed",status="block_not_found"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="removed",status="capacity_exhausted"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="removed",status="indexer_invariant_violation"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="removed",status="invalid_block"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="removed",status="ok"} 1722
+dynamo_kvrouter_kv_cache_events_applied{event_type="removed",status="ownership_degree_overflow"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="removed",status="parent_block_not_found"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="removed",status="unsupported_residency_domain"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="stored",status="allocation_failed"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="stored",status="block_not_found"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="stored",status="capacity_exhausted"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="stored",status="indexer_invariant_violation"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="stored",status="invalid_block"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="stored",status="ok"} 8969
+dynamo_kvrouter_kv_cache_events_applied{event_type="stored",status="ownership_degree_overflow"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="stored",status="parent_block_not_found"} 0
+dynamo_kvrouter_kv_cache_events_applied{event_type="stored",status="unsupported_residency_domain"} 0

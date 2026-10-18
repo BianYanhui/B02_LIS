@@ -1,0 +1,5 @@
+case,observed,model_a_keeps_block_chain,model_b_visible_tokens,model_b_status,survivor_tokens_at_break,advertised_tokens,count
+cold_or_new_prefix,yes,yes,1040,advertised_tip,,,
+partial_eviction,yes,ancestor_blocks_remain,0,LOST_PARTIAL_PREFIX_VISIBILITY,448,1040,1
+full_eviction,no,NOT_OBSERVED,,NOT_OBSERVED,,,0
+removed_then_stored,no,NOT_OBSERVED,,NOT_OBSERVED,,,0

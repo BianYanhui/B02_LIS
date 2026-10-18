@@ -28,11 +28,11 @@
 
 ## 可变交接
 
-更新时间：2026-10-18 13:00（UTC+8）。P0-A4 离线核查写完。没有启动 vLLM。没有改 `experiments/`，没有改论文，没有改 P0-A3 的原始 trace。
+更新时间：2026-10-18 16:25（UTC+8）。P0-C1 单卡事件字节和 Dynamo 索引回放写完。vLLM 已停，四张 T4 显存 0。没有改 `experiments/`，没有改论文。
 
 ### 正在做的事
 
-P0-A4 用 A3 的 ZMQ trace 重算了前缀失效。报告在 `analysis/p0_pressure_realism/a4_invalidation_audit/P0_A4_INVALIDATION_AUDIT.md`。1.91/s 和 1.67/s 只计覆盖增长。灌满阶段 1138 条 `BlockRemoved` 收成 18 条前缀 tombstone，0.261/s。合计 1.928/s，ρ=0.000205。判定 Case A2。Case A 和 Option D 不变。P0-A 结束。不要自动改论文，不要开 GPU。
+P0-C1 用 GPU 0 抓了 59.9 s 的原始 ZMQ KV 事件，再回放进本机 Dynamo 索引器。报告在 `analysis/p0_pressure_realism/c1_real_indexer/P0_C1_ARCHITECTURE_AUDIT.md`。msgpack 约 38 kbit/s。debug 索引器在 64 倍回放（256 事件/s）积压为 0。外部 hash 6525 对 6525。判定按 Case 1 停止，不以索引拥塞为动机。不要自动改论文，不要开 64 卡或集成。
 
 ### 当前状态
 
@@ -40,7 +40,7 @@ P0-A4 用 A3 的 ZMQ trace 重算了前缀失效。报告在 `analysis/p0_pressu
 
 ### 下一步
 
-P0-A 停在这里。用户明确要求改论文时，按 A2/A3/A4 的结论收窄 motivation：前缀级含失效仍约 2 条/s。不要把 `BlockRemoved`/s 写成 Invalidation/s。不要开 GPU、replay 或 64 卡。P0-B 的 2×2 也不要开。
+P0-C1 停在这里。用户明确要求改论文时，只写已测到的两层速率：原生块事件存在，前缀广告少得多，索引器没有排队。不要把 64 倍回放写成 64 张 GPU。不要开集成、64 卡或 TTFT 矩阵。P0-B 的 2×2 也不要开。
 
 ### 已经定下来的约束
 
@@ -53,6 +53,8 @@ P0-A 停在这里。用户明确要求改论文时，按 A2/A3/A4 的结论收�
 
 ### Git
 
-P0-A1 在 `p0-a1-pressure-realism`。P0-A2 在 `p0-a2-realism-gate`。P0-A3 在 `p0-a3-motivation-explore`（`d978ad3`）。P0-A4 在 `p0-a4-invalidation-audit`，从 A3 拉出。不要合并到 `main`，除非用户明确说。`p0-b1-activation-audit` 保持独立。
+P0-A1 在 `p0-a1-pressure-realism`。P0-A2 在 `p0-a2-realism-gate`。P0-A3 在 `p0-a3-motivation-explore`（`d978ad3`）。P0-A4 在 `p0-a4-invalidation-audit`。P0-C1 在 `p0-c1-real-indexer`，从 A4 拉出。不要合并到 `main`，除非用户明确说。`p0-b1-activation-audit` 保持独立。
+
+Dynamo 检出在 `/home/byh/Dynamo/dynamo`，commit `7a2a40906`。`src/dynamo/_core.abi3.so` 现在是指向 debug `lib_core.so` 的符号链接，旧文件是 `_core.abi3.so.pre-c1`。这是为了打开 `kv-indexer`。不要把它提交进 B02。启动索引器需要 `LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6`。
 
 不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`、`/tmp/icc_link_smoke2/`。`analysis/icc_kv/` 在 `.gitignore`。

@@ -1,0 +1,11 @@
+{
+  "sent_events": 252,
+  "applied_events": 252.0,
+  "elapsed_s": 61.889,
+  "cpu_seconds": 0.33,
+  "rss_bytes": 96731136,
+  "reference_alive_hashes": 6525,
+  "dumped_external_hashes": 6525,
+  "missing_from_indexer": 0,
+  "extra_in_indexer": 0
+}
