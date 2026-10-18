@@ -1,0 +1,7 @@
+scenario,duration_s,requests,block_stored_hashes,block_removed_events,prefix_upsert,prefix_re_advertisement,prefix_invalidation,reset_restart,invalidation_with_survivor,invalidation_full,includes_real_invalidation,p0a3_prefix_rate_was
+A_cold,10.473,20,1301,0,20,0,0,0,0,0,no,upsert_only
+B_reuse,3.203,9,74,0,1,0,0,20,0,0,no,upsert_only
+C_plant,1.267,3,196,0,3,0,0,1,0,0,no,upsert_only
+C_flood,68.984,115,7475,1138,115,0,18,0,18,0,yes,upsert_only
+C_replay,1.371,3,195,195,0,3,3,0,3,0,yes,upsert_only
+warmup,0.202,1,10,0,0,0,0,0,0,0,no,upsert_only
