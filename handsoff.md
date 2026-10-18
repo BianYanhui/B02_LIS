@@ -28,70 +28,71 @@
 
 ## 可变交接
 
-更新时间：2026-10-19 00:36（UTC+8）。任务 F6-P2 已停。判定 **Case A**：在引擎确认的快照上，模型 regret 随被隐藏 owner 是否更空闲而出现或消失。不是测到的 TTFT。没有改 `experiments/`、KVSelect、Replica Suppression、Dispatcher、论文。没有动 formal4t4、Run A、Run B、F6-P0、F6-P1。没有画正式 Fig. 6。
+更新时间：2026-10-19 01:27（UTC+8）。任务 F6-P3 已停。没有开正式矩阵，没有合并 `main`。
 
 ### 正在做的事
 
-三个短 cell 已在同一次 vLLM 启动里跑完并停掉。Cell A 反向、Cell B 交错、Cell C 用 seed 2 复现正向。广告顺序始终是 0、1、2、3。Full view 和 `Krep=2` 用同一快照。正 regret 和 0 regret 都留着。
+Fig. 6(a)(c)(d) 的正式实验前置验证已完成。Fig. 6(b) 没有跑。判定：
+
+- Fig. 6(a)：`READY_WITH_LIMITATIONS`
+- Fig. 6(c)：`READY_WITH_LIMITATIONS`
+- Fig. 6(d)：`READY-MODEL`
 
 ### 结论（带标签）
 
-- OBSERVED 驻留：每个 cell 自己的 cache salt。预热 cached tokens 都是 0。探测和再探测都是 1056，hit 计数也加 1056。prompt 1083。引擎 block hash NOT_MEASURED。没有用 ShadowCache。
-- OBSERVED 负载：主指标仍是 harness in-flight。`ENGINE_CONFIRMED` 表示四张卡的 harness 计数等于 `num_requests_running` 且 waiting 为 0。采样在开跑前写死：holder 320 token，启动间隔 0.50 s，首次采样在启动后 0.25 s，之后每 0.50 s，共 8 点。
-- Cell A，seed 1，顺序 `[3,2,1,0,3,2,1,0]`：8 个点里 4 个引擎确认，模型 regret 全是 0，mean DeltaLoad -0.5。后 4 个是 HARNESS_ONLY，regret 也是 0，不进均值。
-- Cell B，seed 1，顺序 `[0,2,1,3,2,0,3,1]`：8/8 引擎确认。只有 `[1,1,1,0]` 的 regret 是 2.0 ms，其余是 0。mean regret 0.25 ms。
-- Cell C，seed 2，顺序 `[0,1,2,3,0,1,2,3]`：8/8 引擎确认。`[1,1,0,0]`、`[1,1,1,0]`、`[2,2,1,1]`、`[2,2,2,1]` 的 regret 是 2.0 ms。mean regret 1.0 ms。F6-P1 的正向结果复现了，并且第二波也得到了引擎确认。
-- MODEL-DERIVED：`T_i = load_i * 2 ms + max(0, 1083-1056)/50`。预填充项都是 0.54 ms。2.0 ms 是一个 in-flight 请求乘正式队列权重。`actual_ttft_ms` 为空。
-- DeltaLoad = min(worker 0,1) - min(worker 2,3)。本轮和 F6-P1 的全部引擎确认点里，DeltaLoad 为 1 时 regret 是 2.0 ms，为 0 或 -1 时 regret 是 0。没有反例。这是 `choose` 算出来的，不是把 DeltaLoad 当成充分条件。
-- 广告：每个快照都是转发 2、丢掉 2，藏住 2 和 3。Full view 选出的 worker 都在模型 argmin 里。
-- F6-P1 正向：8 个点里 3 个引擎确认，mean regret 1.333 ms。这些点是一条轨迹，不是三个 seed。没有做显著性检验。
-- Fig. 6(b) 仍关闭。F6-P0 的 16 ms 仍是 CONTROLLED。
+- OBSERVED，Fig. 6(a)：动态 LatestOnly 五个 rep 的 gateway 日志都能把 supersession 分成扩展和重复。扩展全是 0。rep 0 是 384 条 offered、310 条转发、74 条 supersession，全部是同一 coverage 的重复广告。最新状态可见性 P95 是 41.42 s。幸存消息的投递延迟 P95 是 31.97 s，两者不是同一个指标。五个 rep 的日志都配平：转发加 superseded 等于 offered。
+- 已发表的 LatestOnly 37.775、StaticSemantic 30.950、Adaptive 15.175 是八个 workload×rho 格子的均值，不是这轮新结果。这些格子的原始 gateway 事件缺失，标记 `NOT_RECONSTRUCTABLE`。动态日志是另一套语料（320 个请求加 64 条预播种），不要拿去替换那 8 格均值。
+- ACCOUNTING IDENTITY：上述 LatestOnly 日志里，merge off 会转发全部 offered。这是信令条数对照，不是时延对照。
+- MODEL-REJECTED：按 phase 文件里的 1754/730/1754 bit/s 做 HTB 回放，得到 21 次 supersession 和 5.09 s 的 P95，对不上日志的 74 和 41.42 s。这组速率是实验里的受控容量，不是 10 Mbit/s，也不是生产瓶颈。不要用这组可见性数字。
+- CONTROLLED：把 `original_compatible_trace_rep0` 压到每帧时间的四分之一，并让同一 lineage 落到同一个 owner。出现 56 次 coverage 上升和 20 次 coverage 回绕。这不是 vLLM 的扩展频率。
+- OBSERVED，Fig. 6(c)：overlap 是 phase-0 lineage 被四台机器同时种下的比例，不是重复广告比例。pool 32，四台 worker。seed `2026072640` 只是校准，不是论文点。FullSync 事件全量排空后，Krep=2 的转发差等于 cap 丢弃：0% 为 48→45（6.25%），50% 为 112→66（41.07%），75% 为 144→82（43.06%）。其他机制丢弃为 0，窗口尾差为 0。
+- OBSERVED 旁证：75% 的现场 FullSync 只转发了 123/144，剩下 21 条是窗口结束时的积压，不是 cap 收益。Adaptive 旧表把 low-utility 和 supersession 混在 holder 丢弃里。gateway 到达顺序不是 0、1、2、3。
+- OBSERVED，Fig. 6(d)：一次四卡启动，测量 38.3 s。预热 cached tokens 为 0，探测和两段再探测都是 1056，hit 加 1056，prompt 1083。D-positive `[1,1,0,0]` 四点全部引擎确认，DeltaLoad +1，模型 regret 2.0 ms。D-negative `[0,0,1,1]` 四点全部引擎确认，DeltaLoad -1，regret 0。两段之间引擎回到空闲。
+- MODEL-DERIVED：预填充项四台都是 0.54 ms，2.0 ms 是一个队列权重。不是 TTFT。
+- NOT_MEASURED：成对执行的 TTFT。判定 `TTFT_PAIRING_NOT_READY`。没有做伪配对。
 
-### 已知问题和证据限制
+### 正式实验计划
 
-- 差距只有 1 个请求。反向 cell 的第二波没有和引擎对齐。
-- 同一 cell 里的快照是一条到达过程，不是独立重复。
-- `choose` 不是 `T` 的 argmin。覆盖如果不再相同，DeltaLoad 和 regret 可以分开。
-- 没有测反事实 TTFT，也没有走 gateway。
-- 四个 owner 的 coverage 都是 1056，所以这轮没有回答 overlap。
+路径：`/home/byh/B02/analysis/fig6_reconstruction/f6_p3/FIG6_ACD_FORMAL_EXPERIMENT_PLAN.md`
+
+最小可投稿版本，还没跑：
+
+- Fig. 6(a)：五个已有动态 rep，merge on 用日志，merge off 用配平恒等式。10 行，0 次新实验，CPU 不到 10 分钟。
+- Fig. 6(c)：overlap 0、0.25、0.5、0.75，种子 `2026101901` 到 `2026101903`。12 次 FullSync 实录加 12 次 CPU 回放，共 24 格。一次四卡启动约 30 分钟。
+- Fig. 6(d)：DeltaLoad 为 -1、0、+1，种子 3、4、5。9 个保持阶段。加载约 1 分钟，测量约 5 分钟。不测 TTFT。
+
+用户说「继续」时按 `NEXT_ITERATION_RECOMMENDATION.md`：先汇总 (a)，再跑 (c)，再跑 (d)。不要开 (a) 的可见性扫描，除非 rep 0 的时钟门通过（supersession 距 74 在 10% 以内，且 P95 距 41.42 s 在 20% 以内）。现有 HTB 模型已经失败。
 
 ### 路径
 
-- 实验报告：`/home/byh/B02/analysis/fig6_reconstruction/f6_p2/F6_P2_EXPERIMENT_REPORT.md`
-- 条件分析：`/home/byh/B02/analysis/fig6_reconstruction/f6_p2/F6_P2_CONDITIONAL_TRADEOFF.md`
-- 下一步全文：`/home/byh/B02/analysis/fig6_reconstruction/f6_p2/NEXT_ITERATION_RECOMMENDATION.md`
-- 表：`observed_snapshots.csv`，`counterfactual_routing.csv`，`f6_p1_p2_comparison.csv`，`f6_p1_p2_points.csv`，都在 `/home/byh/B02/analysis/fig6_reconstruction/f6_p2/`
-- 原始记录：`/home/byh/B02/analysis/fig6_reconstruction/f6_p2/raw_cells.json`
-- 内部诊断图（不是 Fig. 6）：`/home/byh/B02/analysis/fig6_reconstruction/f6_p2/deltaload_regret_diagnostic.svg`
-- 脚本：`run_p2_cells.py`，`analyze_p1_p2.py`
-- 服务器日志：`/home/byh/B02/analysis/fig6_reconstruction/f6_p2/server_logs/`（忽略，不要提交）
-
-### 下一步
-
-用户说「继续」时，不要画 Fig. 6，不要改论文，不要开 overlap 矩阵，不要开 Fig. 6(b)，不要再跑同一条斜坡的新 seed。先读 `NEXT_ITERATION_RECOMMENDATION.md`。
-
-若只加一轮：把负载稳住再采样，而不是只采到达斜坡。顺序用正向和反向两种。目标 DeltaLoad 为 +1 和 -1，并且要等到 running gauge 与 harness 一致。seed 1 和 2。广告顺序仍是 0、1、2、3。8 个短阶段，一次启动四张 T4。启动约 2 分钟，测量约 3 分钟。预热超过 120 秒就停那个阶段。模型 regret 和实际执行的那一条 TTFT 分开记。不要把后者写成另一条视图的 TTFT。这次不要自己开。
-
-P0-C1 仍然有效，不要重跑。不要开 Dynamo 集成、64 卡、1024 replay、TTFT 套件、P0-B 的 2×2。
+- 总判定：`/home/byh/B02/analysis/fig6_reconstruction/f6_p3/F6_P3_READINESS_REPORT.md`
+- (a)：`F6_A_EXTENSION_AUDIT.md`，`F6_A_MERGE_PAIRING.csv`，`a_supersession_classification.csv`
+- (c)：`F6_C_OVERLAP_AUDIT.md`，`F6_C_SUPPRESSION_PAIRING.csv`
+- (d)：`F6_D_HELD_LOAD_REPORT.md`，`held_samples.csv`，`raw_held.json`
+- 脚本：`run_ac_readiness.py`，`run_d_held_load.py`
+- 下一步：`NEXT_ITERATION_RECOMMENDATION.md`
+- 服务器日志：`/home/byh/B02/analysis/fig6_reconstruction/f6_p3/server_logs/`（忽略，不要提交）
 
 ### 机器
 
-可以安全停下。2026-10-19 00:36（UTC+8）刚查过：四张 T4 显存 0 MiB，利用率 0%。这次的四个 `vllm serve` 已停，8000–8003 没有在听。没有残留的 `run_p2_cells.py`。`127.0.0.1:9710` 仍是 `b02-gateway4t4`，没有重启。不要动 edgevisor、lhjj、gitlab。
+可以安全停下。2026-10-19 01:27（UTC+8）刚查过：四张 T4 显存 0 MiB，利用率 0%。这次的四个 `vllm serve` 已停，8000–8003 没有在听。没有残留的 held-load 脚本。`127.0.0.1:9710` 仍是 `b02-gateway4t4`，没有重启。不要动 edgevisor、lhjj、gitlab。
 
 ### Git
 
-当前分支 `f6-p2-replica-tradeoff`。研究报告 commit `fcf6fe4`，父提交是 `78b6c1c`（F6-P1 交接，分支 `f6-p1-observed-replica`）。这次交接只改 `handsoff.md`。不要合并到 `main`，除非用户明确说。
+当前分支 `f6-p3-formal-readiness`。研究报告 commit `5f8bf0a`，父提交是 `f401014`（F6-P2 交接）。这次交接只改 `handsoff.md`。不要合并到 `main`。
 
-F6-P1 仍在 `f6-p1-observed-replica`（`78b6c1c`，研究 `78fa6d3`）。F6-P0 在 `f6-p0-fig6-feasibility`（`36f3bfa`）。P0-C1 在 `p0-c1-real-indexer`（`fff14ff`）。
+F6-P2 在 `f6-p2-replica-tradeoff`（交接 `f401014`，研究 `fcf6fe4`）。F6-P1 在 `f6-p1-observed-replica`（`78b6c1c`，研究 `78fa6d3`）。F6-P0 在 `f6-p0-fig6-feasibility`（`36f3bfa`）。P0-C1 在 `p0-c1-real-indexer`（`fff14ff`）。
 
 Dynamo 检出在 `/home/byh/Dynamo/dynamo`，commit `7a2a40906`。不要把 Dynamo 树提交进 B02。
 
-不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`、`/tmp/icc_link_smoke2/`、`analysis/fig6_reconstruction/f6_p2/server_logs/`。`*.log` 已被忽略。
+不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`、`/tmp/icc_link_smoke2/`、`analysis/fig6_reconstruction/f6_p3/server_logs/`、`analysis/fig6_reconstruction/f6_p2/server_logs/`。`*.log` 和 `analysis/**/*.pid` 已被忽略。
 
 ### 仍然有效的旧约束
 
 - 四卡自然负载不能写成顶满 10 Mbit。10 Mbit 路径实测排空约 9408 frame/s。
-- `offered_wire_bit_per_s` 只乘 UPSERT，104 字节是记账约定。P0-C1 的 38 kbit/s 是实测 msgpack，TCP 载荷 NOT_MEASURED。
+- `offered_wire_bit_per_s` 只乘 UPSERT，104 字节是记账约定。
 - fan-in 的 N=32/64 不是 GPU 数。
-- `kv_cache_usage_perc` 在驱逐时可以仍是 0。未引用的 prefix block 也会让这个表接近 0。驱逐证据是 `BlockRemoved`。
+- `kv_cache_usage_perc` 接近 0 不能证明前缀还在。驻留证据是 cached tokens 和 prefix-cache hit。
 - 前缀 tombstone 会藏住部分祖先。P0-C1 有 1 条：广告 1040，留下 448。
+- 不要改 Gateway Admission、Extension Supersession、Replica Suppression、`Dispatcher.choose`、Pressure-Triggered Filtering、Owner Validation。
+- 不要覆盖 `analysis/formal4t4/`、`analysis/icc_kv/`、Run A、Run B、F6-P0、F6-P1、F6-P2。
