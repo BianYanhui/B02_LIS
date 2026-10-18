@@ -1,0 +1,738 @@
+{
+  "seed": 1,
+  "digest": "F6P3D",
+  "cache_salt": "f6p3-prefix-seed1",
+  "admission_order": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "timing": {
+    "hold_tokens": 640,
+    "confirm_wait_s": 5.0,
+    "poll_s": 0.25,
+    "n_samples": 4,
+    "sample_interval_s": 0.5,
+    "fallback_sample_start_s": 1.0
+  },
+  "identity": {
+    "warmup_templated_tokens": 1083,
+    "probe_templated_tokens": 1083,
+    "common_prefix_tokens": 1068,
+    "block_aligned_common_tokens": 1056,
+    "client_common_prefix_sha256": "4474f9646584c9b66181bc7c234cda95c0f18abb75f49fa11f33839f3f4760f3",
+    "engine_block_hash": "NOT_MEASURED"
+  },
+  "ttft_pairing": "TTFT_PAIRING_NOT_READY",
+  "ttft_pairing_reason": [
+    "no prefix-cache snapshot that can be restored without reset_prefix_cache",
+    "a request on the full-view worker changes that worker's KV suffix and running gauge",
+    "checking residency again is itself a request",
+    "the held loads differ across the two selected workers by construction",
+    "reset_prefix_cache would drop the shared prefix and the in-flight holders"
+  ],
+  "phases": [
+    {
+      "phase": "D-positive",
+      "holders": [
+        0,
+        1
+      ],
+      "target_loads": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "target_delta": 1,
+      "idle_before": true,
+      "samples": [
+        {
+          "decision_index": 0,
+          "timestamp_unix": 1792344251.4163487,
+          "rel_s": 0.3576032966375351,
+          "loads": [
+            1,
+            1,
+            0,
+            0
+          ],
+          "running": [
+            1,
+            1,
+            0,
+            0
+          ],
+          "waiting": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "kv_cache_usage_perc": [
+            0.0006122761365375817,
+            0.0006122761365375817,
+            0.0,
+            0.0
+          ],
+          "confirmation": "ENGINE_CONFIRMED",
+          "matches_target": 1,
+          "delta_load": 1,
+          "full_selected": 2,
+          "cap_selected": 1,
+          "regret_vs_full_ms": 2.0,
+          "full_is_model_argmin": 1,
+          "selected_changed": 1,
+          "visible_owners": [
+            0,
+            1
+          ],
+          "suppressed_owners": [
+            2,
+            3
+          ],
+          "forwarded_ads": 2,
+          "dropped_ads": 2,
+          "affinity": 1,
+          "costs": [
+            2.54,
+            2.54,
+            0.54,
+            0.54
+          ]
+        },
+        {
+          "decision_index": 1,
+          "timestamp_unix": 1792344251.9176095,
+          "rel_s": 0.8588610980659723,
+          "loads": [
+            1,
+            1,
+            0,
+            0
+          ],
+          "running": [
+            1,
+            1,
+            0,
+            0
+          ],
+          "waiting": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "kv_cache_usage_perc": [
+            0.0009184142048063171,
+            0.0009184142048063171,
+            0.0,
+            0.0
+          ],
+          "confirmation": "ENGINE_CONFIRMED",
+          "matches_target": 1,
+          "delta_load": 1,
+          "full_selected": 2,
+          "cap_selected": 1,
+          "regret_vs_full_ms": 2.0,
+          "full_is_model_argmin": 1,
+          "selected_changed": 1,
+          "visible_owners": [
+            0,
+            1
+          ],
+          "suppressed_owners": [
+            2,
+            3
+          ],
+          "forwarded_ads": 2,
+          "dropped_ads": 2,
+          "affinity": 1,
+          "costs": [
+            2.54,
+            2.54,
+            0.54,
+            0.54
+          ]
+        },
+        {
+          "decision_index": 2,
+          "timestamp_unix": 1792344252.417547,
+          "rel_s": 1.3587983660399914,
+          "loads": [
+            1,
+            1,
+            0,
+            0
+          ],
+          "running": [
+            1,
+            1,
+            0,
+            0
+          ],
+          "waiting": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "kv_cache_usage_perc": [
+            0.0010714832389407958,
+            0.0010714832389407958,
+            0.0,
+            0.0
+          ],
+          "confirmation": "ENGINE_CONFIRMED",
+          "matches_target": 1,
+          "delta_load": 1,
+          "full_selected": 2,
+          "cap_selected": 1,
+          "regret_vs_full_ms": 2.0,
+          "full_is_model_argmin": 1,
+          "selected_changed": 1,
+          "visible_owners": [
+            0,
+            1
+          ],
+          "suppressed_owners": [
+            2,
+            3
+          ],
+          "forwarded_ads": 2,
+          "dropped_ads": 2,
+          "affinity": 1,
+          "costs": [
+            2.54,
+            2.54,
+            0.54,
+            0.54
+          ]
+        },
+        {
+          "decision_index": 3,
+          "timestamp_unix": 1792344252.9162943,
+          "rel_s": 1.8575457548722625,
+          "loads": [
+            1,
+            1,
+            0,
+            0
+          ],
+          "running": [
+            1,
+            1,
+            0,
+            0
+          ],
+          "waiting": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "kv_cache_usage_perc": [
+            0.0013776213072095311,
+            0.0013776213072095311,
+            0.0,
+            0.0
+          ],
+          "confirmation": "ENGINE_CONFIRMED",
+          "matches_target": 1,
+          "delta_load": 1,
+          "full_selected": 2,
+          "cap_selected": 1,
+          "regret_vs_full_ms": 2.0,
+          "full_is_model_argmin": 1,
+          "selected_changed": 1,
+          "visible_owners": [
+            0,
+            1
+          ],
+          "suppressed_owners": [
+            2,
+            3
+          ],
+          "forwarded_ads": 2,
+          "dropped_ads": 2,
+          "affinity": 1,
+          "costs": [
+            2.54,
+            2.54,
+            0.54,
+            0.54
+          ]
+        }
+      ],
+      "notes": [],
+      "reached_target": true,
+      "idle_after": true,
+      "running_after": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "hold_results": [
+        {
+          "ok": true,
+          "error": "",
+          "worker": 0,
+          "job_id": 0,
+          "ttft_ms": 58.544473,
+          "latency_ms": 14980.196183,
+          "input_tokens": 49,
+          "output_tokens": 640,
+          "vllm_cached_tokens": 0
+        },
+        {
+          "ok": true,
+          "error": "",
+          "worker": 1,
+          "job_id": 1,
+          "ttft_ms": 49.792834,
+          "latency_ms": 16024.067902,
+          "input_tokens": 49,
+          "output_tokens": 640,
+          "vllm_cached_tokens": 0
+        }
+      ],
+      "reprobes_cached": [
+        1056,
+        1056,
+        1056,
+        1056
+      ],
+      "reprobes_ok": true,
+      "status": "ok",
+      "active_wall_s": 16.35497946292162
+    },
+    {
+      "phase": "D-negative",
+      "holders": [
+        2,
+        3
+      ],
+      "target_loads": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "target_delta": -1,
+      "idle_before": true,
+      "samples": [
+        {
+          "decision_index": 0,
+          "timestamp_unix": 1792344267.8133476,
+          "rel_s": 0.3599330773577094,
+          "loads": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "running": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "waiting": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "kv_cache_usage_perc": [
+            0.0,
+            0.0,
+            0.0006122761365375817,
+            0.0006122761365375817
+          ],
+          "confirmation": "ENGINE_CONFIRMED",
+          "matches_target": 1,
+          "delta_load": -1,
+          "full_selected": 0,
+          "cap_selected": 0,
+          "regret_vs_full_ms": 0.0,
+          "full_is_model_argmin": 1,
+          "selected_changed": 0,
+          "visible_owners": [
+            0,
+            1
+          ],
+          "suppressed_owners": [
+            2,
+            3
+          ],
+          "forwarded_ads": 2,
+          "dropped_ads": 2,
+          "affinity": 0,
+          "costs": [
+            0.54,
+            0.54,
+            2.54,
+            2.54
+          ]
+        },
+        {
+          "decision_index": 1,
+          "timestamp_unix": 1792344268.3143263,
+          "rel_s": 0.8609117055311799,
+          "loads": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "running": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "waiting": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "kv_cache_usage_perc": [
+            0.0,
+            0.0,
+            0.0009184142048063171,
+            0.0009184142048063171
+          ],
+          "confirmation": "ENGINE_CONFIRMED",
+          "matches_target": 1,
+          "delta_load": -1,
+          "full_selected": 0,
+          "cap_selected": 0,
+          "regret_vs_full_ms": 0.0,
+          "full_is_model_argmin": 1,
+          "selected_changed": 0,
+          "visible_owners": [
+            0,
+            1
+          ],
+          "suppressed_owners": [
+            2,
+            3
+          ],
+          "forwarded_ads": 2,
+          "dropped_ads": 2,
+          "affinity": 0,
+          "costs": [
+            0.54,
+            0.54,
+            2.54,
+            2.54
+          ]
+        },
+        {
+          "decision_index": 2,
+          "timestamp_unix": 1792344268.8140821,
+          "rel_s": 1.3606675900518894,
+          "loads": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "running": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "waiting": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "kv_cache_usage_perc": [
+            0.0,
+            0.0,
+            0.0010714832389407958,
+            0.0010714832389407958
+          ],
+          "confirmation": "ENGINE_CONFIRMED",
+          "matches_target": 1,
+          "delta_load": -1,
+          "full_selected": 0,
+          "cap_selected": 0,
+          "regret_vs_full_ms": 0.0,
+          "full_is_model_argmin": 1,
+          "selected_changed": 0,
+          "visible_owners": [
+            0,
+            1
+          ],
+          "suppressed_owners": [
+            2,
+            3
+          ],
+          "forwarded_ads": 2,
+          "dropped_ads": 2,
+          "affinity": 0,
+          "costs": [
+            0.54,
+            0.54,
+            2.54,
+            2.54
+          ]
+        },
+        {
+          "decision_index": 3,
+          "timestamp_unix": 1792344269.311694,
+          "rel_s": 1.8582787727937102,
+          "loads": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "running": [
+            0,
+            0,
+            1,
+            1
+          ],
+          "waiting": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "kv_cache_usage_perc": [
+            0.0,
+            0.0,
+            0.0013776213072095311,
+            0.0012245522730751635
+          ],
+          "confirmation": "ENGINE_CONFIRMED",
+          "matches_target": 1,
+          "delta_load": -1,
+          "full_selected": 0,
+          "cap_selected": 0,
+          "regret_vs_full_ms": 0.0,
+          "full_is_model_argmin": 1,
+          "selected_changed": 0,
+          "visible_owners": [
+            0,
+            1
+          ],
+          "suppressed_owners": [
+            2,
+            3
+          ],
+          "forwarded_ads": 2,
+          "dropped_ads": 2,
+          "affinity": 0,
+          "costs": [
+            0.54,
+            0.54,
+            2.54,
+            2.54
+          ]
+        }
+      ],
+      "notes": [],
+      "reached_target": true,
+      "idle_after": true,
+      "running_after": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "hold_results": [
+        {
+          "ok": true,
+          "error": "",
+          "worker": 2,
+          "job_id": 0,
+          "ttft_ms": 46.025475,
+          "latency_ms": 14557.082393,
+          "input_tokens": 49,
+          "output_tokens": 640,
+          "vllm_cached_tokens": 0
+        },
+        {
+          "ok": true,
+          "error": "",
+          "worker": 3,
+          "job_id": 1,
+          "ttft_ms": 54.440519,
+          "latency_ms": 14999.147561,
+          "input_tokens": 49,
+          "output_tokens": 640,
+          "vllm_cached_tokens": 0
+        }
+      ],
+      "reprobes_cached": [
+        1056,
+        1056,
+        1056,
+        1056
+      ],
+      "reprobes_ok": true,
+      "status": "ok",
+      "active_wall_s": 15.278236918151379
+    }
+  ],
+  "metrics_before_warmup": [
+    {
+      "running": 0.0,
+      "waiting": 0.0,
+      "kv_cache_usage_perc": 0.0,
+      "prefix_cache_hits": 0.0,
+      "prefix_cache_queries": 0.0
+    },
+    {
+      "running": 0.0,
+      "waiting": 0.0,
+      "kv_cache_usage_perc": 0.0,
+      "prefix_cache_hits": 0.0,
+      "prefix_cache_queries": 0.0
+    },
+    {
+      "running": 0.0,
+      "waiting": 0.0,
+      "kv_cache_usage_perc": 0.0,
+      "prefix_cache_hits": 0.0,
+      "prefix_cache_queries": 0.0
+    },
+    {
+      "running": 0.0,
+      "waiting": 0.0,
+      "kv_cache_usage_perc": 0.0,
+      "prefix_cache_hits": 0.0,
+      "prefix_cache_queries": 0.0
+    }
+  ],
+  "warmups": [
+    {
+      "ok": true,
+      "error": "",
+      "ttft_ms": 3371.315033,
+      "latency_ms": 4492.598459,
+      "input_tokens": 1083,
+      "output_tokens": 4,
+      "vllm_cached_tokens": 0
+    },
+    {
+      "ok": true,
+      "error": "",
+      "ttft_ms": 3482.250101,
+      "latency_ms": 4681.548188,
+      "input_tokens": 1083,
+      "output_tokens": 4,
+      "vllm_cached_tokens": 0
+    },
+    {
+      "ok": true,
+      "error": "",
+      "ttft_ms": 3325.579454,
+      "latency_ms": 4442.704764,
+      "input_tokens": 1083,
+      "output_tokens": 4,
+      "vllm_cached_tokens": 0
+    },
+    {
+      "ok": true,
+      "error": "",
+      "ttft_ms": 3449.078357,
+      "latency_ms": 4613.433516,
+      "input_tokens": 1083,
+      "output_tokens": 4,
+      "vllm_cached_tokens": 0
+    }
+  ],
+  "probes": [
+    {
+      "ok": true,
+      "error": "",
+      "ttft_ms": 1424.388231,
+      "latency_ms": 1561.064716,
+      "input_tokens": 1083,
+      "output_tokens": 4,
+      "vllm_cached_tokens": 1056,
+      "prefix_cache_hits_delta": 1056.0
+    },
+    {
+      "ok": true,
+      "error": "",
+      "ttft_ms": 1412.583062,
+      "latency_ms": 1503.455534,
+      "input_tokens": 1083,
+      "output_tokens": 4,
+      "vllm_cached_tokens": 1056,
+      "prefix_cache_hits_delta": 1056.0
+    },
+    {
+      "ok": true,
+      "error": "",
+      "ttft_ms": 1455.873366,
+      "latency_ms": 1612.252558,
+      "input_tokens": 1083,
+      "output_tokens": 4,
+      "vllm_cached_tokens": 1056,
+      "prefix_cache_hits_delta": 1056.0
+    },
+    {
+      "ok": true,
+      "error": "",
+      "ttft_ms": 1457.562958,
+      "latency_ms": 1549.723181,
+      "input_tokens": 1083,
+      "output_tokens": 4,
+      "vllm_cached_tokens": 1056,
+      "prefix_cache_hits_delta": 1056.0
+    }
+  ],
+  "residency_problems": [],
+  "idle_before_load": true,
+  "coverages": [
+    1056,
+    1056,
+    1056,
+    1056
+  ],
+  "prompt_tokens": 1083,
+  "idle_metrics": [
+    {
+      "running": 0.0,
+      "waiting": 0.0,
+      "kv_cache_usage_perc": 0.0,
+      "prefix_cache_hits": 1056.0,
+      "prefix_cache_queries": 2166.0
+    },
+    {
+      "running": 0.0,
+      "waiting": 0.0,
+      "kv_cache_usage_perc": 0.0,
+      "prefix_cache_hits": 1056.0,
+      "prefix_cache_queries": 2166.0
+    },
+    {
+      "running": 0.0,
+      "waiting": 0.0,
+      "kv_cache_usage_perc": 0.0,
+      "prefix_cache_hits": 1056.0,
+      "prefix_cache_queries": 2166.0
+    },
+    {
+      "running": 0.0,
+      "waiting": 0.0,
+      "kv_cache_usage_perc": 0.0,
+      "prefix_cache_hits": 1056.0,
+      "prefix_cache_queries": 2166.0
+    }
+  ],
+  "active_wall_s": 38.31715506222099,
+  "status": "ok"
+}
