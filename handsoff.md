@@ -28,81 +28,67 @@
 
 ## 可变交接
 
-更新时间：2026-10-18 17:55（UTC+8）。任务 F6-P0 已停。目标是 Fig. 6(b)(d) 的最小可行性，不是正式矩阵。没有改 `experiments/`，没有改 KVSelect，没有改论文，没有动 formal4t4、Run A、Run B 的结果。
+更新时间：2026-10-19 00:08（UTC+8）。任务 F6-P1 已停。判定 **P1-PASS**。目标是在真实 Worker Load 和真实 KV residency 下，看 `Krep=2` 会不会藏住更便宜的 owner。没有改 `experiments/`、KVSelect admission、Replica Suppression、Dispatcher、论文。没有动 formal4t4、Run A、Run B、F6-P0。没有画 Fig. 6。
 
 ### 正在做的事
 
-Fig. 6(b) 判定 **INCONCLUSIVE**。Fig. 6(d) 判定 **PASS**，范围只限 CONTROLLED 反事实。Fig. 6(a)(c) 只审计，没有重跑，现有计数可以留。
-
-没有启动 vLLM。离线脚本调用了冻结的 `Relay.enqueue` / `_dequeue` 和 `Dispatcher.choose`。
+一个 GPU cell、seed 1 已跑完并停掉。四个 vLLM worker 持有同一条前缀。离线对同一快照做了 full view 和 `Krep=2`。正 regret 和 0 regret 的样本都留着。
 
 ### 结论（带标签）
 
-Fig. 6(b)，INCONCLUSIVE：
+- OBSERVED：四张 T4 上的 vLLM 0.10.2，端口 8000–8003，Qwen2.5-1.5B-Instruct，Automatic Prefix Caching。预热 cached tokens 都是 0，prompt 1083。探测和负载窗口之后的再探测，四张卡 cached tokens 都是 1056。每张卡的 `prefix_cache_hits` 在探测时增加 1056，`prefix_cache_queries` 增加 1083。这等于 block size 16 对齐后的公共前缀。客户端公共 token 前缀 SHA-256 是 `a0c92e73685889a436edaafe47579af53b47baed287a82c208ee5f3f8a84ac7d`。引擎 block hash NOT_MEASURED。没有用 ShadowCache。
+- OBSERVED 负载：Dispatcher 用的是 harness in-flight。引擎确认的不平衡是 `[1,1,0,0]`（B1）和 `[1,1,1,0]`（B2）。平衡样本是 `[0,0,0,0]` 和 `[1,1,1,1]`。B0、B4–B7 的 harness 计数和 `num_requests_running` 不一致，不能当引擎确认的不平衡。`num_requests_waiting` 全是 0。
+- OBSERVED 广告：入队顺序 0、1、2、3。冻结的 `_admit_replica`（`dedup=2`）每次都留下 0 和 1，丢掉 2 和 3。转发 2，丢弃 2。没有改这条规则。merge、priority、adaptive、top-k 都关着，两边只差 dedup。
+- MODEL-DERIVED：`T_i = load_i * 2 ms + max(0, 1083 - 1056) / 50`。预填充项四张卡都是 0.54 ms。B1、B2 的 `Regret = T(cap) - T(full) = 2.0 ms`。这是一个 in-flight 请求乘正式队列权重，不是测到的 TTFT。Full view 选出的 worker 每次都在模型 argmin 里。Cap 在 regret 为 2 ms 时不在。
+- 平衡负载下 regret 全是 0。`rr=2` 和 `rr=3` 时选出的下标会变，因为 cap 看不见被 round-robin 指到的 worker，但 `T` 相同。
+- B5、B6 的 harness regret 也是 2.0 ms，但当时引擎 running 是 `[1,1,1,1]`。这两条不算引擎确认。
+- 负载计划在开跑前写死：8 个 96-token holder，worker 顺序 `[0,1,2,3,0,1,2,3]`，间隔 300 ms。跑完没有改，也没有丢掉 regret 为 0 的样本。这个顺序从 worker 0 开始，和 cap 保留的前两个 owner 对齐，所以早段会让 2 和 3 空闲。这是真实 in-flight，也是这次不能外推的原因。
+- Fig. 6(b) 仍是 INCONCLUSIVE，保持关闭。Fig. 6(a)(c) 不重跑。F6-P0 的 16 ms 仍是 CONTROLLED，这次没有复现那个 `[8,8,0,8]`。
 
-- OBSERVED：`analysis/formal4t4/summary/signaling_accounting.csv` 里 8 个正式 cell，所有策略 `source_tombstones_sent_mean` 都是 0。baseline 的 `physical_false_positive_affinity_rate_mean` 和 `tombstone_delay_p95_s_mean` 都是 0。后者在没有 tombstone 样本时由 `percentile()` 写成 0，不是测到的零延迟。
-- CONTROLLED：FIFO 下 tombstone 排在 8 条无关 upsert 之后。服务 1 帧后，FIFO 仍按正向 affinity 选中 worker 0；priority 已经应用 tombstone，改选空闲 worker，affinity 为假。表：`/home/byh/B02/analysis/fig6_reconstruction/f6_p0/smoke_b/priority_window.csv`。
-- 这条对照的“前缀已经失效”是设定的，不是 vLLM residency。NOT_MEASURED：真实 Stale-Positive、以秒计的可见性延迟、Owner Validation、TTFT。
-- 已发布策略把 priority、merge、dedup 捆在一起。churn 是注入 reset，不是这条隔离对照。不能宣称调度收益。
+### 已知问题和证据限制
 
-Fig. 6(d)，PASS（CONTROLLED）：
-
-- OBSERVED：同一张 signaling 表，StaticSemantic 平均丢掉 25.15 条 duplicate holder，Adaptive 17.68，dedup 关闭的策略是 0。重叠预热会向四张卡各发一次再广告 instance 0..3。
-- CONTROLLED / DERIVED：同一快照上，Krep=2 转发 2 条、丢掉 2 条。负载都是 2 时，`T` regret 为 0。负载 `[8,8,0,8]` 时，cap 按入队顺序留下 0 和 1，藏起空闲的 worker 2，`Dispatcher.choose` 选 worker 1，regret 16 ms。`T_i = load_i * 2 ms + max(0, prompt-coverage_i) / 50`。这不是测到的 TTFT。覆盖差是 0，16 ms 全是负载项。
-- NOT_MEASURED：正式 trace 里隐藏 owner 恰好最便宜的比例；被抑制 owner 当时的 `vllm_cached_tokens`。
-
-Fig. 6(a)(c)，保留现有数据：
-
-- (a) OBSERVED gateway `relay_drop_superseded`：LatestOnly 37.78，StaticSemantic 30.95，Adaptive 15.18，merge 关闭的策略是 0。这是未发送队列上同一 `(instance, digest)` 的替换。不是 vLLM 把多个 block hash 收成一条 `BlockStored`。计数不区分覆盖增长和重复广告。
-- (c) OBSERVED 就是上面的 duplicate_holder。保留规则与 (d) 相同：先入队的两个 instance，不看负载和覆盖，转发后仍然占着名额，直到 tombstone。正式 baseline 没有 tombstone，名额不会释放。0/25/50/75% overlap 扫描按 `final_report.md` 仍是校准，不要写进论文。
-- (c) 与 (d) 共用这条规则，共用不了 regret。(d) 的 regret 在 `smoke_d/replica_regret.csv`，是 CONTROLLED。
-
-### 已知问题和未验证假设
-
-- 优先级只重排 relay 里还没写进内核的帧。tc 里已有的积压这次没有测。
-- `source_view_false_positive` 对的是 ShadowCache。`physical_false_positive_affinity` 对的是被选中 worker 的 `vllm_cached_tokens`。Shadow tombstone 不是 `BlockRemoved`。
-- `choose` 不是 `T` 的 argmin。覆盖相同时，最轻负载的 worker 不会走 affinity 分支。
-- P0-A4 的 18 条前缀 tombstone 没有和这次 dispatcher 决策对齐。`experiments/icc_kv/replay.py` 不能当这个对齐工具。
-- 假设：D-B 这种负载不均会在正式预热之后出现。频率 NOT_MEASURED。
+- 正 regret 只在到达斜坡上出现，负载差是 1 个请求，不是持续的服务倾斜。
+- `choose` 不是 `T` 的 argmin。负载计数包括被 cap 藏住的 worker，因为 load 是本地计数，不是广告。
+- `kv_cache_usage_perc` 在负载窗口里大约 0.001。这个 vLLM 的 free queue 含有未被引用的 prefix block，所以该表不能证明前缀还在或不在。驻留证据是 cached tokens 和 hit 计数。
+- 没有为反事实 worker 再发请求。`actual_ttft_ms` 是空的。探测 TTFT 约 1.6 s，再探测约 95 ms，都是实际打到四张卡上的请求，不是另一条视图的 TTFT。
+- 主动测量 14.7 s，预热波 6.7 s。KV cache 104,544 tokens。
 
 ### 路径
 
-- 审计：`/home/byh/B02/analysis/fig6_reconstruction/f6_p0/F6_P0_FEASIBILITY_AUDIT.md`
-- (b)：`/home/byh/B02/analysis/fig6_reconstruction/f6_p0/F6_B_SMOKE_REPORT.md`
-- (d)：`/home/byh/B02/analysis/fig6_reconstruction/f6_p0/F6_D_SMOKE_REPORT.md`
-- (a)(c)：`/home/byh/B02/analysis/fig6_reconstruction/f6_p0/F6_AC_EXISTING_DATA_AUDIT.md`
-- 下一步全文：`/home/byh/B02/analysis/fig6_reconstruction/f6_p0/NEXT_ITERATION_RECOMMENDATION.md`
-- 脚本：`/home/byh/B02/analysis/fig6_reconstruction/f6_p0/smoke_b/offline_priority.py`
-- 历史汇总：`/home/byh/B02/analysis/fig6_reconstruction/f6_p0/audit/historical_formal4t4.json`
+- 快照报告：`/home/byh/B02/analysis/fig6_reconstruction/f6_p1/F6_P1_OBSERVED_SNAPSHOT_REPORT.md`
+- 反事实：`/home/byh/B02/analysis/fig6_reconstruction/f6_p1/F6_P1_ROUTING_COUNTERFACTUAL.md`
+- 下一步全文：`/home/byh/B02/analysis/fig6_reconstruction/f6_p1/NEXT_ITERATION_RECOMMENDATION.md`
+- 表：`/home/byh/B02/analysis/fig6_reconstruction/f6_p1/observed_worker_snapshots.csv`，`/home/byh/B02/analysis/fig6_reconstruction/f6_p1/counterfactual_routing.csv`
+- 原始记录：`/home/byh/B02/analysis/fig6_reconstruction/f6_p1/raw_observations.json`
+- 脚本：`/home/byh/B02/analysis/fig6_reconstruction/f6_p1/run_observed_snapshot.py`
+- 服务器日志：`/home/byh/B02/analysis/fig6_reconstruction/f6_p1/server_logs/`（`*.log` 与 `*.pid` 被忽略，不要提交）
 
 ### 下一步
 
-用户说「继续」时，不要开 GPU，不要画 Fig. 6，不要改论文。先读 `NEXT_ITERATION_RECOMMENDATION.md`。
+用户说「继续」时，不要画 Fig. 6，不要改论文，不要开 overlap 矩阵，不要开 Fig. 6(b)。先读 `NEXT_ITERATION_RECOMMENDATION.md`。
 
-下一轮最值得做的不是新矩阵。Fig. 6(d) 的机制问题已经由这次离线快照回答。若只能新增一组测量，做一次 OBSERVED 负载快照：4 个共享前缀预热（16 次请求）加约 8 次路由，记下每个候选的 coverage、in-flight load、`vllm_cached_tokens`，再离线套 full / Krep=2 / Krep=1。1 个 GPU cell，1 个 seed，主动测量目标不超过 120 秒，含启动大约 2 分钟。预热单独超过 120 秒就停。不要把 `T` 写成 TTFT。这次不要自己开。
+若只加一次测量：holder 启动顺序改成 `[3,2,1,0,3,2,1,0]`，广告顺序仍是 0、1、2、3。只保留 harness in-flight 等于 `num_requests_running` 的样本。同一条前缀，seed 1，full 与 `Krep=2` 离线比较。不要为了正 regret 改 cap。1 个 GPU cell，2 个离线视图。启动大约 1–2 分钟，测量控制在 2 分钟内。预热波超过 120 秒就停。不要把 `T` 写成 TTFT。这次不要自己开。
 
-Fig. 6(b) 保持关闭，直到另一次设计把真实失效、仍为正的 affinity、以及窗口内请求记在同一条时间线上，并且只改 priority 标志。
-
-P0-C1 的结论仍然有效，不要重跑。不要开 Dynamo 集成、64 卡、1024 replay、TTFT 矩阵、P0-B 的 2×2。
+P0-C1 仍然有效，不要重跑。不要开 Dynamo 集成、64 卡、1024 replay、TTFT 矩阵、P0-B 的 2×2。
 
 ### 机器
 
-可以安全停下。2026-10-18 17:55（UTC+8）刚查过：四张 T4 显存 0 MiB，利用率 0%。没有 `vllm serve`，没有 `dynamo.indexer`，没有 `run_c1.py`，没有这次的离线脚本残留。8000–8003、5557、8090 没有在听。`127.0.0.1:9710` 是容器 `b02-gateway4t4`，不要动。不要动 edgevisor、lhjj、gitlab。
+可以安全停下。2026-10-19 00:08（UTC+8）刚查过：四张 T4 显存 0 MiB，利用率 0%。这次的四个 `vllm serve` 已停，8000–8003 没有在听。没有 `dynamo.indexer`，没有 `run_c1.py`，没有 `run_observed_snapshot.py` 残留。`127.0.0.1:9710` 仍是容器 `b02-gateway4t4`，没有重启。不要动 edgevisor、lhjj、gitlab。
 
 ### Git
 
-当前分支 `f6-p0-fig6-feasibility`。研究报告 commit `7cecab4`，已经推到 `origin/f6-p0-fig6-feasibility`。父提交是 `fff14ff`（P0-C1 交接）。这次交接只改 `handsoff.md`。不要合并到 `main`，除非用户明确说。
+当前分支 `f6-p1-observed-replica`。研究报告 commit `78fa6d3`，已经推到 `origin/f6-p1-observed-replica`。父提交是 `36f3bfa`（F6-P0 交接，分支 `f6-p0-fig6-feasibility`）。这次交接只改 `handsoff.md`。不要合并到 `main`，除非用户明确说。
 
-P0-C1 仍在 `p0-c1-real-indexer`（`fff14ff`）。P0-A3 `d978ad3`。P0-A4 `9010ce0`。P0-A1、P0-A2、`p0-b1-activation-audit` 保持原分支。
+F6-P0 仍在 `f6-p0-fig6-feasibility`（`36f3bfa`）。P0-C1 仍在 `p0-c1-real-indexer`（`fff14ff`）。P0-A3 `d978ad3`。P0-A4 `9010ce0`。P0-A1、P0-A2、`p0-b1-activation-audit` 保持原分支。
 
 Dynamo 检出在 `/home/byh/Dynamo/dynamo`，commit `7a2a40906`。`_core.abi3.so` 指向 debug `lib_core.so`，旧文件是 `_core.abi3.so.pre-c1`。不要把 Dynamo 树提交进 B02。
 
-不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`、`/tmp/icc_link_smoke2/`。`analysis/icc_kv/` 在 `.gitignore`。`*.log` 已被忽略。
+不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`、`/tmp/icc_link_smoke2/`、`analysis/fig6_reconstruction/f6_p1/server_logs/`。`analysis/icc_kv/` 在 `.gitignore`。`*.log` 已被忽略。
 
 ### 仍然有效的旧约束
 
 - 四卡自然负载不能写成顶满 10 Mbit。10 Mbit 路径实测排空约 9408 frame/s。
 - `offered_wire_bit_per_s` 只乘 UPSERT，104 字节是记账约定。P0-C1 的 38 kbit/s 是实测 msgpack，TCP 载荷 NOT_MEASURED。
 - fan-in 的 N=32/64 不是 GPU 数。
-- `kv_cache_usage_perc` 在驱逐时可以仍是 0。驱逐证据是 `BlockRemoved`。
+- `kv_cache_usage_perc` 在驱逐时可以仍是 0。驱逐证据是 `BlockRemoved`。未引用的 prefix block 也会让这个表接近 0。
 - 前缀 tombstone 会藏住部分祖先。P0-C1 有 1 条：广告 1040，留下 448。
