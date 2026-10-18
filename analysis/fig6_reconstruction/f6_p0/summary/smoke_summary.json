@@ -1,0 +1,66 @@
+{
+  "b_stale_when_one_frame_served": {
+    "InvalidationFIFO": 1,
+    "InvalidationPriority": 0
+  },
+  "b_tomb_slot": {
+    "InvalidationFIFO": 8,
+    "InvalidationPriority": 0
+  },
+  "d": [
+    {
+      "scenario": "D-A-similar-load",
+      "krep": "full",
+      "regret_ms": 0.0,
+      "ads_forwarded": 4,
+      "ads_dropped": 0,
+      "best_owner_hidden": 0,
+      "selected": 0
+    },
+    {
+      "scenario": "D-A-similar-load",
+      "krep": "2",
+      "regret_ms": 0.0,
+      "ads_forwarded": 2,
+      "ads_dropped": 2,
+      "best_owner_hidden": 0,
+      "selected": 0
+    },
+    {
+      "scenario": "D-A-similar-load",
+      "krep": "1",
+      "regret_ms": 0.0,
+      "ads_forwarded": 1,
+      "ads_dropped": 3,
+      "best_owner_hidden": 0,
+      "selected": 0
+    },
+    {
+      "scenario": "D-B-load-imbalance",
+      "krep": "full",
+      "regret_ms": 0.0,
+      "ads_forwarded": 4,
+      "ads_dropped": 0,
+      "best_owner_hidden": 0,
+      "selected": 2
+    },
+    {
+      "scenario": "D-B-load-imbalance",
+      "krep": "2",
+      "regret_ms": 16.0,
+      "ads_forwarded": 2,
+      "ads_dropped": 2,
+      "best_owner_hidden": 1,
+      "selected": 1
+    },
+    {
+      "scenario": "D-B-load-imbalance",
+      "krep": "1",
+      "regret_ms": 16.0,
+      "ads_forwarded": 1,
+      "ads_dropped": 3,
+      "best_owner_hidden": 1,
+      "selected": 0
+    }
+  ]
+}

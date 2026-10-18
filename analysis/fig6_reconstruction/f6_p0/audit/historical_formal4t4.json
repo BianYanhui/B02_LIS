@@ -1,0 +1,150 @@
+{
+  "signaling_mean_across_rho": {
+    "Adaptive": {
+      "cells": 8,
+      "tombstones_sent_mean": 0.0,
+      "superseded_mean": 15.175,
+      "duplicate_holder_mean": 17.675,
+      "forwarded_mean": 79.95,
+      "upserts_sent_mean": 152.0
+    },
+    "AgeCov-Greedy": {
+      "cells": 8,
+      "tombstones_sent_mean": 0.0,
+      "superseded_mean": 0.0,
+      "duplicate_holder_mean": 0.0,
+      "forwarded_mean": 118.9,
+      "upserts_sent_mean": 152.0
+    },
+    "FullSync": {
+      "cells": 8,
+      "tombstones_sent_mean": 0.0,
+      "superseded_mean": 0.0,
+      "duplicate_holder_mean": 0.0,
+      "forwarded_mean": 117.45,
+      "upserts_sent_mean": 152.0
+    },
+    "LatestOnly": {
+      "cells": 8,
+      "tombstones_sent_mean": 0.0,
+      "superseded_mean": 37.775,
+      "duplicate_holder_mean": 0.0,
+      "forwarded_mean": 100.89999999999999,
+      "upserts_sent_mean": 152.0
+    },
+    "RateFIFO": {
+      "cells": 8,
+      "tombstones_sent_mean": 0.0,
+      "superseded_mean": 0.0,
+      "duplicate_holder_mean": 0.0,
+      "forwarded_mean": 37.45,
+      "upserts_sent_mean": 152.0
+    },
+    "StaticSemantic": {
+      "cells": 8,
+      "tombstones_sent_mean": 0.0,
+      "superseded_mean": 30.95,
+      "duplicate_holder_mean": 25.15,
+      "forwarded_mean": 93.22500000000001,
+      "upserts_sent_mean": 152.0
+    }
+  },
+  "correctness": [
+    {
+      "stage": "baseline",
+      "policy": "Adaptive",
+      "physical_false_positive_affinity_rate_mean": "0.0",
+      "tombstone_delay_p95_s_mean": "0.0",
+      "forced_owner_resets_mean": "0.0",
+      "stale_fallback_rate_mean": "0.0"
+    },
+    {
+      "stage": "baseline",
+      "policy": "AgeCov-Greedy",
+      "physical_false_positive_affinity_rate_mean": "0.0",
+      "tombstone_delay_p95_s_mean": "0.0",
+      "forced_owner_resets_mean": "0.0",
+      "stale_fallback_rate_mean": "0.0"
+    },
+    {
+      "stage": "baseline",
+      "policy": "FullSync",
+      "physical_false_positive_affinity_rate_mean": "0.0",
+      "tombstone_delay_p95_s_mean": "0.0",
+      "forced_owner_resets_mean": "0.0",
+      "stale_fallback_rate_mean": "0.0"
+    },
+    {
+      "stage": "baseline",
+      "policy": "Ideal",
+      "physical_false_positive_affinity_rate_mean": "0.0",
+      "tombstone_delay_p95_s_mean": "0.0",
+      "forced_owner_resets_mean": "0.0",
+      "stale_fallback_rate_mean": "0.0"
+    },
+    {
+      "stage": "baseline",
+      "policy": "LatestOnly",
+      "physical_false_positive_affinity_rate_mean": "0.0",
+      "tombstone_delay_p95_s_mean": "0.0",
+      "forced_owner_resets_mean": "0.0",
+      "stale_fallback_rate_mean": "0.0"
+    },
+    {
+      "stage": "baseline",
+      "policy": "RateFIFO",
+      "physical_false_positive_affinity_rate_mean": "0.0",
+      "tombstone_delay_p95_s_mean": "0.0",
+      "forced_owner_resets_mean": "0.0",
+      "stale_fallback_rate_mean": "0.0"
+    },
+    {
+      "stage": "baseline",
+      "policy": "StaticSemantic",
+      "physical_false_positive_affinity_rate_mean": "0.0",
+      "tombstone_delay_p95_s_mean": "0.0",
+      "forced_owner_resets_mean": "0.0",
+      "stale_fallback_rate_mean": "0.0"
+    },
+    {
+      "stage": "churn",
+      "policy": "Adaptive",
+      "physical_false_positive_affinity_rate_mean": "0.03958333333333333",
+      "tombstone_delay_p95_s_mean": "169.95327410697936",
+      "forced_owner_resets_mean": "9.0",
+      "stale_fallback_rate_mean": "0.07291666666666667"
+    },
+    {
+      "stage": "churn",
+      "policy": "FullSync",
+      "physical_false_positive_affinity_rate_mean": "0.004166666666666667",
+      "tombstone_delay_p95_s_mean": "0.0",
+      "forced_owner_resets_mean": "9.0",
+      "stale_fallback_rate_mean": "0.14166666666666666"
+    },
+    {
+      "stage": "churn",
+      "policy": "Ideal",
+      "physical_false_positive_affinity_rate_mean": "0.008333333333333333",
+      "tombstone_delay_p95_s_mean": "0.0",
+      "forced_owner_resets_mean": "0.0",
+      "stale_fallback_rate_mean": "0.010416666666666666"
+    },
+    {
+      "stage": "churn",
+      "policy": "LatestOnly",
+      "physical_false_positive_affinity_rate_mean": "0.008333333333333333",
+      "tombstone_delay_p95_s_mean": "178.6494162082672",
+      "forced_owner_resets_mean": "9.0",
+      "stale_fallback_rate_mean": "0.14791666666666667"
+    },
+    {
+      "stage": "churn",
+      "policy": "RateFIFO",
+      "physical_false_positive_affinity_rate_mean": "0.07708333333333334",
+      "tombstone_delay_p95_s_mean": "0.0",
+      "forced_owner_resets_mean": "9.0",
+      "stale_fallback_rate_mean": "0.09166666666666666"
+    }
+  ]
+}
