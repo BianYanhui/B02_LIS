@@ -28,42 +28,44 @@
 
 ## 可变交接
 
-更新时间：2026-10-19 17:35（UTC+8）。P0-D1 已完成并停止。没有开 GPU。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。
+更新时间：2026-10-19 22:50（UTC+8）。P0-D1b 已完成并停止。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。
 
 ### 现在在做的事
 
-分支 `p0-d1-topk-boundary`，从 main `7426cf8` 拉出。问题是 Static Top-K16 有没有容量边界，值得不值得做 Adaptive Expansion。没有改网关，没有改 Algorithm 1，没有跑新格子。
+分支 `p0-d1b-k-crossover`，从 `p0-d1-topk-boundary` 的 `198a5b6` 拉出。问题是 K=8 和 K=16 有没有可重复的性能交叉，值不值得做 Adaptive。没有改网关准入，没有改 Algorithm 1。
 
 ### 结论
 
-主判定 `CAPACITY_TRADEOFF_WITHOUT_NET_GAIN`。控制判定 `ADAPTIVE_CONTROL_NOT_YET_FEASIBLE`。不要开始 P0-D2。
+主判定 `STATIC_K8_SUFFICIENT`。不要开始 P0-D2。
 
-证据是已有的 `analysis/icc_kv/formal_A_5d2d300/ksweep_ov30`，commit `5d2d300`，10 Mbit，ultrahigh，pool 32，ov30，3 个 seed，K = 4/8/16/32/64。K=24 没有配过，记 `NOT_MEASURED`。该提交的 Top-K 代码和当前 `HEAD` 的 `gateway_relay_4t4.py`、`wire.py`、`e2e.py` 一致。
+ov30 已有三 seed：K=8 的 Routing FN 三个 seed 都更低（差值 −0.0075、−0.0451、−0.0150）。TTFT 只有两个 seed 更低，seed 0 是 +18 ms。K=4 没有优于 K=8。
 
-K=16 在所有看过的正式格里都会把 pending 顶满（peak queue 16–19）。base 负载（pool 16，噪声 256）上 FN 率是 0，包括 ρ=0.5 到 2.0。ov30 上 K=16 的 FN 率均值 0.030，K=32 是 0.013，但配对 TTFT 是 +210、−12、+60 ms，复用 token 不升。转发速率在 K=16 已经约 10148/s，K=32 仍是 10140/s，链路已经满。同一张表里 FN 最低的是 K=8（0.0075），不是更大的 K。
+Base 补了同一次进程里的配对：StaticTopK8 与 StaticTopK16，ultrahigh，pool 16，噪声 256，10 Mbit，seed 0–2，600 s，commit `198a5b6`。六个 cell 都成功。两边 FN 都是 0，143/143 前景更新都送达。复用 token 只在 seed 0 的一个请求上有差别。TTFT 差值（K=8−K=16）是 +0.4、+21.5、−9.1 ms。K=16 没有用户侧优势。K=16 每秒大约多转发 2100 帧，网关 CPU 高约 0.05。
 
-更新级别的淘汰分类没有网关事件日志，记 `COUNTERFACTUAL_NOT_VERIFIED`。队列深度和 drop 计数在 FN=0 的 base 格里也很高，不能当作扩容信号。
+这不是性能交叉。Base 上队列和 Top-K drop 都很高，同时 FN 是 0，这两个信号不能用来切换 K。10 月那次 Base K=16 的 TTFT 是 3300–3800 ms，这次同配置大约 600 ms，复用 token 接近，绝对 TTFT 不能跨天比较。
 
 ### 路径
 
-`analysis/p0_adaptive/d1_topk_boundary/`
+`analysis/p0_adaptive/d1b_k_crossover/`
 
-- `P0_D1_EXISTING_DATA_AUDIT.md`
-- `adaptive_feasibility_assessment.md`
+- `P0_D1B_SUMMARY.md`
+- `DATA_AND_IMPLEMENTATION_AUDIT.md`
+- `existing_k_sweep_paired.csv`
+- `base_k8_k16_comparison.csv`
+- `regime_crossover_analysis.csv`
+- `mechanism_evidence_audit.md`
+- `online_signal_feasibility.md`
 - `NEXT_ITERATION_RECOMMENDATION.md`
-- `audit_existing_ksweep.py`
-- `static_k_sweep.csv`，`topk_candidate_pressure.csv`，`topk_harmful_drop_analysis.csv`，`capacity_visibility_tradeoff.csv`
-
-`analysis/icc_kv/` 仍被 gitignore，原始 summary 不入库。
+- `smoke/`，`base_ultrahigh/`
 
 ### 机器
 
-没有启动 vLLM。`b02-gateway4t4` 仍在 `127.0.0.1:9710`。本轮没有新端口。
+本轮用 `experiments/4t4/restart_4t4.sh` 拉起四个 vLLM，KV cache 104544。`prepare_fixed_gateway` 重建了 `b02-gateway4t4`，1 CPU，HTB 10 Mbit，这是正式矩阵的控制路径，不是准入改动。实验结束后关掉本轮的四个 vLLM。9710 上的网关容器保留。
 
 ### 下一步
 
-不要实现 Adaptive Expansion，不要改默认 K，不要为了补 K=24 开 GPU。下一轮如果还做 Adaptive，先换问题；现有问题已经有答案。
+不要实现 Adaptive，不要改默认 K，不要为了找交叉再调负载。
 
 ### 不要提交、不要覆盖
 
-不要提交 `analysis/icc_kv/`、`ICC_KV_实验结果_20261005.zip`、`analysis/admission_overhead_4t4/`、`analysis/icc_kv_export/`、`supplemental_20260922_cp_queue_delay/`、`*.log`、`*.pid`。不要改 `experiments/4t4/` 的冻结网关和 `Dispatcher.choose`。不要重启 `b02-gateway4t4`。
+不要提交 `analysis/icc_kv/`、`ICC_KV_实验结果_20261005.zip`、`analysis/admission_overhead_4t4/`、`analysis/icc_kv_export/`、`supplemental_20260922_cp_queue_delay/`、`*.log`、`*.pid`。不要改 `experiments/4t4/` 的冻结网关和 `Dispatcher.choose`。
