@@ -28,13 +28,13 @@
 
 ## 可变交接
 
-更新时间：2026-10-19 17:15（UTC+8）。Fig. 6 重建已整理，准备并入 main。没有正在跑的实验。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。
+更新时间：2026-10-19 17:20（UTC+8）。Fig. 6 重建已并入 main，合并提交 `3a8fe0c`。没有正在跑的实验。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。本机没有 GitHub CLI 登录，所以没有开 GitHub PR，是直接 merge 后推送 main。
 
 ### 现在在做的事
 
 Fig. 6(a)(b)(c)(d) 的证据已经收在 `analysis/fig6_reconstruction/`。索引是 `analysis/fig6_reconstruction/README.md`。下一模块还没开始。不要自己开新实验。
 
-分支：`f6-b1-real-invalidation`。Fig. 6(b) 的测量代码是 `3a3ce7d`，结果是 `6e8ee8d`。本交接在整理提交之后。没有改 `experiments/4t4/` 的冻结网关和 `Dispatcher.choose`。
+当前分支是 `main`。Fig. 6(b) 的测量代码是 `3a3ce7d`，结果是 `6e8ee8d`，索引提交是 `d06404e`。没有改 `experiments/4t4/` 的冻结网关和 `Dispatcher.choose`。旧的 `f6-*` 远程分支还在，内容和 main 里的这段历史相同，可以以后删。
 
 ### 论文该引用哪一版
 
