@@ -1,0 +1,2 @@
+model,wrapper,zmq_messages,block_stored_events,block_removed_events,all_blocks_cleared,block_hash_occurrences,wrapper_upserts,ack_delay_s,status,git_commit
+/home/byh/.cache/modelscope/qwen/Qwen2.5-1.5B-Instruct,EXPERIMENTAL_WRAPPER,168,168,0,0,14336,168,0.5881700101106063,RAN,c9996308eba5debfccb4afaeb16e6d89a17d1b16

@@ -1,0 +1,14 @@
+{
+  "rule": "ack_delay_s = 2 / feasibility_offered_upserts_per_s; max_inflight = 1 on the controlled arm only",
+  "feasibility_offered_rate_per_s": 3.400377383443771,
+  "ack_delay_s": 0.5881700101106063,
+  "gates": {
+    "lineages": 8,
+    "growing_lineages": 8,
+    "upserts": 24,
+    "partial_rows": 0,
+    "gate1": true,
+    "gate2": true
+  },
+  "fixed_before_replay": true
+}
