@@ -28,3 +28,9 @@ The stale entry changes the decision. It does not do so by winning an affinity s
 `run_f6_b1.py` is marked `EXPERIMENTAL_INVALIDATION_ADAPTER`. It is not `publish_state`. It emits `K_TOMB` for owner 0 and lineage `F6B1S{seed}X` only after worker 0's event tap shows `AllBlocksCleared` ordered before any `BlockStored`, and no later store in that window carries prefix X. The clear is queued by vLLM until the next scheduler step, so a short trigger prompt that is not prefix X is sent only to publish the event. That trigger is recorded. It is not a refill of X.
 
 The physical loss is a developer `reset_prefix_cache` on worker 0. Label: `CONTROLLED_REAL_CACHE_INVALIDATION`. It is not a natural `BlockRemoved`. No `BlockRemoved` is invented. A clear ordered after a store of X fails the trial.
+
+## What this run actually exercised
+
+The run on commit `3a3ce7d` used that path unchanged. Every capture saw `AllBlocksCleared` before the trigger's `BlockStored` on worker 0, with no prefix-X tokens in that window, and no clear or removal on worker 1. The adapter's `K_TOMB` used owner 0 and lineage `F6B1S{seed}X`. After apply, the index kept worker 1 at 4096 and dropped only worker 0.
+
+The relay was the frozen program on `127.0.0.1:9730`, dispatcher on `9731`. Controlled cells set `max_inflight=1` and held each ACK for 0.7922039031982422 s. That number is this pilot's capture span divided by four. It was frozen, with no later adjustment, before seeds `2026101920`–`2026101922`. Natural cells used `max_inflight=0` and no ACK hold. Merge, dedup, adaptive utility, and coverage top-k stayed off. The priority flag was the only difference inside a condition.

@@ -1,0 +1,33 @@
+{
+  "status": "RAN",
+  "git_commit": "3a3ce7dc9ad07a5d08bb98fb59193ba126c0fc7f",
+  "gates": {
+    "gate1_residency": true,
+    "gate2_tombstone": true,
+    "gate3_backlog": true,
+    "gate4_priority_order": true,
+    "gate5_apply": true,
+    "gate6_routing": true,
+    "gate7_executed": true,
+    "stop_formal": false
+  },
+  "rule": {
+    "ack_delay_s": 0.7922039031982422,
+    "span_s": 3.1688156127929688,
+    "n_background": 8,
+    "formula": "span/(N-4)",
+    "fixed_before_formal": true,
+    "adjustments": 0,
+    "probe_offset_s": 2.371638536453247,
+    "pilot_fifo_apply_delay_s": 3.9570436477661133,
+    "pilot_priority_apply_delay_s": 0.7862334251403809,
+    "pilot_fifo_dequeue_position": 4,
+    "pilot_priority_dequeue_position": 0
+  },
+  "elapsed_s": 192.9621880054474,
+  "cells": 18,
+  "executed": 4,
+  "production_gateway": "not touched; 127.0.0.1:9710",
+  "adapter": "EXPERIMENTAL_INVALIDATION_ADAPTER",
+  "invalidation": "CONTROLLED_REAL_CACHE_INVALIDATION"
+}

@@ -1,0 +1,13 @@
+{
+  "ack_delay_s": 0.7922039031982422,
+  "span_s": 3.1688156127929688,
+  "n_background": 8,
+  "formula": "span/(N-4)",
+  "fixed_before_formal": true,
+  "adjustments": 0,
+  "probe_offset_s": 2.371638536453247,
+  "pilot_fifo_apply_delay_s": 3.9570436477661133,
+  "pilot_priority_apply_delay_s": 0.7862334251403809,
+  "pilot_fifo_dequeue_position": 4,
+  "pilot_priority_dequeue_position": 0
+}
