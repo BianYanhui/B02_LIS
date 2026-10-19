@@ -1,0 +1,22 @@
+[
+  {
+    "seed": 2026101901,
+    "overlap": 0.0,
+    "attempt": 1,
+    "status": "stream_mismatch_or_request_failure",
+    "request_failures": 0,
+    "offered": 0,
+    "expected": 48,
+    "source_upserts": 48
+  },
+  {
+    "seed": 2026101901,
+    "overlap": 0.0,
+    "attempt": 2,
+    "status": "stream_mismatch_or_request_failure",
+    "request_failures": 0,
+    "offered": 0,
+    "expected": 48,
+    "source_upserts": 48
+  }
+]
