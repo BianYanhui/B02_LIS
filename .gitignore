@@ -40,3 +40,9 @@ analysis/**/*.pid
 
 # Oversized control-plane fan-in gateway event log (>100MB GitHub limit)
 supplemental_20260920_controlplane/raw/fanin/gateway_events_fanin.csv
+
+# Local dumps. Not part of the Fig. 6 reconstruction or the frozen formal matrix.
+/ICC_KV_实验结果_20261005.zip
+/analysis/admission_overhead_4t4/
+/analysis/icc_kv_export/
+/supplemental_20260922_cp_queue_delay/
