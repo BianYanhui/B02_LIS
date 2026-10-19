@@ -1,0 +1,10 @@
+source,seed,baseline,other,compared_requests,fn_fixed,fn_created,fn_both,mean_ttft_delta_ms,update_class,note
+formal_A_5d2d300/ksweep_ov30,0,StaticTopK16,StaticTopK8,133,2,1,1,17.850161511278245,COUNTERFACTUAL_NOT_VERIFIED,Separate end-to-end cells with the same request ids. Not a trace of one evicted update.
+formal_A_5d2d300/ksweep_ov30,0,StaticTopK16,StaticTopK32,133,3,2,0,210.3097534586466,COUNTERFACTUAL_NOT_VERIFIED,Separate end-to-end cells with the same request ids. Not a trace of one evicted update.
+formal_A_5d2d300/ksweep_ov30,0,StaticTopK16,StaticTopK64,133,3,0,0,159.9246722180451,COUNTERFACTUAL_NOT_VERIFIED,Separate end-to-end cells with the same request ids. Not a trace of one evicted update.
+formal_A_5d2d300/ksweep_ov30,1,StaticTopK16,StaticTopK8,133,6,0,0,-37.60738609774435,COUNTERFACTUAL_NOT_VERIFIED,Separate end-to-end cells with the same request ids. Not a trace of one evicted update.
+formal_A_5d2d300/ksweep_ov30,1,StaticTopK16,StaticTopK32,133,6,1,0,-12.298136436090228,COUNTERFACTUAL_NOT_VERIFIED,Separate end-to-end cells with the same request ids. Not a trace of one evicted update.
+formal_A_5d2d300/ksweep_ov30,1,StaticTopK16,StaticTopK64,133,5,5,1,-36.44542719548872,COUNTERFACTUAL_NOT_VERIFIED,Separate end-to-end cells with the same request ids. Not a trace of one evicted update.
+formal_A_5d2d300/ksweep_ov30,2,StaticTopK16,StaticTopK8,133,3,1,0,-112.91756592481198,COUNTERFACTUAL_NOT_VERIFIED,Separate end-to-end cells with the same request ids. Not a trace of one evicted update.
+formal_A_5d2d300/ksweep_ov30,2,StaticTopK16,StaticTopK32,133,3,2,0,60.42980532330827,COUNTERFACTUAL_NOT_VERIFIED,Separate end-to-end cells with the same request ids. Not a trace of one evicted update.
+formal_A_5d2d300/ksweep_ov30,2,StaticTopK16,StaticTopK64,133,3,0,0,-21.758366421052585,COUNTERFACTUAL_NOT_VERIFIED,Separate end-to-end cells with the same request ids. Not a trace of one evicted update.
