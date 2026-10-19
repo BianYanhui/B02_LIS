@@ -4,6 +4,8 @@ LLM 推理服务的实例–调度器控制面。当前主线是 ICC 论文实�
 
 仓库里还留着 2026-07 的动机实验和其后的多轮补充。开跑和读当前代码以 `docs/icc_formal/`、`experiments/icc_kv/` 为准。两人交替改这个仓库时，先读 `handsoff.md` 分隔线以下。
 
+Fig. 6 的机制重建在 `analysis/fig6_reconstruction/README.md`。那一轮不改冻结的网关和 `Dispatcher.choose`，也不代替上面的正式矩阵。
+
 ## 当前实验
 
 `Adaptive` 是消融。对照包括 `BoundedSemantic16`、`BoundedPrio16`、`BoundedFIFO16`、`FullSync`、`Ideal`。主张、假设和剔除规则在 `docs/icc_formal/PREREG.md`。仓库里的那份是空白模板，填好的副本放在仓库外。
@@ -37,7 +39,7 @@ Python：`/home/byh/B02/poc/.venv/bin/python`。
 | `docs/icc_formal/` | 本轮正式实验的入口、预注册模板、操作手册、`check_smoke.py` |
 | `experiments/icc_kv/` | 正式矩阵：单格执行、block 队列、容量窗口、负载、策略 |
 | `experiments/4t4/` | 4×T4 网关、策略单测，以及更早的冻结基线 |
-| `analysis/` | 已入库的汇总。`analysis/icc_kv/` 不入库 |
+| `analysis/` | 已入库的汇总。`analysis/icc_kv/` 不入库。Fig. 6 见 `analysis/fig6_reconstruction/` |
 | `poc/` | vLLM 虚拟环境，以及早期可观测性探测 |
 | `experiments/` | 2026-07 的动机实验（语义 State Sketch） |
 | `shared_link_exp/`、`ksweep/`、`supplemental_*/`、`full_experiment/`、`tradeoff_experiments/`、`N256_dispatch/` | 各轮补充和中间实验 |

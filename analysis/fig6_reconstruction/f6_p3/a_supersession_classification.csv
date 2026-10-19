@@ -1,0 +1,12 @@
+group,rep,path,offered,forwarded,extension,duplicate,other,tombstone,anomalous,true_extension_ratio,total_supersession_ratio,duplicate_ratio,pending_duration_p50_s,pending_duration_p95_s
+dynamic_LatestOnly,0,analysis/formal4t4/raw/dynamic/gateway_events_dynamic_LatestOnly_rep0_20260726.csv,384,310,0,74,0,0,0,0.000000,0.192708,0.192708,3.550711,16.545910
+dynamic_LatestOnly,1,analysis/formal4t4/raw/dynamic/gateway_events_dynamic_LatestOnly_rep1_20260726.csv,384,314,0,70,0,0,0,0.000000,0.182292,0.182292,2.200426,23.389928
+dynamic_LatestOnly,2,analysis/formal4t4/raw/dynamic/gateway_events_dynamic_LatestOnly_rep2_20260726.csv,384,311,0,73,0,0,0,0.000000,0.190104,0.190104,2.507774,19.964186
+dynamic_LatestOnly,3,analysis/formal4t4/raw/dynamic/gateway_events_dynamic_LatestOnly_rep3_20260726.csv,384,290,0,94,0,0,0,0.000000,0.244792,0.244792,3.606277,22.577782
+dynamic_LatestOnly,4,analysis/formal4t4/raw/dynamic/gateway_events_dynamic_LatestOnly_rep4_20260726.csv,384,296,0,88,0,0,0,0.000000,0.229167,0.229167,2.642146,17.431849
+dynamic_StaticSemantic,0,analysis/formal4t4/raw/dynamic/gateway_events_dynamic_StaticSemantic_rep0_20260726.csv,348,279,0,69,0,0,0,0.000000,0.198276,0.198276,1.948925,11.488830
+dynamic_StaticSemantic,1,analysis/formal4t4/raw/dynamic/gateway_events_dynamic_StaticSemantic_rep1_20260726.csv,351,296,0,55,0,0,0,0.000000,0.156695,0.156695,1.626945,11.998373
+dynamic_StaticSemantic,2,analysis/formal4t4/raw/dynamic/gateway_events_dynamic_StaticSemantic_rep2_20260726.csv,350,281,0,69,0,0,0,0.000000,0.197143,0.197143,1.649055,10.895697
+dynamic_StaticSemantic,3,analysis/formal4t4/raw/dynamic/gateway_events_dynamic_StaticSemantic_rep3_20260726.csv,352,259,0,93,0,0,0,0.000000,0.264205,0.264205,3.131254,12.473629
+dynamic_StaticSemantic,4,analysis/formal4t4/raw/dynamic/gateway_events_dynamic_StaticSemantic_rep4_20260726.csv,352,272,0,80,0,0,0,0.000000,0.227273,0.227273,1.375454,7.667128
+churn_LatestOnly,file,analysis/formal4t4/raw/churn/gateway_events_churn_LatestOnly_20260726.csv,1560,348,0,239,0,896,0,0.000000,0.727564,0.153205,61.013409,170.229326

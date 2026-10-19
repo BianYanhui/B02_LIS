@@ -1,0 +1,17 @@
+{
+  "gate1": true,
+  "gate2": true,
+  "gate3": true,
+  "natural_true_extension": 0,
+  "controlled_true_extension": 8,
+  "native_feasibility": {
+    "phase": "feasibility",
+    "zmq_messages": 24,
+    "block_stored": 24,
+    "block_removed": 0,
+    "cleared": 0,
+    "hash_occurrences": 2048,
+    "wrapper_upserts": 24
+  },
+  "ack_delay_s": 0.5881700101106063
+}

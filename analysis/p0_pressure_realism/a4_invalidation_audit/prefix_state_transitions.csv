@@ -1,0 +1,185 @@
+timestamp_ns,worker_id,scenario,request_id,prefix_identifier,kind,category,advertised_coverage,reusable_coverage_after,survivor_tokens,validity_after,version,evidence,protocol_op
+1792257485156950272,0,A_cold,A_cold:0,5fc3db431bf2654c,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257487243044096,0,A_cold,A_cold:1,fdb556288af497ca,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257487689923072,0,A_cold,A_cold:2,9ce3832a7f49ecd3,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257488162024192,0,A_cold,A_cold:3,7bfaae3bffd6ed,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257488606699008,0,A_cold,A_cold:4,c5efd97de0bed535,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257489054772224,0,A_cold,A_cold:5,a432ec61dc56f29b,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257489499172608,0,A_cold,A_cold:6,6cb0cce09c122747,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257489943556608,0,A_cold,A_cold:7,1d4c23946f0fc897,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257490389081856,0,A_cold,A_cold:8,a3048e4bf58648ef,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257490831500288,0,A_cold,A_cold:9,b43010fff53abcd5,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257491276923392,0,A_cold,A_cold:10,98d69edf5c898ed4,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257491700210944,0,A_cold,A_cold:11,75bc83328e88a884,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257492142248704,0,A_cold,A_cold:12,8e2f57aea11d3574,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257492585862912,0,A_cold,A_cold:13,9645faf5d8b515cb,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257493031993856,0,A_cold,A_cold:14,bbcbb54012b5d071,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257493474552832,0,A_cold,A_cold:15,dd4a150be73b2ad9,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257493919282944,0,A_cold,A_cold:16,afa1df4fe82d9ab3,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257494365211904,0,A_cold,A_cold:17,d1404641d59e5d5d,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257494808007936,0,A_cold,A_cold:18,52ed3b6fc9c184e5,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257495230653952,0,A_cold,A_cold:19,6c8c1f98d464d2bb,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257496243308032,0,B_reuse,B_reuse:0,5fc3db431bf2654c,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,fdb556288af497ca,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,9ce3832a7f49ecd3,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,7bfaae3bffd6ed,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,c5efd97de0bed535,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,a432ec61dc56f29b,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,6cb0cce09c122747,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,1d4c23946f0fc897,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,a3048e4bf58648ef,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,b43010fff53abcd5,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,98d69edf5c898ed4,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,75bc83328e88a884,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,8e2f57aea11d3574,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,9645faf5d8b515cb,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,bbcbb54012b5d071,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,dd4a150be73b2ad9,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,afa1df4fe82d9ab3,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,d1404641d59e5d5d,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,52ed3b6fc9c184e5,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,6c8c1f98d464d2bb,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257496243308032,0,B_reuse,B_reuse:0,af2b786ab9dc0f6c,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257500587111936,0,C_plant,C_plant:0,af2b786ab9dc0f6c,RESTART,reset_not_eviction,1040,0,0,INVALID,2,AllBlocksCleared from the collector's reset_prefix_cache,K_RESET
+1792257500587111936,0,C_plant,C_plant:0,7d16d6aebc328b7d,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257501013611264,0,C_plant,C_plant:1,22cf94dcba7b8bc2,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257501457072896,0,C_plant,C_plant:2,fd324f05e619653e,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257502117771264,0,C_flood,C_flood:0,5a68a10ba50683e,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257502712316928,0,C_flood,C_flood:1,1643c7b2b199c56d,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257503294656000,0,C_flood,C_flood:2,5f1e1b608b4417bf,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257503879127808,0,C_flood,C_flood:3,f7df11a71733f39d,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257504465092096,0,C_flood,C_flood:4,582cf5725a1691c3,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257505051625472,0,C_flood,C_flood:5,7e930c3fa2683a91,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257505641217280,0,C_flood,C_flood:6,2acaec6bbf8fd659,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257506226494464,0,C_flood,C_flood:7,b667d2f6215b0c9e,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257506809798656,0,C_flood,C_flood:8,d5b1f00392580054,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257507374575360,0,C_flood,C_flood:9,5103a73611a0854f,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257507962806784,0,C_flood,C_flood:10,1deaa614ceb757c2,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257508547687424,0,C_flood,C_flood:11,59f79d3811bb1252,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257509130839552,0,C_flood,C_flood:12,968f89b473022292,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257509719601664,0,C_flood,C_flood:13,21895b09d358bd5a,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257510317826048,0,C_flood,C_flood:14,619e0c27ade3c752,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257510905513984,0,C_flood,C_flood:15,8ca01cce24883ab0,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257511487564544,0,C_flood,C_flood:16,630da863a973d33b,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257512052730880,0,C_flood,C_flood:17,49d4bebb2c09c5f0,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257512639192320,0,C_flood,C_flood:18,2f382c336c87322c,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257513225948416,0,C_flood,C_flood:19,9e0e2693c2f5eeac,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257513816927488,0,C_flood,C_flood:20,6ffeeb5bdd3e617c,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257514420801792,0,C_flood,C_flood:21,cacedc2fa20a7c56,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257515013573120,0,C_flood,C_flood:22,71316cb06ed7a23f,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257515600737792,0,C_flood,C_flood:23,a1fffb3b39129b4a,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257516186975232,0,C_flood,C_flood:24,7c952b35a9a15acc,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257516757054464,0,C_flood,C_flood:25,8d4d9b227e49f07f,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257517347631872,0,C_flood,C_flood:26,4a86ffe560e737e8,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257517933052672,0,C_flood,C_flood:27,adfeffe172a6e80b,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257518511132672,0,C_flood,C_flood:28,f838ae32f0e8bd32,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257519099835136,0,C_flood,C_flood:29,ab87d33d3c02ef6b,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257519691100928,0,C_flood,C_flood:30,fe36b4dbcf3c1257,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257520280063744,0,C_flood,C_flood:31,bd93845f284c8c34,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257520873798656,0,C_flood,C_flood:32,bc1c8d6f5f467d77,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257521438946048,0,C_flood,C_flood:33,6ec7cda5a172d0d0,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257522025136640,0,C_flood,C_flood:34,7fdc679b7aa28cf4,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257522613130752,0,C_flood,C_flood:35,5922d6e648a882e3,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257523206815232,0,C_flood,C_flood:36,c0fceb7e7d44f426,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257523792144640,0,C_flood,C_flood:37,3f6f497bcd56d958,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257524384041984,0,C_flood,C_flood:38,a080ed20022f3270,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257524974947584,0,C_flood,C_flood:39,edebb03809cac275,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257525559821824,0,C_flood,C_flood:40,5872de21a31f792d,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257526133588224,0,C_flood,C_flood:41,a2345db2ec1da2da,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257526719418880,0,C_flood,C_flood:42,e21d459ee8883d94,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257527305004800,0,C_flood,C_flood:43,9d4977d142880084,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257527890724864,0,C_flood,C_flood:44,4f00bd75152bb6ef,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257528478228480,0,C_flood,C_flood:45,32adcea2355bfd38,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257529071261440,0,C_flood,C_flood:46,48ed89e33a79555d,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257529657248512,0,C_flood,C_flood:47,97b4a2975ba919f1,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257530282520320,0,C_flood,C_flood:48,f14750f033309a68,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257530870521344,0,C_flood,C_flood:49,1da55e4d6f100a1e,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257531462026240,0,C_flood,C_flood:50,88000adb1f697537,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257532057454592,0,C_flood,C_flood:51,ab60fd65193d58d7,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257532655951104,0,C_flood,C_flood:52,fc1cb2754cb5eb05,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257533247069184,0,C_flood,C_flood:53,cf0ab6783035ecf9,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257533842814720,0,C_flood,C_flood:54,d3df2338f5d7128,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257534434132224,0,C_flood,C_flood:55,437a76a12b3c6fff,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257535029935616,0,C_flood,C_flood:56,e5f2e3bfc6ad13bf,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257535605411328,0,C_flood,C_flood:57,bd2eb67e66f38dd2,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257536202432256,0,C_flood,C_flood:58,b39d8990705044e7,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257536796243200,0,C_flood,C_flood:59,51d6ff7b9fcd8b94,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257537391982848,0,C_flood,C_flood:60,7e304a4fcbd2b9cf,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257537988333568,0,C_flood,C_flood:61,bb1f774eee2fa318,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257538578239744,0,C_flood,C_flood:62,7837ae293984626e,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257539176251136,0,C_flood,C_flood:63,c5f96d6fd2aabab9,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257539773088512,0,C_flood,C_flood:64,f9983784c704abb,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257540351395584,0,C_flood,C_flood:65,5ad6a05cd839698c,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257540946741248,0,C_flood,C_flood:66,47f5e6f9a6c30033,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257541542567936,0,C_flood,C_flood:67,7700c6c68f2398d1,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257542138824704,0,C_flood,C_flood:68,adcf302ab38d69d7,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257542735613184,0,C_flood,C_flood:69,48e648c0ad0c714a,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257543332560384,0,C_flood,C_flood:70,88f5a196ab80d274,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257543936771840,0,C_flood,C_flood:71,d8f14ad8c4b3ea3f,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257544529632768,0,C_flood,C_flood:72,b0d6af47a6c1e66c,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257545114763776,0,C_flood,C_flood:73,a98c3d285cc88161,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257545712860672,0,C_flood,C_flood:74,ed33080f385fe33,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257546346742016,0,C_flood,C_flood:75,2bb3c09b2e85ce3d,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257546972382976,0,C_flood,C_flood:76,6e4b43a1fd5d7183,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257547608575488,0,C_flood,C_flood:77,603deb85f0b40b7b,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257548246752256,0,C_flood,C_flood:78,f0eee9763bc95a22,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257548907116032,0,C_flood,C_flood:79,52a93a925ef09edc,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257549524228352,0,C_flood,C_flood:80,48afd027a8cd3d99,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257550132347648,0,C_flood,C_flood:81,663784cc48890240,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257550773186048,0,C_flood,C_flood:82,19dcef1be4a61a6a,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257551401619712,0,C_flood,C_flood:83,58338dbd78ce535f,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257552027881216,0,C_flood,C_flood:84,4726ca020c26ee6,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257552653481984,0,C_flood,C_flood:85,825daa763c948b3d,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257553280581120,0,C_flood,C_flood:86,3b74eb9c442d9a18,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257553930140416,0,C_flood,C_flood:87,7f0e016c078d6929,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257554537475840,0,C_flood,C_flood:88,449ee898ffebbb33,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257555141684224,0,C_flood,C_flood:89,c422923acd08f9e0,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257555740979200,0,C_flood,C_flood:90,b6196fa032a3d6ed,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257556370120704,0,C_flood,C_flood:91,5e48232264e7966e,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257556998139392,0,C_flood,C_flood:92,4e4096847c51048d,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257557624852480,0,C_flood,C_flood:93,3a7752f948380dd0,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257558255611136,0,C_flood,C_flood:94,42baa2ce48e3f77f,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257558903240960,0,C_flood,C_flood:95,c177bf4cffc7ad4c,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257559514096384,0,C_flood,C_flood:96,987546f65060c549,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257560119961856,0,C_flood,C_flood:97,7d16d6aebc328b7d,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257560119961856,0,C_flood,C_flood:97,f719f1543108b683,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257560739595520,0,C_flood,C_flood:98,22cf94dcba7b8bc2,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257560739595520,0,C_flood,C_flood:98,2abfff43f84f4cf4,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257561342368256,0,C_flood,C_flood:99,fd324f05e619653e,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257561342368256,0,C_flood,C_flood:99,cacbfafe0b454a2c,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257561948756224,0,C_flood,C_flood:100,5a68a10ba50683e,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257561948756224,0,C_flood,C_flood:100,2f0dd28f9fb75ef2,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257562579991296,0,C_flood,C_flood:101,1643c7b2b199c56d,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257562579991296,0,C_flood,C_flood:101,e55bce58231bd848,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257563171560448,0,C_flood,C_flood:102,5f1e1b608b4417bf,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257563171560448,0,C_flood,C_flood:102,a22125d43989c3f7,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257563797442304,0,C_flood,C_flood:103,f7df11a71733f39d,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257563797442304,0,C_flood,C_flood:103,c5e62f10b46ad231,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257564424869120,0,C_flood,C_flood:104,582cf5725a1691c3,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257564424869120,0,C_flood,C_flood:104,bdc1c2d73464bec7,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257565052474880,0,C_flood,C_flood:105,7e930c3fa2683a91,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257565052474880,0,C_flood,C_flood:105,9d61eb35e770330d,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257565678082048,0,C_flood,C_flood:106,2acaec6bbf8fd659,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257565678082048,0,C_flood,C_flood:106,5fc98e7ad6184cba,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257566307288064,0,C_flood,C_flood:107,b667d2f6215b0c9e,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257566307288064,0,C_flood,C_flood:107,6749ff3e424ab083,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257566916372992,0,C_flood,C_flood:108,d5b1f00392580054,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257566916372992,0,C_flood,C_flood:108,4cb47d5b2102a84e,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257567540308736,0,C_flood,C_flood:109,5103a73611a0854f,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257567540308736,0,C_flood,C_flood:109,5d8173a9da885dd9,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257568141114368,0,C_flood,C_flood:110,1deaa614ceb757c2,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257568141114368,0,C_flood,C_flood:110,987bd6cc3471a7c2,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257568771755264,0,C_flood,C_flood:111,59f79d3811bb1252,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257568771755264,0,C_flood,C_flood:111,f2de3261c6e0433c,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257569401063168,0,C_flood,C_flood:112,968f89b473022292,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257569401063168,0,C_flood,C_flood:112,6b517b113975307a,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257570031000832,0,C_flood,C_flood:113,21895b09d358bd5a,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257570031000832,0,C_flood,C_flood:113,3f34de667770a252,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257570661805568,0,C_flood,C_flood:114,619e0c27ade3c752,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257570661805568,0,C_flood,C_flood:114,c9bbebfe1a1fb151,UPSERT,upsert,1040,1040,1040,VALID,1,BlockStored batch with at least 16 new hashes,K_UP
+1792257571151718656,0,C_replay,C_replay:0,8ca01cce24883ab0,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257571151718656,0,C_replay,C_replay:0,7d16d6aebc328b7d,RE_ADVERTISE,upsert,1040,1040,1040,VALID,3,tip stored again after its advertisement was invalidated,K_UP
+1792257571626648576,0,C_replay,C_replay:1,630da863a973d33b,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257571626648576,0,C_replay,C_replay:1,22cf94dcba7b8bc2,RE_ADVERTISE,upsert,1040,1040,1040,VALID,3,tip stored again after its advertisement was invalidated,K_UP
+1792257572115650816,0,C_replay,C_replay:2,49d4bebb2c09c5f0,INVALIDATE,invalidation,1040,528,528,INVALID,2,one removal batch broke this advertised tip; survivor_tokens=528 remain on the ancestor chain,K_TOMB
+1792257572115650816,0,C_replay,C_replay:2,fd324f05e619653e,RE_ADVERTISE,upsert,1040,1040,1040,VALID,3,tip stored again after its advertisement was invalidated,K_UP

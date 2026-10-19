@@ -1,0 +1,9 @@
+{
+  "gate1_residency": false,
+  "gate2_owners": false,
+  "gate3_route": false,
+  "gate4_ttft": false,
+  "gate5_rebuild": false,
+  "stop": true,
+  "pairs": 1
+}

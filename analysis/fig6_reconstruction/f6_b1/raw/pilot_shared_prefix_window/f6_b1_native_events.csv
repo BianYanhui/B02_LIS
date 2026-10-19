@@ -1,0 +1,3 @@
+seed,worker,recv_time,event_type,n_hashes,n_tokens,matches_x_prefix
+2026101919,0,1792398197.2031012,AllBlocksCleared,0,0,0
+2026101919,0,1792398197.2031012,BlockStored,4,64,0

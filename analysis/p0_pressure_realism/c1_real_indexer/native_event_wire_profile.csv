@@ -1,0 +1,7 @@
+scenario,zmq_messages,event_objects,block_stored_events,block_removed_events,all_blocks_cleared,block_hashes,msgpack_payload_bytes,zmq_frame_body_bytes,tcp_payload_bytes,tcp_payload_status,tcp_packets,tcp_header_bytes,tcp_header_status,duration_s,hashes_per_message_p50,hashes_per_message_max,seq_first,seq_last,seq_gaps,subscriber_decode_s,byte_status
+A_cold,16,17,16,0,1,521,23442,23570,,NOT_MEASURED,,,NOT_MEASURED,8.313,64,65,0,15,0,0.0002,OBSERVED
+B_reuse,6,6,6,0,0,6,594,642,,NOT_MEASURED,,,NOT_MEASURED,0.835,1,1,16,21,0,1.4e-05,OBSERVED
+C_plant,4,4,4,0,0,130,5262,5294,,NOT_MEASURED,,,NOT_MEASURED,0.715,64,64,22,25,0,4.5e-05,OBSERVED
+C_flood,182,221,182,39,0,5954,254957,256413,,NOT_MEASURED,,,NOT_MEASURED,47.901,1,103,26,207,0,0.002063,OBSERVED
+C_replay,4,4,2,2,0,4,274,306,,NOT_MEASURED,,,NOT_MEASURED,0.287,1,1,208,211,0,9e-06,OBSERVED
+ALL,212,252,210,41,1,6615,284529,286225,,NOT_MEASURED,,,NOT_MEASURED,59.885,1,103,0,211,0,0.002284,OBSERVED

@@ -1,0 +1,7 @@
+label,strategy,priority_flag,merge,dedup,noise_upserts_ahead,tomb_queue_slot,frames_served_before_request,tomb_applied,truth_coverage_worker0,stale_positive,selected,raw_fanout,evaluated,affinity,view_coverage,expected_net_ms
+CONTROLLED,InvalidationFIFO,0,0,0,8,8,0,0,0,1,0,1,1,True,2048,30.96
+CONTROLLED,InvalidationFIFO,0,0,0,8,8,1,0,0,1,0,1,1,True,2048,30.96
+CONTROLLED,InvalidationFIFO,0,0,0,8,8,9,1,0,0,1,0,0,False,0,0.0
+CONTROLLED,InvalidationPriority,1,0,0,8,0,0,0,0,1,0,1,1,True,2048,30.96
+CONTROLLED,InvalidationPriority,1,0,0,8,0,1,1,0,0,1,0,0,False,0,0.0
+CONTROLLED,InvalidationPriority,1,0,0,8,0,1,1,0,0,1,0,0,False,0,0.0

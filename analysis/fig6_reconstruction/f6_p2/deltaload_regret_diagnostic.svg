@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420">
+<rect width="100%" height="100%" fill="white"/>
+<text x="70" y="18" font-size="13" font-family="sans-serif">Internal diagnostic, not Fig. 6. Engine-confirmed snapshots only. Model regret, not TTFT.</text>
+<line x1="70" y1="350.0" x2="620" y2="350.0" stroke="#ddd"/>
+<line x1="345.0" y1="30" x2="345.0" y2="350" stroke="#ddd"/>
+<line x1="70" y1="350" x2="620" y2="350" stroke="#222"/>
+<line x1="70" y1="30" x2="70" y2="350" stroke="#222"/>
+<text x="345.0" y="392" text-anchor="middle" font-size="12" font-family="sans-serif">DeltaLoad = min(load 0,1) - min(load 2,3)</text>
+<text x="18" y="190.0" transform="rotate(-90 18 190.0)" font-size="12" font-family="sans-serif">Model routing regret (ms)</text>
+<circle cx="337.0" cy="350.0" r="4" fill="#85929e" fill-opacity="0.85"/>
+<circle cx="612.0" cy="30.0" r="4" fill="#1b4f72" fill-opacity="0.85"/>
+<circle cx="616.0" cy="30.0" r="4" fill="#1b4f72" fill-opacity="0.85"/>
+<circle cx="337.0" cy="350.0" r="4" fill="#1b4f72" fill-opacity="0.85"/>
+<circle cx="337.0" cy="350.0" r="4" fill="#85929e" fill-opacity="0.85"/>
+<circle cx="337.0" cy="350.0" r="4" fill="#196f3d" fill-opacity="0.85"/>
+<circle cx="62.0" cy="350.0" r="4" fill="#196f3d" fill-opacity="0.85"/>
+<circle cx="66.0" cy="350.0" r="4" fill="#196f3d" fill-opacity="0.85"/>
+<circle cx="341.0" cy="350.0" r="4" fill="#196f3d" fill-opacity="0.85"/>
+<circle cx="341.0" cy="350.0" r="4" fill="#85929e" fill-opacity="0.85"/>
+<circle cx="337.0" cy="350.0" r="4" fill="#b9770e" fill-opacity="0.85"/>
+<circle cx="341.0" cy="350.0" r="4" fill="#b9770e" fill-opacity="0.85"/>
+<circle cx="612.0" cy="30.0" r="4" fill="#b9770e" fill-opacity="0.85"/>
+<circle cx="345.0" cy="350.0" r="4" fill="#b9770e" fill-opacity="0.85"/>
+<circle cx="349.0" cy="350.0" r="4" fill="#b9770e" fill-opacity="0.85"/>
+<circle cx="353.0" cy="350.0" r="4" fill="#b9770e" fill-opacity="0.85"/>
+<circle cx="62.0" cy="350.0" r="4" fill="#b9770e" fill-opacity="0.85"/>
+<circle cx="337.0" cy="346.0" r="4" fill="#b9770e" fill-opacity="0.85"/>
+<circle cx="345.0" cy="350.0" r="4" fill="#85929e" fill-opacity="0.85"/>
+<circle cx="337.0" cy="350.0" r="4" fill="#6c3483" fill-opacity="0.85"/>
+<circle cx="612.0" cy="30.0" r="4" fill="#6c3483" fill-opacity="0.85"/>
+<circle cx="616.0" cy="30.0" r="4" fill="#6c3483" fill-opacity="0.85"/>
+<circle cx="341.0" cy="350.0" r="4" fill="#6c3483" fill-opacity="0.85"/>
+<circle cx="345.0" cy="350.0" r="4" fill="#6c3483" fill-opacity="0.85"/>
+<circle cx="620.0" cy="30.0" r="4" fill="#6c3483" fill-opacity="0.85"/>
+<circle cx="624.0" cy="30.0" r="4" fill="#6c3483" fill-opacity="0.85"/>
+<circle cx="349.0" cy="350.0" r="4" fill="#6c3483" fill-opacity="0.85"/>
+<rect x="70" y="396" width="10" height="10" fill="#1b4f72"/>
+<text x="84" y="406" font-size="11" font-family="sans-serif">F6-P1 Forward</text>
+<rect x="166" y="396" width="10" height="10" fill="#85929e"/>
+<text x="180" y="406" font-size="11" font-family="sans-serif">F6-P1 Forward idle</text>
+<rect x="292" y="396" width="10" height="10" fill="#196f3d"/>
+<text x="306" y="406" font-size="11" font-family="sans-serif">F6-P2 Reverse</text>
+<rect x="388" y="396" width="10" height="10" fill="#b9770e"/>
+<text x="402" y="406" font-size="11" font-family="sans-serif">F6-P2 Interleaved</text>
+<rect x="508" y="396" width="10" height="10" fill="#6c3483"/>
+<text x="522" y="406" font-size="11" font-family="sans-serif">F6-P2 Forward Reproduction</text>
+<rect x="682" y="396" width="10" height="10" fill="#85929e"/>
+<text x="696" y="406" font-size="11" font-family="sans-serif">F6-P2 idle</text>
+</svg>

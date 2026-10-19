@@ -1,0 +1,16 @@
+{
+  "forwarded": 80,
+  "rate_limit": 0,
+  "superseded": 0,
+  "replica_cap": 0,
+  "low_utility": 0,
+  "queue_drop": 0,
+  "expired": 0,
+  "maxq": 3,
+  "queued": 0,
+  "received": 80,
+  "global_topk_drops": 0,
+  "stale_cell": 0,
+  "live_depth": 0,
+  "pqueue": 0
+}

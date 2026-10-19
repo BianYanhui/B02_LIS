@@ -1,0 +1,5 @@
+tier,input_events_per_s,applied_events_per_s,lag_after_drain,stable,cpu_seconds,rss_bytes,lookup_ms_p95
+1x,3.21,3.21,0.0,yes,0.55,97124352,3
+4x,15.223,15.223,0.0,yes,1.13,97910784,3
+16x,63.301,63.301,0.0,yes,3.2,98304000,3
+64x,255.527,255.527,0.0,yes,10.87,97910784,3

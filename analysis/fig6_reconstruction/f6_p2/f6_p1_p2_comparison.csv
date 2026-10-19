@@ -1,0 +1,7 @@
+condition,n_cells,n_snapshots,n_engine_confirmed,n_harness_only,n_unique_confirmed_load_vectors,mean_model_regret_ms,positive_regret_rate,mean_delta_load,best_owner_hidden_rate,selected_change_rate,ads_forwarded_mean,ads_dropped_mean,full_is_argmin_rate
+F6-P1 Forward,1,8,3,5,3,1.3333333333333333,0.6666666666666666,0.6666666666666666,0.6666666666666666,0.6666666666666666,2.0,2.0,1.0
+F6-P1 Forward idle,1,1,1,0,1,0.0,0.0,0.0,0.0,0.0,2.0,2.0,1.0
+F6-P2 Reverse,1,8,4,4,4,0.0,0.0,-0.5,0.0,0.0,2.0,2.0,1.0
+F6-P2 Interleaved,1,8,8,0,8,0.25,0.125,0.0,0.125,0.125,2.0,2.0,1.0
+F6-P2 Forward Reproduction,1,8,8,0,8,1.0,0.5,0.5,0.5,0.5,2.0,2.0,1.0
+F6-P2 idle,3,3,3,0,1,0.0,0.0,0.0,0.0,0.0,2.0,2.0,1.0

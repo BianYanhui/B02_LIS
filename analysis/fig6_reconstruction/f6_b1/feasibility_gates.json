@@ -1,0 +1,10 @@
+{
+  "gate1_residency": true,
+  "gate2_tombstone": true,
+  "gate3_backlog": true,
+  "gate4_priority_order": true,
+  "gate5_apply": true,
+  "gate6_routing": true,
+  "gate7_executed": true,
+  "stop_formal": false
+}

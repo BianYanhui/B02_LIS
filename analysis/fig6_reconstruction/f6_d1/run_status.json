@@ -1,0 +1,20 @@
+{
+  "status": "RAN",
+  "git_commit": "28a4ec34e9198601b79f524837c7d96e0f656d8c",
+  "gates": {
+    "gate1_residency": true,
+    "gate2_owners": true,
+    "gate3_route": true,
+    "gate4_ttft": true,
+    "gate5_rebuild": true,
+    "pilot_pair_valid": true,
+    "stop": false,
+    "pairs": 1
+  },
+  "d3": "ran",
+  "elapsed_s": 182.11476874351501,
+  "trials": 30,
+  "model_definition": "T=load*2+max(0,prompt-warmup_coverage)/50; regret=Tcap-Tfull; MODEL_DERIVED",
+  "ttft_definition": "client stream POST to first non-empty completion text; MEASURED_CLIENT_TTFT",
+  "production_gateway": "not touched; 127.0.0.1:9710"
+}

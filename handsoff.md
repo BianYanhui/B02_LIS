@@ -28,31 +28,42 @@
 
 ## 可变交接
 
-更新时间：2026-10-17 01:00（UTC+8）。根目录 README 已改成当前 ICC KV 正式实验的入口说明。没有改 `experiments/`。没有实验进程。不要开正式矩阵，不要启动 `overnight.py` 或 `full_queue.py`。
+更新时间：2026-10-19 17:15（UTC+8）。Fig. 6 重建已整理，准备并入 main。没有正在跑的实验。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。
 
-### 正在做的事
+### 现在在做的事
 
-替换过期的根目录 `README.md`。旧文还停在 2026-07 的语义 State Sketch 动机实验。新文指向 `docs/icc_formal/`，写明主方法 `StaticTopK16`、五个 block，以及不入库的本地产物。`handsoff.md` 分隔线以下按这次查看过的机器状态重写。
+Fig. 6(a)(b)(c)(d) 的证据已经收在 `analysis/fig6_reconstruction/`。索引是 `analysis/fig6_reconstruction/README.md`。下一模块还没开始。不要自己开新实验。
 
-### 当前状态
+分支：`f6-b1-real-invalidation`。Fig. 6(b) 的测量代码是 `3a3ce7d`，结果是 `6e8ee8d`。本交接在整理提交之后。没有改 `experiments/4t4/` 的冻结网关和 `Dispatcher.choose`。
 
-停着。没有 `experiments.icc_kv`、`experiments.4t4`、`overnight` 或 `full_queue` 进程。`127.0.0.1:8000–8003` 没有在听，vLLM 没起来。网关容器 `b02-gateway4t4` 已 Up 6 天，`127.0.0.1:9710` 在听，9711 没有。同机还有 edgevisor、lhjj、gitlab 等无关容器，不要动。
+### 论文该引用哪一版
 
-正式实验入口是 `docs/icc_formal/START_HERE.md`。实验代码 CODE_SHA 仍是 `48b64f4`。改文档之前 `git diff --stat 48b64f4 HEAD -- experiments` 为空。
+- Fig. 6(a)：`f6_a2/`，Case C。自然投递不合并。受控 inflight 窗口下转发更新减少均值 0.549，P95 可见性 16.84 s 到 4.09 s。
+- Fig. 6(b)：`f6_b1/`，条件收益。自然队列为空。冻结 ACK 窗口 0.792 s 下，决策层无效路由 FIFO 3/3、优先级 0/3。
+- Fig. 6(c)：`f6_f1_formal_ac/`。冻结 `Krep=2` 回放的重叠削减。不是在线副本上限，也不是 TTFT。
+- Fig. 6(d)：`f6_d1/`，Case A，负载 0。配对客户端 TTFT 均值差 1813 ms。61.44 ms 的模型 regret 不是这个延迟。
+
+`f6_p0/` 到 `f6_p3/` 和 `analysis/p0_pressure_realism/` 留作阴性记录。F6-F1 的同覆盖度约 21% 不是 Fig. 6(a) 的扩展合并结论。候选图没有替换论文图。
+
+### 丢掉的部分
+
+没有删已入库的轮次。下列本地目录只忽略、不提交，文件还在磁盘上：
+
+- `ICC_KV_实验结果_20261005.zip`
+- `analysis/admission_overhead_4t4/`
+- `analysis/icc_kv_export/`
+- `supplemental_20260922_cp_queue_delay/`
+
+`analysis/icc_kv/` 本来就在 `.gitignore`。
+
+### 机器
+
+四张 T4 为 0 MiB。vLLM 已停。8000–8003、9730、9731 没有监听。`b02-gateway4t4` 仍在，`127.0.0.1:9710`。
 
 ### 下一步
 
-用户说「继续」时，不要开正式矩阵。先等用户决定要不要把 vLLM 拉起来。开跑仍按 `docs/icc_formal/RUN_GUIDE.md`，并且先核对 `experiments/` 相对 `48b64f4` 没有 diff。
+用户指定下一个模块之前，不要开 GPU，不要重跑 Fig. 6，不要改 0.792 s 的 ACK 保持，不要改 `choose`，不要改论文图。正式矩阵的开跑方式仍是 `docs/icc_formal/`。
 
-### 已经定下来的约束
+### 不要提交、不要覆盖
 
-- 默认天花板仍是 1 Gbit。10 Mbit 只用于 `--link-bit 10000000`。Gateway `--cpus 1 --cpuset-cpus 0`。
-- 主方法是 `StaticTopK16`。`Adaptive` 是消融。k 敏感性、覆盖度重叠、ρ 扫描的划分以 `experiments/icc_kv/full_queue.py` 的 `BLOCKS` 和 `docs/icc_formal/PREREG.md` 为准。
-- 不要把 4 张 GPU 写成大规模系统。
-- Python：`/home/byh/B02/poc/.venv/bin/python`。`analysis/icc_kv/` 在 `.gitignore`。
-
-### Git
-
-分支 `main`，跟踪 `origin/main`。这次提交只含 `README.md` 和 `handsoff.md`。不要 amend。
-
-不要提交、不要推送：`ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、论文 PDF、`/tmp/icc_link_smoke/`、`/tmp/icc_link_smoke2/`。
+不要提交上面四个本地目录、`server_logs`、`*.log`、`*.pid`。不要改 `analysis/formal4t4/`、`analysis/icc_kv/`、KVSelect 核心算法。不要重启或重配 `b02-gateway4t4`，不要跑 `cell_rate_4t4.sh` 或 `restart_4t4.sh`。

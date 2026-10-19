@@ -1,0 +1,27 @@
+{
+  "code_commit": "7605cd5d7d3679e3c6a6aaf8ccc5f6ba13e1d513",
+  "seeds": [
+    2026101901,
+    2026101902,
+    2026101903
+  ],
+  "overlaps": [
+    0.0,
+    0.25,
+    0.5,
+    0.75
+  ],
+  "pool_size": 32,
+  "n_requests": 48,
+  "warmup": 12,
+  "output_tokens": 4,
+  "workload": "reuse_intensive",
+  "workers": 4,
+  "mechanisms_off": "merge,priority,adaptive,topk,replica_cap",
+  "htb": "not retuned",
+  "ambient_class_1_1": "class htb 1:1 root rate 10Mbit ceil 10Mbit burst 1600b cburst 1600b",
+  "relay": "existing b02-gateway4t4 on 127.0.0.1:9710",
+  "gateway_per_update_log": "NOT_EMITTED_RELAY_QUIET",
+  "offered_capture": "FULLSYNC_FIFO_DISPATCHER plus relay K_STATS received/forwarded/drops",
+  "evidence": "LIVE_VLLM_OFFERED_TRACE + PAIRED_FROZEN_RELAY_REPLAY"
+}
