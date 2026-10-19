@@ -28,42 +28,42 @@
 
 ## 可变交接
 
-更新时间：2026-10-19 17:20（UTC+8）。Fig. 6 重建已并入 main，合并提交 `3a8fe0c`。没有正在跑的实验。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。本机没有 GitHub CLI 登录，所以没有开 GitHub PR，是直接 merge 后推送 main。
+更新时间：2026-10-19 17:35（UTC+8）。P0-D1 已完成并停止。没有开 GPU。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。
 
 ### 现在在做的事
 
-Fig. 6(a)(b)(c)(d) 的证据已经收在 `analysis/fig6_reconstruction/`。索引是 `analysis/fig6_reconstruction/README.md`。下一模块还没开始。不要自己开新实验。
+分支 `p0-d1-topk-boundary`，从 main `7426cf8` 拉出。问题是 Static Top-K16 有没有容量边界，值得不值得做 Adaptive Expansion。没有改网关，没有改 Algorithm 1，没有跑新格子。
 
-当前分支是 `main`。Fig. 6(b) 的测量代码是 `3a3ce7d`，结果是 `6e8ee8d`，索引提交是 `d06404e`。没有改 `experiments/4t4/` 的冻结网关和 `Dispatcher.choose`。旧的 `f6-*` 远程分支还在，内容和 main 里的这段历史相同，可以以后删。
+### 结论
 
-### 论文该引用哪一版
+主判定 `CAPACITY_TRADEOFF_WITHOUT_NET_GAIN`。控制判定 `ADAPTIVE_CONTROL_NOT_YET_FEASIBLE`。不要开始 P0-D2。
 
-- Fig. 6(a)：`f6_a2/`，Case C。自然投递不合并。受控 inflight 窗口下转发更新减少均值 0.549，P95 可见性 16.84 s 到 4.09 s。
-- Fig. 6(b)：`f6_b1/`，条件收益。自然队列为空。冻结 ACK 窗口 0.792 s 下，决策层无效路由 FIFO 3/3、优先级 0/3。
-- Fig. 6(c)：`f6_f1_formal_ac/`。冻结 `Krep=2` 回放的重叠削减。不是在线副本上限，也不是 TTFT。
-- Fig. 6(d)：`f6_d1/`，Case A，负载 0。配对客户端 TTFT 均值差 1813 ms。61.44 ms 的模型 regret 不是这个延迟。
+证据是已有的 `analysis/icc_kv/formal_A_5d2d300/ksweep_ov30`，commit `5d2d300`，10 Mbit，ultrahigh，pool 32，ov30，3 个 seed，K = 4/8/16/32/64。K=24 没有配过，记 `NOT_MEASURED`。该提交的 Top-K 代码和当前 `HEAD` 的 `gateway_relay_4t4.py`、`wire.py`、`e2e.py` 一致。
 
-`f6_p0/` 到 `f6_p3/` 和 `analysis/p0_pressure_realism/` 留作阴性记录。F6-F1 的同覆盖度约 21% 不是 Fig. 6(a) 的扩展合并结论。候选图没有替换论文图。
+K=16 在所有看过的正式格里都会把 pending 顶满（peak queue 16–19）。base 负载（pool 16，噪声 256）上 FN 率是 0，包括 ρ=0.5 到 2.0。ov30 上 K=16 的 FN 率均值 0.030，K=32 是 0.013，但配对 TTFT 是 +210、−12、+60 ms，复用 token 不升。转发速率在 K=16 已经约 10148/s，K=32 仍是 10140/s，链路已经满。同一张表里 FN 最低的是 K=8（0.0075），不是更大的 K。
 
-### 丢掉的部分
+更新级别的淘汰分类没有网关事件日志，记 `COUNTERFACTUAL_NOT_VERIFIED`。队列深度和 drop 计数在 FN=0 的 base 格里也很高，不能当作扩容信号。
 
-没有删已入库的轮次。下列本地目录只忽略、不提交，文件还在磁盘上：
+### 路径
 
-- `ICC_KV_实验结果_20261005.zip`
-- `analysis/admission_overhead_4t4/`
-- `analysis/icc_kv_export/`
-- `supplemental_20260922_cp_queue_delay/`
+`analysis/p0_adaptive/d1_topk_boundary/`
 
-`analysis/icc_kv/` 本来就在 `.gitignore`。
+- `P0_D1_EXISTING_DATA_AUDIT.md`
+- `adaptive_feasibility_assessment.md`
+- `NEXT_ITERATION_RECOMMENDATION.md`
+- `audit_existing_ksweep.py`
+- `static_k_sweep.csv`，`topk_candidate_pressure.csv`，`topk_harmful_drop_analysis.csv`，`capacity_visibility_tradeoff.csv`
+
+`analysis/icc_kv/` 仍被 gitignore，原始 summary 不入库。
 
 ### 机器
 
-四张 T4 为 0 MiB。vLLM 已停。8000–8003、9730、9731 没有监听。`b02-gateway4t4` 仍在，`127.0.0.1:9710`。
+没有启动 vLLM。`b02-gateway4t4` 仍在 `127.0.0.1:9710`。本轮没有新端口。
 
 ### 下一步
 
-用户指定下一个模块之前，不要开 GPU，不要重跑 Fig. 6，不要改 0.792 s 的 ACK 保持，不要改 `choose`，不要改论文图。正式矩阵的开跑方式仍是 `docs/icc_formal/`。
+不要实现 Adaptive Expansion，不要改默认 K，不要为了补 K=24 开 GPU。下一轮如果还做 Adaptive，先换问题；现有问题已经有答案。
 
 ### 不要提交、不要覆盖
 
-不要提交上面四个本地目录、`server_logs`、`*.log`、`*.pid`。不要改 `analysis/formal4t4/`、`analysis/icc_kv/`、KVSelect 核心算法。不要重启或重配 `b02-gateway4t4`，不要跑 `cell_rate_4t4.sh` 或 `restart_4t4.sh`。
+不要提交 `analysis/icc_kv/`、`ICC_KV_实验结果_20261005.zip`、`analysis/admission_overhead_4t4/`、`analysis/icc_kv_export/`、`supplemental_20260922_cp_queue_delay/`、`*.log`、`*.pid`。不要改 `experiments/4t4/` 的冻结网关和 `Dispatcher.choose`。不要重启 `b02-gateway4t4`。
