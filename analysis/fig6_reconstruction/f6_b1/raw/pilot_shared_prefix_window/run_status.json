@@ -1,0 +1,21 @@
+{
+  "status": "GATE_STOP",
+  "git_commit": "d76ef498f9f8b3d694ef91caf29a92a489e1ad9b",
+  "gates": {
+    "gate1_residency": false,
+    "gate2_tombstone": true,
+    "gate3_backlog": false,
+    "gate4_priority_order": false,
+    "gate5_apply": false,
+    "gate6_routing": false,
+    "gate7_executed": false,
+    "stop_formal": true
+  },
+  "rule": {},
+  "elapsed_s": 55.832581520080566,
+  "cells": 0,
+  "executed": 0,
+  "production_gateway": "not touched; 127.0.0.1:9710",
+  "adapter": "EXPERIMENTAL_INVALIDATION_ADAPTER",
+  "invalidation": "CONTROLLED_REAL_CACHE_INVALIDATION"
+}

@@ -419,11 +419,17 @@ async def stream_ttft(session, port: int, model: str, token_ids: list[int]) -> d
     }
 
 
-def score_window(events: list[dict], token_ids: list[int], result: dict) -> dict:
-    """Chain match on block hashes. A clear before the first store is the reset."""
+def score_window(events: list[dict], token_ids: list[int], result: dict, blocks: dict | None = None) -> dict:
+    """Chain match on block hashes. A clear before the first store is the reset.
+
+    ``blocks`` persists across requests on one worker. A later request that
+    reuses a prefix only emits the new blocks; the walk still reaches the
+    cached parent stored for the earlier request.
+    """
     started = float(result["started"])
     window = [event for event in events if event["recv_time"] >= started - 0.05]
-    blocks: dict[int, tuple[int | None, list[int]]] = {}
+    if blocks is None:
+        blocks = {}
     tip = None
     removed = cleared_after = reset_clear = stored = 0
     seen = False
@@ -438,6 +444,7 @@ def score_window(events: list[dict], token_ids: list[int], result: dict) -> dict
                 order.append("clear_after")
             else:
                 reset_clear += 1
+                blocks.clear()
                 order.append("reset_clear")
         elif event["event_type"] == "BlockStored":
             seen = True
@@ -718,12 +725,13 @@ async def capture_seed(session, taps, tokenizer, model: str, seed: int) -> dict:
     prefix, prompt = build_prefix(tokenizer, seed)
     lineage = f"F6B1S{seed}X"
     native_rows = []
+    blocks = [dict() for _ in range(4)]
 
     async def warm(worker: int) -> dict:
         window = len(taps[worker].rows)
         result = await completion(session, 8000 + worker, model, prefix)
         await asyncio.sleep(0.2)
-        scored = score_window(taps[worker].rows[window:], prefix, result)
+        scored = score_window(taps[worker].rows[window:], prefix, result, blocks[worker])
         return {"worker": worker, "lineage": lineage, "generation_time": result["finished"], **scored,
                 "token_sha256": sha_ids(prefix)}
 
@@ -736,7 +744,7 @@ async def capture_seed(session, taps, tokenizer, model: str, seed: int) -> dict:
         window = len(taps[worker].rows)
         result = await completion(session, 8000 + worker, model, tokens)
         await asyncio.sleep(0.3)
-        scored = score_window(taps[worker].rows[window:], tokens, result)
+        scored = score_window(taps[worker].rows[window:], tokens, result, blocks[worker])
         return {"worker": worker, "lineage": bg_lineage, "generation_time": result["finished"],
                 "token_sha256": sha_ids(tokens), **scored}
 
@@ -929,7 +937,7 @@ async def executed_world(session, taps, tokenizer, model: str, relay: RelaySessi
         window = len(taps[worker].rows)
         result = await completion(session, 8000 + worker, model, prefix)
         await asyncio.sleep(0.2)
-        return score_window(taps[worker].rows[window:], prefix, result)
+        return score_window(taps[worker].rows[window:], prefix, result, {})
 
     scored = await asyncio.gather(warm(0), warm(1))
     names = {relay.h.digest64(lineage): lineage}
