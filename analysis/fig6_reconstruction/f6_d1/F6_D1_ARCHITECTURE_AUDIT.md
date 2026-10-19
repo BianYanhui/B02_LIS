@@ -55,3 +55,7 @@ The formal cost, fixed before any trial:
 `Regret = T(Krep=2 selected) - T(Full selected)`.
 
 Label: `MODEL_DERIVED`. A startup tripwire checks that D1 assignment A at load 0 still returns workers 3 and 0. If that frozen result changes, the run stops before any GPU request. The cost model is not edited to create regret.
+
+## Live check
+
+The successful run called the frozen `choose` on the index the isolated relay actually delivered. Every returned worker matched the read-only mirror. For load 0 the live selections were the table above: D1 assignment A full selected worker 3 and the cap selected worker 0; D1 assignment B full selected worker 0 and the cap selected worker 3. On assignment B the cap's native choice was worker 0, whose advertisement had been dropped, and the guard then moved the request to worker 3. Native load balancing was not blocked from naming a hidden worker. The override is what left that worker.
