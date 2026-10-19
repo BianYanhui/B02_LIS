@@ -1,0 +1,6 @@
+policy,setting,ran_this_round,label,note,delta_ttft_ms_mean,delta_ttft_ms_sd,n_pairs
+StaticTopK16,formal4t4_reuse_and_10Mbit_run_b,NO,HISTORICAL_NOT_A_PAIR,"Present in 10 Mbit Run B, where Adaptive utility rejects are 0. Absent from formal4t4 baseline, so it is not paired with the 942 coverage rejects.",,,
+PressureCoverageThreshold16,formal4t4_reuse_and_10Mbit_run_b,NO,NOT_MEASURED,Not implemented and not run.,,,
+PressureUtilityOnly16,formal4t4_reuse_and_10Mbit_run_b,NO,NOT_MEASURED,Not implemented and not run. Pre-enqueue behavior on the historical trace matches a 1024 threshold.,,,
+FullAdaptive,formal4t4_reuse_and_10Mbit_run_b,NO,HISTORICAL_NOT_A_PAIR,"formal4t4 Adaptive bundles K=16, shrink-to-4, and utility. The 161 ms contrast is against StaticSemantic, which has top-k 0.",,,
+Adaptive_minus_StaticSemantic,formal4t4_reuse_intensive,NO,HISTORICAL_BUNDLED,Not a utility ablation. rho 0.5 mean is -2.0 ms. Original-compatible mean is -25.2 ms.,161.0,193.3,20
