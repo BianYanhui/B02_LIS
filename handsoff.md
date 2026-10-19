@@ -28,44 +28,36 @@
 
 ## 可变交接
 
-更新时间：2026-10-19 22:50（UTC+8）。P0-D1b 已完成并停止。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。
+更新时间：2026-10-19 23:50（UTC+8）。P0-D3 已完成并停止。没有开 GPU。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。
 
 ### 现在在做的事
 
-分支 `p0-d1b-k-crossover`，从 `p0-d1-topk-boundary` 的 `198a5b6` 拉出。问题是 K=8 和 K=16 有没有可重复的性能交叉，值不值得做 Adaptive。没有改网关准入，没有改 Algorithm 1。
+分支 `p0-d3-utility-final`。问题是压力触发的 Utility Filtering 有没有独立于 Coverage Top-K 的收益，以及它到底是 freshness 还是 1024-token 门槛。没有改 tau、lambda、压力门、Top-K、Algorithm 1。
 
 ### 结论
 
-主判定 `STATIC_K8_SUFFICIENT`。不要开始 P0-D2。
+主判定 `NO_INDEPENDENT_UTILITY_GAIN`。建议 `REMOVE_ADAPTIVE_FROM_MAIN_DESIGN`：从主要技术贡献里拿掉，不要在这轮删代码，也不要改论文。下一轮如果改论文，再改那句 161 ± 85 ms。
 
-ov30 已有三 seed：K=8 的 Routing FN 三个 seed 都更低（差值 −0.0075、−0.0451、−0.0150）。TTFT 只有两个 seed 更低，seed 0 是 +18 ms。K=4 没有优于 K=8。
+formal4t4 Reuse 的网关事件：入队前效用拒绝 942 条，全部是 1024 token，年龄 0.1–1.4 ms。2048 和 4096 的入队前拒绝是 0。这是覆盖门槛，不是 freshness。Original 上入队前拒绝是 0。10 Mbit Run B 上 congested 和 low_utility 都是 0。
 
-Base 补了同一次进程里的配对：StaticTopK8 与 StaticTopK16，ultrahigh，pool 16，噪声 256，10 Mbit，seed 0–2，600 s，commit `198a5b6`。六个 cell 都成功。两边 FN 都是 0，143/143 前景更新都送达。复用 token 只在 seed 0 的一个请求上有差别。TTFT 差值（K=8−K=16）是 +0.4、+21.5、−9.1 ms。K=16 没有用户侧优势。K=16 每秒大约多转发 2100 帧，网关 CPU 高约 0.05。
+`1dc24ec` 的 `relay_drop_low_utility` 混进了缩容。入队后 50 ms 内删掉的是缩容误记。更晚的同名事件分不清缩容和出队时的第二次效用检查，EWMA 没有记录，不记成 freshness 拒绝。
 
-这不是性能交叉。Base 上队列和 Top-K drop 都很高，同时 FN 是 0，这两个信号不能用来切换 K。10 月那次 Base K=16 的 TTFT 是 3300–3800 ms，这次同配置大约 600 ms，复用 token 接近，绝对 TTFT 不能跨天比较。
+161.0 ms（20 对，样本 SD 193.3）是完整 Adaptive 相对 StaticSemantic。对方没有 Top-K。ρ=0.5 的分项均值是 −2.0 ms。Original 上同一对比均值 −25.2 ms。不能写成 Utility 的独立收益。Fig. 7(b) 也是整套 Adaptive，不是 freshness 消融。
+
+A/B/C/D 没有跑。事件已经说明过滤器是 1024 门槛，不再为了找用户侧增益改准入。
 
 ### 路径
 
-`analysis/p0_adaptive/d1b_k_crossover/`
-
-- `P0_D1B_SUMMARY.md`
-- `DATA_AND_IMPLEMENTATION_AUDIT.md`
-- `existing_k_sweep_paired.csv`
-- `base_k8_k16_comparison.csv`
-- `regime_crossover_analysis.csv`
-- `mechanism_evidence_audit.md`
-- `online_signal_feasibility.md`
-- `NEXT_ITERATION_RECOMMENDATION.md`
-- `smoke/`，`base_ultrahigh/`
+`analysis/p0_adaptive/d3_utility_final/`
 
 ### 机器
 
-本轮用 `experiments/4t4/restart_4t4.sh` 拉起四个 vLLM，KV cache 104544。`prepare_fixed_gateway` 重建了 `b02-gateway4t4`，1 CPU，HTB 10 Mbit，这是正式矩阵的控制路径，不是准入改动。实验结束后关掉本轮的四个 vLLM。9710 上的网关容器保留。
+GPU 空闲。没有启动 vLLM。`127.0.0.1:9710` 仍在听。
 
 ### 下一步
 
-不要实现 Adaptive，不要改默认 K，不要为了找交叉再调负载。
+等论文修改决定。不要再开 Adaptive 实验，不要调参，不要实现 coverage-threshold 模式。
 
 ### 不要提交、不要覆盖
 
-不要提交 `analysis/icc_kv/`、`ICC_KV_实验结果_20261005.zip`、`analysis/admission_overhead_4t4/`、`analysis/icc_kv_export/`、`supplemental_20260922_cp_queue_delay/`、`*.log`、`*.pid`。不要改 `experiments/4t4/` 的冻结网关和 `Dispatcher.choose`。
+不要提交 `analysis/icc_kv/`、`analysis/formal4t4/` 的原始格、`ICC_KV_实验结果_20261005.zip`、`analysis/admission_overhead_4t4/`、`analysis/icc_kv_export/`、`supplemental_20260922_cp_queue_delay/`、`*.log`、`*.pid`。不要改 `experiments/4t4/`。不要覆盖 P0-B1、P0-D1、P0-D1b。
