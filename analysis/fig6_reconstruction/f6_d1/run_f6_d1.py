@@ -761,21 +761,36 @@ async def reset_caches(session) -> list[int]:
 
 
 def score_warmup(tap: EventTap, blocks: dict, window_start: int, token_ids: list[int], result: dict) -> dict:
+    # reset_prefix_cache queues AllBlocksCleared until the next scheduler
+    # step, which is this warmup. That clear is ordered before the new
+    # BlockStored events. It is the reset, not an eviction of this prefix.
     window = tap.rows[window_start:]
     tip = None
     removed = 0
-    cleared = 0
+    cleared_after_store = 0
+    reset_clear = 0
     stored = 0
     new_tokens = 0
+    seen_store = False
+    order: list[str] = []
     for event in window:
         if event["event_type"] == "BlockRemoved":
             removed += 1
+            order.append("remove")
         elif event["event_type"] == "AllBlocksCleared":
-            cleared += 1
+            if seen_store:
+                cleared_after_store += 1
+                order.append("clear_after_store")
+            else:
+                reset_clear += 1
+                order.append("reset_clear")
         elif event["event_type"] == "BlockStored":
+            seen_store = True
             stored += 1
             new_tokens += len(event["token_ids"])
             tip = absorb(blocks, event) or tip
+            order.append("store")
+    cleared = cleared_after_store
     chain, complete = chain_tokens(blocks, tip)
     prompt_tokens = int(result["prompt_tokens"] or 0)
     cached = 0 if result["cached_tokens"] is None else int(result["cached_tokens"])
@@ -802,6 +817,8 @@ def score_warmup(tap: EventTap, blocks: dict, window_start: int, token_ids: list
         "new_block_tokens": new_tokens,
         "block_removed": removed,
         "cleared": cleared,
+        "reset_clear_before_store": reset_clear,
+        "event_order": ",".join(order),
         "http_status": result["http_status"],
         "error": json.dumps(result["error"]) if result["error"] else "",
     }
@@ -1199,13 +1216,15 @@ def pilot_gates(trials: list[dict], pairs: list[dict]) -> dict:
                  and full["http_status"] == 200 and cap["http_status"] == 200)
     gate5 = bool(cap and cap["warmup_cached"] == "0,0,0,0" and cap["idle_before_reset"] == 1
                  and "residency" not in cap["invalid_reasons"])
+    pilot_valid = bool(full and cap and full["valid"] == 1 and cap["valid"] == 1)
     return {
         "gate1_residency": gate1,
         "gate2_owners": gate2,
         "gate3_route": gate3,
         "gate4_ttft": gate4,
         "gate5_rebuild": gate5,
-        "stop": not (gate1 and gate2 and gate4 and gate5),
+        "pilot_pair_valid": pilot_valid,
+        "stop": not (gate1 and gate2 and gate4 and gate5 and pilot_valid),
         "pairs": len(pairs),
     }
 

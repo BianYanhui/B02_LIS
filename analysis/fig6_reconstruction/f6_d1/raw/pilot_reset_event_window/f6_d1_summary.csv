@@ -1,0 +1,2 @@
+phase,scenario,pairs,valid_pairs,mean_ttft_full_ms,mean_ttft_cap_ms,mean_delta_ttft_ms,median_delta_ttft_ms,sd_delta_ttft_ms,min_delta_ttft_ms,max_delta_ttft_ms,mean_coverage_loss,mean_model_regret_ms,route_change_rate,ttft_label,model_label
+pilot,D1,1,0,,,,,,,,,,,MEASURED_CLIENT_TTFT,MODEL_DERIVED

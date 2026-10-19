@@ -1,0 +1,19 @@
+{
+  "status": "GATE_STOP",
+  "git_commit": "2aa5604da961fe6b5e80d457ecf062bc97fa5c20",
+  "gates": {
+    "gate1_residency": false,
+    "gate2_owners": false,
+    "gate3_route": false,
+    "gate4_ttft": false,
+    "gate5_rebuild": false,
+    "stop": true,
+    "pairs": 1
+  },
+  "d3": "not_reached",
+  "elapsed_s": 43.46414113044739,
+  "trials": 2,
+  "model_definition": "T=load*2+max(0,prompt-warmup_coverage)/50; regret=Tcap-Tfull; MODEL_DERIVED",
+  "ttft_definition": "client stream POST to first non-empty completion text; MEASURED_CLIENT_TTFT",
+  "production_gateway": "not touched; 127.0.0.1:9710"
+}

@@ -16,6 +16,8 @@ Salt alone cannot separate the two views, because the views must share token ids
 
 The next warmup is the residency check. A cold prefix omits `prompt_tokens_details` when cached tokens are 0; the driver records that omission as 0. If a warmup reports cached tokens other than 0, or the block chain does not match, or coverage is not the target, the trial is invalid and is kept. The target length is not substituted for the measured coverage.
 
+vLLM publishes `AllBlocksCleared` on the next scheduler step, so the reset event arrives in the warmup's own batch, before that step's `BlockStored` events. A clear ordered before the first store is the deferred reset. A clear ordered after a store is an eviction and fails the trial. The first pilot, saved under `raw/pilot_reset_event_window/`, counted every clear as an eviction and stopped. The chain already matched and cached tokens were 0. That scorer cut was corrected before any TTFT was measured. Seeds, lengths, and the routing rule were not changed.
+
 `reset_prefix_cache` is not called while a holder is in flight.
 
 Different seeds and scenarios differ inside the first 64 token ids, so a missed reset cannot make one lineage hit another. The reset is still required so that Full and Cap of the same lineage both start cold.
