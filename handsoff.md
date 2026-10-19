@@ -28,50 +28,54 @@
 
 ## 可变交接
 
-更新时间：2026-10-19 14:21（UTC+8）。任务 F6-A2 已完成并停止。没有正在跑的实验。
+更新时间：2026-10-19 15:22（UTC+8）。任务 F6-D1 已完成并停止。没有正在跑的实验。`/handsoff-skill` 在仓库和 `/home/byh/.cursor` 里都没有对应 Skill 文件，这次没有调用该 Skill，只按本文件分隔线以下的规则更新。
 
 ### 现在在做的事
 
-Fig. 6(a) 的真实前缀增长和网关 extension supersession 已做完。判定是 Case C。Fig. 6(b)(c)(d) 没有开始。论文和论文里的 Fig. 6 没有改。
+Fig. 6(d) 的真实 coverage 异构和实测 TTFT 已做完。判定是 Case A，只针对负载为 0、隐藏 Owner 持有更长前缀的条件。Fig. 6(a)(b)(c) 没有新实验。论文和论文里的 Fig. 6 没有改。
 
-分支：`f6-a2-real-extension`。研究结果 commit `6ec93f2`（父提交 `c999630`）已推到 `origin/f6-a2-real-extension`。本交接文件在该提交之后单独提交。没有合并 main。
+分支：`f6-d1-measured-routing-regret`。跑实验时的代码是 `28a4ec3`。结果 commit `bc30302`，父提交含 `28a4ec3`。本交接文件在该提交之后单独提交。没有合并 main。
 
 ### 做了什么
 
-一次四卡启动。可行性 seed `2026101905`：每卡 2 条 lineage，共 24 个 upsert。正式 seed `2026101906` `2026101907` `2026101908`：每卡 4 条 lineage，每条 1024、2048、4096，共 48 个 upsert。每个正式 seed 有 Natural / Controlled × Merge off / on，共 12 个正式 gateway cell。可行性另有 4 个 cell，只用来冻结 ACK 延迟，不进正式均值。整段脚本墙钟 342 秒。
+两次四卡启动。第一次 pilot 把 `reset_prefix_cache` 推迟到下一步才发出的 `AllBlocksCleared` 当成了驱逐，四条 warmup 的 token chain 其实已经对齐，cached tokens 为 0，但被标成 PARTIAL，在任何 TTFT 之前停止。原始表在 `analysis/fig6_reconstruction/f6_d1/raw/pilot_reset_event_window/`。计分改为：store 之前的 clear 是 reset，store 之后的 clear 才是驱逐。种子、长度、`choose` 没有改。
 
-请求是 `/v1/completions` 的 token id 列表，不是 chat template。发布器是 `EXPERIMENTAL_WRAPPER`，不是 `publish_state`。网关是冻结 Relay 的独立进程，端口 9720/9721。没有动 `b02-gateway4t4` 和 9710。没有用 F6-P3 的 HTB 模型。
+第二次启动跑完。Pilot seed `2026101909`，正式 seed `2026101910`–`2026101913`，外加 D3 两个 seed。脚本墙钟 182 秒。30 个 trial 全部 valid。请求是 token id 列表，不是 chat template。发布器是 `EXPERIMENTAL_WRAPPER`。网关是冻结 Relay，端口 9720/9721，`dedup` 0 或 2。广告顺序是 visible 在前，标签 `CONTROLLED_ADMISSION_ORDER`。没有动 `b02-gateway4t4` 和 9710。没有改 `Dispatcher.choose`。
 
 ### 结果和标签
 
-Prefix growth：`OBSERVED`。56 条 lineage 全部是 1024 < 2048 < 4096，证据 `BLOCK_CHAIN_MATCH`。version 2 的 cached tokens 是 1024，version 3 是 2048。`BlockRemoved` 为 0。不能写成完整生命周期无损。
+Coverage：`OBSERVED`。120 条 warmup 全是 `BLOCK_CHAIN_MATCH`，warmup cached tokens 全是 0，`BlockRemoved` 为 0。同一 trial 四个 Worker 的 prompt token hash 相同。短 Worker 1024，长 Worker 4096。正式请求返回的 cached tokens 与被选中 Worker 的 warmup coverage 一致。prompt 长度 4128。
 
-Native：168 条 ZMQ 消息，168 条 `BlockStored`，14336 个 hash，168 条 wrapper upsert。消息数没有被 wrapper 再压缩。一个 `BlockStored` 平均 85.3 个 hash，这是 vLLM 批处理，不是网关合并。
+路由：Full 与 Krep=2 在 D1 的四对里都选了不同 Worker，Full 拿到 4096，Cap 拿到 1024。Assignment B 的 cap 仍然把 native 选在被隐藏的 Worker 0 上，然后 guard 把它改到短 coverage 的 Worker 3。Native 负载均衡没有被人为关掉。
 
-Natural：`NATURAL_NO_MERGE_OPPORTUNITY`。三次正式 seed 的 reduction 都是 0，true extension 都是 0，P95 可见性延迟两边都约 0.003 秒。
+TTFT：`MEASURED_CLIENT_TTFT`。D1 四对，Δ = TTFT_Krep2 − TTFT_Full，均值 1812.59 ms，中位数 1802.58 ms，样本 SD 90.32 ms，范围 1716–1929 ms。coverage loss 每对都是 3072。A/B 两种角色、两种世界顺序都是正的。
 
-Controlled：`CONTROLLED` ACK 窗口。延迟在可行性速率上冻结为 0.588170 秒，`max_inflight=1`，正式 seed 没有再调。实测服务速率约 1.697 frame/s。正式 offered 约 4.6–4.7 upsert/s，强度约 2.7–2.8。这不是 10 Mbit，也不是自然四卡瓶颈。
+D2：路由不变，Δ 均值 0.91 ms。D0：coverage loss 0，model regret 0。中位数 Δ −1.10 ms。均值 −316.97 ms，因为第一对正式 trial（seed 2026101910，同一 Worker，两边 cached 都是 4096）是 1390 ms 对 124 ms。这不是 suppression 的收益。这一对留在主表里。其余三对 D0 都在 1.4 ms 以内，包括换了 GPU 的 Assignment B。
 
-Controlled merge-on，三次正式 seed：转发 21、22、22；true extension 27、26、26；eligible 与 true extension 相同，比例 1。被替换的全是 1024→2048 或 2048→4096。reduction 均值 0.5486，样本 SD 0.0120。P95 可见性延迟从约 16.84 s 降到约 4.09 s。时间加权 coverage staleness 从约 1382 token 降到约 675 token。`TIMED_REPLAY`，不是在线 TTFT。never-visible 为 0。最终 coverage 全部对齐。coverage regression 为 0。version 1 只有 6/48 自己被转发，version 2 是 11/48，但它们被后续更高 coverage 覆盖的时间仍短于 merge-off 的 FIFO。
+模型：`MODEL_DERIVED`。D1 的 regret 每对都是 61.44 ms，大约是实测 Δ 的 1/30。符号一致，不能当成 TTFT。
+
+D3：两个真实 holder，Δ 4072 ms 和 5485 ms。n=2，不是主结论。
+
+Pilot 的第一对绝对时间更慢（1550 ms 和 3406 ms），不进正式均值。
 
 ### 论文
 
-Case C。可以写成条件性 extension supersession，caption 必须带上 Natural 的零。不能写成自然拥塞改善、TTFT、更快路由，也不能把实验适配器写成已部署 wrapper。候选图 `fig6a_candidate.pdf` 没有替换论文图。
+Case A，仅限上述条件。可以写成 measured serving penalty。caption 必须带上 D0 的第一对离群、D2 的近零、controlled admission，以及 61.44 ms 不是 TTFT。不能写成自然到达、已部署 wrapper、或生产拥塞。候选图 `fig6d_candidate.pdf` 没有替换论文图。
 
 ### 路径
 
-`analysis/fig6_reconstruction/f6_a2/`
+`analysis/fig6_reconstruction/f6_d1/`
 
-- `F6_A2_ARCHITECTURE_AUDIT.md`
-- `F6_A2_PREFIX_GROWTH_REPORT.md`
-- `F6_A2_WRAPPER_REPRESENTATION.md`
-- `F6_A2_GATEWAY_MERGE_REPORT.md`
-- `F6_A2_VISIBILITY_REPORT.md`
-- `F6_A2_PAPER_READINESS.md`
+- `F6_D1_ARCHITECTURE_AUDIT.md`
+- `F6_D1_COUNTERFACTUAL_DESIGN.md`
+- `F6_D1_COVERAGE_VALIDATION.md`
+- `F6_D1_ROUTING_ANALYSIS.md`
+- `F6_D1_MEASURED_TTFT_REPORT.md`
+- `F6_D1_PAPER_READINESS.md`
 - `NEXT_ITERATION_RECOMMENDATION.md`
-- `f6_a2_source_growth.csv`，`f6_a2_gateway_events.csv`，`f6_a2_visibility.csv`，`f6_a2_per_cell.csv`，`f6_a2_summary.csv`
-- `capacity_rule.json`，`raw/relay_stdout.jsonl`
-- 候选图 `fig6a_candidate.pdf` / `.png`
+- `f6_d1_warmup.csv`，`f6_d1_per_trial.csv`，`f6_d1_paired_results.csv`，`f6_d1_summary.csv`，`f6_d1_model_vs_measured.csv`
+- `feasibility_gates.json`，`run_status.json`，`raw/relay_stdout.jsonl`
+- 候选图 `fig6d_candidate.pdf` / `.png`
 
 vLLM 日志在 `raw/vllm_gpu*.log`，被 `*.log` 忽略，没有进 git。
 
@@ -81,8 +85,8 @@ vLLM 日志在 `raw/vllm_gpu*.log`，被 `*.log` 忽略，没有进 git。
 
 ### 下一步
 
-用户说「继续」时，不要开 GPU，不要跑 Fig. 6(b)(c)(d)，不要改 ACK 延迟，不要改论文。下一步只是 caption 取舍：要不要把这个带 Natural 零点的条件性面板放进正文。除非审稿明确要求服务限制必须是 tc qdisc，否则不要重跑。那一次也不能复用 F6-P3 的 HTB 公式。
+用户说「继续」时，不要开 GPU，不要跑 Fig. 6(a)(b)(c)，不要改 `choose` 或 50 tok/ms，不要改论文。下一步只是 caption 取舍：要不要把这个带 D0 离群点和 D2 近零的实测面板放进正文。除非审稿明确要求广告顺序必须是自然到达，否则不要重跑。那一次也必须走冻结 Relay。
 
 ### 不要提交、不要覆盖
 
-不要提交 `ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、`server_logs`、`*.log`、`*.pid`。不要改 `analysis/formal4t4/`、`analysis/icc_kv/`、F6-P0/P1/P2/P3/F1 的结果、Run A/B、KVSelect 核心算法、论文图。不要重启或重配 `b02-gateway4t4`，不要跑 `cell_rate_4t4.sh` 或 `restart_4t4.sh`。
+不要提交 `ICC_KV_实验结果_20261005.zip`、`analysis/icc_kv_export/`、`analysis/admission_overhead_4t4/`、`supplemental_20260922_cp_queue_delay/`、`server_logs`、`*.log`、`*.pid`。不要改 `analysis/formal4t4/`、`analysis/icc_kv/`、F6-P0/P1/P2/P3/F1/A2 的结果、Run A/B、KVSelect 核心算法、论文图。不要重启或重配 `b02-gateway4t4`，不要跑 `cell_rate_4t4.sh` 或 `restart_4t4.sh`。
