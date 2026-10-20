@@ -1,6 +1,6 @@
 # Fig. 6 reconstruction
 
-This directory is the 2026-10 Fig. 6 evidence. Each round has its own driver, and that driver is the one that produced the tables next to it. The drivers call the frozen relay and `Dispatcher.choose` in `experiments/4t4/`. They do not change those files.
+This directory is the 2026-10 Fig. 6 evidence. Each round has its own driver, and that driver is the one that produced the tables next to it. `f6_d1b_coverage_dominance/` is the exception: it runs the coverage-dominance change in `experiments/4t4/net/gateway_relay_4t4.py`. `Dispatcher.choose` is still unchanged. The earlier drivers did not modify the relay.
 
 The formal ICC matrix is still `docs/icc_formal/` and `experiments/icc_kv/`. This reconstruction does not replace it.
 
@@ -11,7 +11,8 @@ The formal ICC matrix is still `docs/icc_formal/` and `experiments/icc_kv/`. Thi
 | Fig. 6(a) | `f6_a2/` | Case C. Real 1024→2048→4096 growth. Natural delivery does not merge. One frozen inflight window does: mean forwarded-update reduction 0.549, P95 visibility 16.84 s → 4.09 s. |
 | Fig. 6(b) | `f6_b1/` | Conditional priority benefit. A real `reset_prefix_cache` on worker 0, then a timed relay replay. Natural queue is empty. Under a frozen 0.792 s ACK window the decision-level invalid route is 3/3 for FIFO and 0/3 for priority. |
 | Fig. 6(c) | `f6_f1_formal_ac/` | Overlap reduction from a frozen `Krep=2` replay of a live FullSync stream. Not a live replica cap on the four-GPU service, and not a TTFT. |
-| Fig. 6(d) | `f6_d1/` | Case A at load 0 when the hidden owners hold the longer prefix. Mean paired client TTFT gap 1813 ms. The 61.44 ms model regret is not that delay. |
+| Fig. 6(d) | `f6_d1/` | Arrival-order Krep=2. Case A at load 0 when the hidden owners hold the longer prefix. Mean paired client TTFT gap 1813 ms, coverage loss 3072. The 61.44 ms model regret is not that delay. |
+| Fig. 6(d) follow-up | `f6_d1b_coverage_dominance/` | Coverage-dominance Krep=2, same protocol, new seeds. Formal D1 mean paired client TTFT gap +1.57 ms, coverage loss 0, route change 0/4. Does not replace the `f6_d1/` measurement. |
 
 Candidate figures (`fig6a_candidate.pdf`, `fig6b_candidate.pdf`, `fig6c_candidate_reduction.pdf`, `fig6d_candidate.pdf`) are internal. They are not the figure in the paper.
 

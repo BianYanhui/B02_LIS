@@ -28,36 +28,36 @@
 
 ## 可变交接
 
-更新时间：2026-10-19 23:50（UTC+8）。P0-D3 已完成并停止。没有开 GPU。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。
+更新时间：2026-10-20 14:50（UTC+8）。F6-D1b 已提交在分支 `f6-d1b-coverage-dominance`。vLLM 已停。GPU 空闲。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。
 
 ### 现在在做的事
 
-分支 `p0-d3-utility-final`。问题是压力触发的 Utility Filtering 有没有独立于 Coverage Top-K 的收益，以及它到底是 freshness 还是 1024-token 门槛。没有改 tau、lambda、压力门、Top-K、Algorithm 1。
+加强方案已实现并重测 Fig. 6(d)。Krep=2 满员后，严格更大的 coverage 替换最弱 holder（coverage 更小，其次 instance id 更小）。相等 coverage 不替换。已转发的被替换 Owner 会先收到 tombstone，再转发新的 upsert。`Dispatcher.choose`、guard、代价模型没改。
 
 ### 结论
 
-主判定 `NO_INDEPENDENT_UTILITY_GAIN`。建议 `REMOVE_ADAPTIVE_FROM_MAIN_DESIGN`：从主要技术贡献里拿掉，不要在这轮删代码，也不要改论文。下一轮如果改论文，再改那句 161 ± 85 ms。
+正式 D1 四对：平均 ΔTTFT（cap−full）+1.57 ms，中位数 +0.51 ms，样本 SD 2.83 ms，范围 −0.49 到 +5.76 ms。覆盖损失 0。路由变化 0/4。模型 regret 0.00 ms，标签 MODEL_DERIVED，不是 TTFT。两边请求的 cached token 都是 4096。
 
-formal4t4 Reuse 的网关事件：入队前效用拒绝 942 条，全部是 1024 token，年龄 0.1–1.4 ms。2048 和 4096 的入队前拒绝是 0。这是覆盖门槛，不是 freshness。Original 上入队前拒绝是 0。10 Mbit Run B 上 congested 和 low_utility 都是 0。
+这是新策略的测量。旧的到达顺序结果仍是 `f6_d1/`：+1812.59 ms、覆盖损失 3072、路由变化 4/4。不要把两者相减，也不要拿去减论文里的 118–391 ms。
 
-`1dc24ec` 的 `relay_drop_low_utility` 混进了缩容。入队后 50 ms 内删掉的是缩容误记。更晚的同名事件分不清缩容和出队时的第二次效用检查，EWMA 没有记录，不记成 freshness 拒绝。
+D0 相等 coverage，cap 仍留前两名。路由变化 2/4，都在 assignment B，覆盖损失 0。均值 −325.17 ms 只来自第一对正式试验（1435.5 vs 129.6 ms，同一 worker，两边都缓存 4096）。中位数 −0.05 ms。D2 后来的 1024 被丢掉，路由变化 0，覆盖损失 0，均值 −0.30 ms。D3 两对都选中空闲的 4096 owner，覆盖损失 0；均值被第一对的 1424.5 vs 115.8 ms 拉低，第二对 −0.10 ms。
 
-161.0 ms（20 对，样本 SD 193.3）是完整 Adaptive 相对 StaticSemantic。对方没有 Top-K。ρ=0.5 的分项均值是 −2.0 ms。Original 上同一对比均值 −25.2 ms。不能写成 Utility 的独立收益。Fig. 7(b) 也是整套 Adaptive，不是 freshness 消融。
-
-A/B/C/D 没有跑。事件已经说明过滤器是 1024 门槛，不再为了找用户侧增益改准入。
+30/30 有效。Pilot 2026102009 不进正式均值。种子是 2026102010–13，不是旧的 2026101910–13。
 
 ### 路径
 
-`analysis/p0_adaptive/d3_utility_final/`
+`experiments/4t4/net/gateway_relay_4t4.py` 的 `_admit_replica`。
+`analysis/fig6_reconstruction/f6_d1b_coverage_dominance/`。
+报告 `F6_D1B_MEASURED_TTFT_REPORT.md`。表：`f6_d1_summary.csv`、`f6_d1_paired_results.csv`、`f6_d1_per_trial.csv`。
 
 ### 机器
 
-GPU 空闲。没有启动 vLLM。`127.0.0.1:9710` 仍在听。
+四张 GPU 0 MiB。本轮 vLLM 已退出。`127.0.0.1:9710` 仍在听。9732/9733 没有残留。
 
 ### 下一步
 
-等论文修改决定。不要再开 Adaptive 实验，不要调参，不要实现 coverage-threshold 模式。
+不要 merge main。不要把这组数写成已经替换论文 Fig. 6(d)。
 
 ### 不要提交、不要覆盖
 
-不要提交 `analysis/icc_kv/`、`analysis/formal4t4/` 的原始格、`ICC_KV_实验结果_20261005.zip`、`analysis/admission_overhead_4t4/`、`analysis/icc_kv_export/`、`supplemental_20260922_cp_queue_delay/`、`*.log`、`*.pid`。不要改 `experiments/4t4/`。不要覆盖 P0-B1、P0-D1、P0-D1b。
+不要提交 `*.log` 和 `__pycache__`。不要覆盖 `analysis/fig6_reconstruction/f6_d1/`。不要改 `Dispatcher.choose`。`run_status.json` 里的 `8d4df0b` 是开跑时的 HEAD，保留规则在这次提交里。

@@ -1,0 +1,10 @@
+{
+  "gate1_residency": true,
+  "gate2_owners": true,
+  "gate3_route": true,
+  "gate4_ttft": true,
+  "gate5_rebuild": true,
+  "pilot_pair_valid": true,
+  "stop": false,
+  "pairs": 1
+}

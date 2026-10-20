@@ -129,6 +129,11 @@ class Relay:
         self.queued_up: dict[tuple[int, int], bytes] = {}
         self.superseded_ids: set[int] = set()
         self.replicas: OrderedDict[int, set[int]] = OrderedDict()
+        # digest -> instance -> coverage of the retained holder. Used only to
+        # decide which holder a strictly larger replica replaces.
+        self.replica_coverage: dict[int, dict[int, int]] = {}
+        self.dominance_tombstones = 0
+        self.dominance_seq = 3_000_000_000
         self.recent: OrderedDict[int, float] = OrderedDict()
         self.ewma_dq = 0.0
         self.queue_high_since: float | None = None
@@ -350,8 +355,12 @@ class Relay:
         if not holders:
             return
         holders.discard(instance)
+        covered = self.replica_coverage.get(digest)
+        if covered is not None:
+            covered.pop(instance, None)
         if not holders:
             self.replicas.pop(digest, None)
+            self.replica_coverage.pop(digest, None)
 
     def _evict_old_replica(self) -> None:
         """Drop the oldest single-holder digest. One pop, not a copy of the map."""
@@ -360,15 +369,23 @@ class Relay:
                 return
             old, holders = self.replicas.popitem(last=False)
             if len(holders) <= 1:
+                self.replica_coverage.pop(old, None)
                 return
             self.replicas[old] = holders
 
-    def _admit_replica(self, instance: int, digest: int) -> bool:
-        """True when this instance may hold the digest. Every instance id counts.
+    def _admit_replica(self, instance: int, digest: int, coverage: int, cell: int) -> bool:
+        """True when this instance may hold the digest.
 
         The map keeps at most 65536 digests. Unique noise never reaches a cap
         of 2, so the oldest single-holder entry can be forgotten. A digest
         that already has two holders stays, and the cap still applies.
+
+        A new id is admitted while the holder set is short. Once it is full,
+        a strictly larger coverage replaces the weakest holder: lowest
+        coverage, then the smaller instance id. Equal or smaller coverage
+        leaves the earlier holders. A displaced frame that is still queued is
+        suppressed. A displaced frame that was already forwarded is followed
+        by a tombstone, queued ahead of the new upsert.
         """
         if not self.dedup:
             return True
@@ -378,12 +395,52 @@ class Relay:
                 self._evict_old_replica()
             holders = set()
             self.replicas[digest] = holders
+            self.replica_coverage[digest] = {}
         else:
             self.replicas.move_to_end(digest)
-        if instance not in holders and len(holders) >= self.dedup:
-            return False
+        covered = self.replica_coverage.setdefault(digest, {})
+        if instance in holders:
+            covered[instance] = coverage
+            return True
+        if len(holders) >= self.dedup:
+            worst = min(holders, key=lambda owner: (covered.get(owner, 0), owner))
+            if coverage <= covered.get(worst, 0):
+                return False
+            self._displace_holder(digest, worst, cell)
+            holders = self.replicas.setdefault(digest, set())
+            covered = self.replica_coverage.setdefault(digest, {})
         holders.add(instance)
+        covered[instance] = coverage
         return True
+
+    def _displace_holder(self, digest: int, instance: int, cell: int) -> None:
+        """Remove one retained holder and hide it from the dispatcher."""
+        prev = self.queued_up.pop((instance, digest), None)
+        if prev is not None:
+            self.superseded_ids.add(id(prev))
+            qkind, qinst, qcell, qseq, qcov, qdig, qt = HDR.unpack(prev[:32])
+            if qkind == K_UP:
+                self._topk_release(qdig)
+            self.drops["replica_cap"] += 1
+            self.emit_update(
+                "suppressed", qkind, qinst, qcell, qseq, qcov, qdig, qt,
+                selected=False, reason="coverage_dominated",
+            )
+        else:
+            self.dominance_seq += 1
+            sent = time.time()
+            tomb_cell = cell if cell >= 0 else 0
+            tomb = frame(K_TOMB, instance, tomb_cell, self.dominance_seq, 0, digest, sent)
+            self.dominance_tombstones += 1
+            if self.priority:
+                self.pqueue.append(tomb)
+            else:
+                self.queue.append(tomb)
+            self.emit_update(
+                "enqueued", K_TOMB, instance, tomb_cell, self.dominance_seq, 0, digest, sent,
+                selected=True, reason="coverage_dominated",
+            )
+        self._forget_replica(digest, instance)
 
     def enqueue(self, data: bytes, kind: int, instance: int, seq: int, coverage: int, digest: int, t_send: float) -> None:
         cell = self.current_cell
@@ -414,7 +471,7 @@ class Relay:
                 return
             if self.merge:
                 self._supersede_queued_up(instance, digest)
-            if not self._admit_replica(instance, digest):
+            if not self._admit_replica(instance, digest, coverage, cell):
                 self.drops["replica_cap"] += 1
                 self.emit_update("suppressed", kind, instance, cell, seq, coverage, digest, t_send,
                                  selected=False, reason="duplicate_holder")
@@ -425,7 +482,7 @@ class Relay:
             self.pqueue.append(data)
         else:
             self.queue.append(data)
-            if kind == K_UP and self.merge:
+            if kind == K_UP:
                 self.queued_up[(instance, digest)] = data
             if kind == K_UP:
                 self._topk_add(digest, coverage)
@@ -550,7 +607,7 @@ class Relay:
             self.pqueue.appendleft(data)
             return
         self.queue.appendleft(data)
-        if kind == K_UP and self.merge and (instance, digest) not in self.queued_up:
+        if kind == K_UP and (instance, digest) not in self.queued_up:
             self.queued_up[(instance, digest)] = data
         if kind == K_UP:
             self._topk_add(digest, coverage)
@@ -586,6 +643,8 @@ class Relay:
         self.queued_up.clear()
         self.superseded_ids.clear()
         self.replicas.clear()
+        self.replica_coverage.clear()
+        self.dominance_tombstones = 0
         self.recent.clear()
         self.inflight_event.set()
         self.ewma_dq = 0.0
