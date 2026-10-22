@@ -1,0 +1,9 @@
+quantity,value,unit,label,scope,saturation
+10mbit_htb_drain,9408,frames_per_s,MEASURED,"CONFIGURED 10 Mbit path, 104-byte frames","this is the drain of that shaped path, not the NIC"
+10mbit_nominal,10000000,bit_per_s,CONFIGURED,tc HTB ceiling used by icc_kv,not a measured production quota
+100mbit_nominal,100000000,bit_per_s,SENSITIVITY_ONLY,not measured as a control quota in this round,do not cite as production capacity
+1gbit_nominal,1000000000,bit_per_s,SENSITIVITY_ONLY,not measured,do not cite as production capacity
+indexer_replay_kept_up,256,events_per_s,MEASURED,"Dynamo debug indexer, one connection, copied single-GPU trace",NOT a saturation throughput; backlog was 0 and the rate was not increased
+indexer_saturation,NOT_MEASURED,events_per_s,NOT_MEASURED,release build and independent keys were not run,unknown
+dispatcher_apply_latency,p50 1.6 us,per_record,MEASURED,"control-plane calibration cell, one record",not a throughput
+unconstrained_local_transport,NOT_MEASURED,bytes_per_s,NOT_MEASURED,loopback TCP payload was not captured,unknown

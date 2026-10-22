@@ -1,0 +1,12 @@
+test,evidence,expected,dispatcher
+A_growth,TRACE_REPLAY,1056,1056
+B_rollback_448,TRACE_REPLAY,448,448
+B_tail_416,TRACE_REPLAY,416,416
+version_rollback_then_stale_1040,SYNTHETIC_REGRESSION,448_should_remain_if_versioned,1040
+version_tomb_then_late_upsert,SYNTHETIC_REGRESSION,absent,1056
+topk_A_under_capacity,SYNTHETIC_REGRESSION,448,448
+topk_B_exactly_k_pending,SYNTHETIC_REGRESSION,448,448
+topk_C_over_capacity,SYNTHETIC_TOPK_STRESS,448,1056
+replica_owner_a,SYNTHETIC_REGRESSION,448,448
+replica_owner_b,SYNTHETIC_REGRESSION,1024,1024
+owner_tomb_leaves_other_owner,SYNTHETIC_REGRESSION,1056,1056

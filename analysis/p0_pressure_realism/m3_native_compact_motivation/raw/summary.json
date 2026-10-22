@@ -1,0 +1,223 @@
+{
+  "started_at": "2026-10-22T02:37:55+0000",
+  "finished_at": "2026-10-22T02:38:00+0000",
+  "git_head": "f3adf24fcf111c2bedcd64f3d28a0a9496d1abed",
+  "hostname": "cloud25",
+  "trace": "/home/byh/B02/analysis/p0_pressure_realism/c1_real_indexer/raw/frames.bin",
+  "frames": 212,
+  "events_csv_rows": 252,
+  "decoded_events": 252,
+  "event_counts": {
+    "AllBlocksCleared": 1,
+    "BlockStored": 210,
+    "BlockRemoved": 41
+  },
+  "seq_first": 0,
+  "seq_last": 211,
+  "seq_gaps": 0,
+  "topics": [
+    ""
+  ],
+  "data_parallel_ranks": [
+    0
+  ],
+  "duration_s": 59.885152,
+  "payload_bytes": 284529,
+  "zmq_body_bytes": 286225,
+  "message_size": {
+    "payload_p50": 99,
+    "payload_p95": 2824,
+    "payload_p99": 2824,
+    "body_p50": 107,
+    "body_p95": 2832,
+    "body_p99": 2832
+  },
+  "peak_payload_bytes": {
+    "1ms": 3772,
+    "10ms": 3772,
+    "100ms": 3772,
+    "1s": 8769
+  },
+  "peak_body_bytes": {
+    "1ms": 3780,
+    "10ms": 3780,
+    "100ms": 3780,
+    "1s": 8817
+  },
+  "token_stats": {
+    "messages_containing_token_ids": 210,
+    "payload_bytes_of_those_messages": 284449,
+    "reencoded_without_token_ids_bytes": 69372,
+    "derived_token_id_bytes": 215157,
+    "reencode_failures": 0
+  },
+  "requests": 109,
+  "distinct_prompt_hashes": 101,
+  "request_overlaps": 0,
+  "store_join_one": 210,
+  "store_join_zero": 0,
+  "store_join_many": 0,
+  "store_join_slack80ms_one": 201,
+  "store_join_slack80ms_zero": 0,
+  "store_join_slack80ms_many": 9,
+  "distinct_prompts_joined": 101,
+  "prompt_lineage_pairs": 202,
+  "lineages_with_one_prompt": 101,
+  "lineages_with_many_prompts": 0,
+  "prompts_with_one_lineage": 101,
+  "prompts_with_many_lineages": 0,
+  "payload_bytes_max": 3772,
+  "root_stores": 1,
+  "stores_with_parent": 209,
+  "oracle": {
+    "alive": 6525,
+    "reference_alive": 6525,
+    "alive_equals_c1_reference": true,
+    "parent_entries": 6566,
+    "token_entries": 6566,
+    "parent_conflicts": 0,
+    "token_conflicts": 0,
+    "missing_parent": 0,
+    "duplicate_store": 8,
+    "remove_missing": 0,
+    "token_len_mismatch": 0,
+    "hash_width_bad": 0,
+    "incomplete_token_blocks": 0,
+    "stored_blocks": 6566,
+    "removed_blocks": 41,
+    "clears": 1,
+    "block_size": 16,
+    "roots": 1,
+    "branched_parents": 1,
+    "max_children": 101
+  },
+  "c1_recorded_indexer": {
+    "sent_events": 252,
+    "applied_events": 252.0,
+    "elapsed_s": 61.889,
+    "cpu_seconds": 0.33,
+    "rss_bytes": 96731136,
+    "reference_alive_hashes": 6525,
+    "dumped_external_hashes": 6525,
+    "missing_from_indexer": 0,
+    "extra_in_indexer": 0
+  },
+  "c1_partial_probe": {
+    "case": "partial_eviction",
+    "observed": "yes",
+    "model_a_keeps_block_chain": "ancestor_blocks_remain",
+    "model_b_visible_tokens": 0,
+    "model_b_status": "LOST_PARTIAL_PREFIX_VISIBILITY",
+    "survivor_tokens_at_break": 448,
+    "advertised_tokens": 1040,
+    "count": 1
+  },
+  "break": {
+    "recv_ns": 1792311129094531255,
+    "frame_index": 206,
+    "chain_blocks": 65,
+    "oracle_reusable_tokens": 448,
+    "oracle_prefix_blocks": 28,
+    "orphan_blocks_after_hole": 0,
+    "lineage_id": 16215451153097395629,
+    "rollback_advertised_tokens": 448,
+    "tip_tombstone_tokens": 0,
+    "removed_in_this_check": true,
+    "full_token_len": 1040,
+    "prefix_token_len": 448
+  },
+  "converter": {
+    "lineages": 101,
+    "live_advertisements": 101,
+    "upserts": 243,
+    "evicts": 0,
+    "restarts": 0,
+    "coverage_shrinks": 41,
+    "end_false_positive_tokens": 0,
+    "end_lost_tokens": 0,
+    "mismatch_checks": 0,
+    "max_false_positive_tokens": 0,
+    "max_lost_tokens": 0,
+    "incorrect_invalidation_checks": 0,
+    "frame_bytes_if_each_update_is_64": 15552,
+    "identity": "DERIVED_BRANCH_ROOT",
+    "trace_coverage_before_break": 1056,
+    "trace_coverage_at_break": 448
+  },
+  "dispatcher_probe": {
+    "frame_bytes": 64,
+    "rollback_accepted_coverage": 448,
+    "stale_longer_coverage_overwrites": 1040,
+    "tombstone_removes_key": true,
+    "two_owner_snapshot": [
+      [
+        0,
+        1040
+      ],
+      [
+        1,
+        1040
+      ]
+    ],
+    "trace_rollback_applied_coverage": 448,
+    "evidence": "TRACE_REPLAY"
+  },
+  "indexer_replay": {
+    "status": "TRACE_REPLAY",
+    "sent_messages": 212,
+    "sent_events": 252,
+    "at_break": {
+      "applied_events": 247.0,
+      "expected_events": 247,
+      "query_full_chain": {
+        "scores": {
+          "0/0": 448
+        },
+        "raw_keys": [
+          "frequencies",
+          "instances",
+          "scores"
+        ]
+      },
+      "query_surviving_prefix": {
+        "scores": {
+          "0/0": 448
+        },
+        "raw_keys": [
+          "frequencies",
+          "instances",
+          "scores"
+        ]
+      },
+      "query_origin": "CONTROLLED_FROM_STORED_BLOCKS"
+    },
+    "at_end": {
+      "applied_events": 252.0,
+      "expected_events": 252,
+      "query_full_chain": {
+        "scores": {
+          "0/0": 416
+        },
+        "raw_keys": [
+          "frequencies",
+          "instances",
+          "scores"
+        ]
+      },
+      "query_surviving_prefix": {
+        "scores": {
+          "0/0": 416
+        },
+        "raw_keys": [
+          "frequencies",
+          "instances",
+          "scores"
+        ]
+      }
+    },
+    "dumped_external_hashes": 6525,
+    "timing": "ordered_fast_replay_not_original_timestamps"
+  },
+  "phase_3": "NOT_RUN",
+  "phase_4": "NOT_RUN"
+}

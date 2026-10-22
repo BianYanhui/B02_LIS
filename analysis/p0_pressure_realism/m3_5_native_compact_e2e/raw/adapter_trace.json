@@ -1,0 +1,18 @@
+{
+  "native_events": 252,
+  "updates": 243,
+  "joins": {
+    "one": 210,
+    "zero": 0,
+    "many": 0
+  },
+  "prompts_one": 101,
+  "prompts_many": 0,
+  "lineages_one": 101,
+  "lineages_many": 0,
+  "lineages": 101,
+  "identity_stable_within_row": true,
+  "alive": 6525,
+  "oracle_mismatches": 0,
+  "live_regression": 416
+}

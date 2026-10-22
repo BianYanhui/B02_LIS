@@ -1,0 +1,286 @@
+{
+  "git_head": "f3adf24fcf111c2bedcd64f3d28a0a9496d1abed",
+  "started_note": "2026-10-22T03:40:10+0000",
+  "policy": "StaticTopK",
+  "ports": {
+    "dispatcher": 19950,
+    "control": 19951,
+    "gateway": 19960
+  },
+  "adapter": {
+    "native_events": 252,
+    "updates": 243,
+    "joins": {
+      "one": 210,
+      "zero": 0,
+      "many": 0
+    },
+    "prompts_one": 101,
+    "prompts_many": 0,
+    "lineages_one": 101,
+    "lineages_many": 0,
+    "lineages": 101,
+    "identity_stable_within_row": true,
+    "alive": 6525,
+    "oracle_mismatches": 0,
+    "live_regression": 416
+  },
+  "phase1": {
+    "native_events_processed": 252,
+    "adapter_updates_generated": 243,
+    "gateway": {
+      "received": 243,
+      "queued": 0,
+      "forwarded": 205,
+      "superseded": 38,
+      "replica_cap": 0,
+      "low_utility": 0,
+      "queue_drop": 0,
+      "expired": 0,
+      "maxq": 3,
+      "global_topk": 0,
+      "stale_cell": 0,
+      "live_queued": 0,
+      "congested_ms": 0,
+      "pqueued": 0
+    },
+    "dispatcher_applied": 205,
+    "checkpoints": [
+      {
+        "name": "growth_1040_to_1056",
+        "evidence": "TRACE_REPLAY",
+        "sent": 2,
+        "first_applied": 2,
+        "drained_applied": 2,
+        "dispatcher_coverage": 1056,
+        "adapter_coverage": 1056,
+        "oracle_coverage": 1056
+      },
+      {
+        "name": "rollback_to_448",
+        "evidence": "TRACE_REPLAY",
+        "sent": 240,
+        "first_applied": 200,
+        "first_coverage": 1056,
+        "drained_applied": 203,
+        "dispatcher_coverage": 448,
+        "adapter_coverage": 448,
+        "oracle_coverage": 448,
+        "in_flight_at_first_look": 40
+      },
+      {
+        "name": "end_of_trace",
+        "evidence": "TRACE_REPLAY",
+        "sent": 243,
+        "dispatcher_coverage": 416,
+        "adapter_coverage": 416,
+        "oracle_coverage": 416,
+        "keys": 101,
+        "expected_keys": 101,
+        "mismatches": 0,
+        "false_positive_tokens": 0,
+        "false_negative_tokens": 0
+      }
+    ],
+    "final": {
+      "keys": 101,
+      "expected_keys": 101,
+      "mismatches": 0,
+      "false_positive_tokens": 0,
+      "false_negative_tokens": 0
+    },
+    "regression_final": 416,
+    "pacing": "original_recv_ns",
+    "policy": "StaticTopK",
+    "max_inflight": 0
+  },
+  "synthetic": {
+    "version": {
+      "evidence": "SYNTHETIC_REGRESSION",
+      "after_1056": 1056,
+      "after_448": 448,
+      "after_delayed_1040": 1040,
+      "after_tomb": null,
+      "after_late_upsert": 1056,
+      "gateway": {
+        "received": 5,
+        "queued": 0,
+        "forwarded": 5,
+        "superseded": 0,
+        "replica_cap": 0,
+        "low_utility": 0,
+        "queue_drop": 0,
+        "expired": 0,
+        "maxq": 1,
+        "global_topk": 0,
+        "stale_cell": 0,
+        "live_queued": 0,
+        "congested_ms": 0,
+        "pqueued": 0
+      },
+      "history": [
+        {
+          "seq": 1,
+          "worker": 0,
+          "kind": 1,
+          "coverage": 1056,
+          "digest": "501"
+        },
+        {
+          "seq": 2,
+          "worker": 0,
+          "kind": 1,
+          "coverage": 448,
+          "digest": "501"
+        },
+        {
+          "seq": 3,
+          "worker": 0,
+          "kind": 1,
+          "coverage": 1040,
+          "digest": "501"
+        },
+        {
+          "seq": 4,
+          "worker": 0,
+          "kind": 2,
+          "coverage": 0,
+          "digest": "501"
+        },
+        {
+          "seq": 5,
+          "worker": 0,
+          "kind": 1,
+          "coverage": 1056,
+          "digest": "501"
+        }
+      ]
+    },
+    "topk_a": {
+      "evidence": "SYNTHETIC_REGRESSION",
+      "dispatcher": 448,
+      "applied": 4,
+      "gateway": {
+        "received": 4,
+        "queued": 0,
+        "forwarded": 4,
+        "superseded": 0,
+        "replica_cap": 0,
+        "low_utility": 0,
+        "queue_drop": 0,
+        "expired": 0,
+        "maxq": 3,
+        "global_topk": 0,
+        "stale_cell": 0,
+        "live_queued": 0,
+        "congested_ms": 0,
+        "pqueued": 0
+      }
+    },
+    "topk_b": {
+      "evidence": "SYNTHETIC_REGRESSION",
+      "dispatcher_rollback": 448,
+      "applied": 16,
+      "keys": 16,
+      "gateway": {
+        "received": 17,
+        "queued": 0,
+        "forwarded": 16,
+        "superseded": 1,
+        "replica_cap": 0,
+        "low_utility": 0,
+        "queue_drop": 0,
+        "expired": 0,
+        "maxq": 12,
+        "global_topk": 0,
+        "stale_cell": 0,
+        "live_queued": 0,
+        "congested_ms": 0,
+        "pqueued": 0
+      }
+    },
+    "topk_c": {
+      "evidence": "SYNTHETIC_TOPK_STRESS",
+      "published_1056": 1056,
+      "after_burst": 1056,
+      "applied": 17,
+      "keys": 17,
+      "gateway": {
+        "received": 18,
+        "queued": 0,
+        "forwarded": 17,
+        "superseded": 0,
+        "replica_cap": 0,
+        "low_utility": 0,
+        "queue_drop": 0,
+        "expired": 0,
+        "maxq": 16,
+        "global_topk": 1,
+        "stale_cell": 0,
+        "live_queued": 0,
+        "congested_ms": 0,
+        "pqueued": 0
+      },
+      "history_for_801": [
+        {
+          "seq": 1,
+          "worker": 0,
+          "kind": 1,
+          "coverage": 1056,
+          "digest": "801"
+        }
+      ]
+    },
+    "replica": {
+      "evidence": "SYNTHETIC_REGRESSION",
+      "owner_a": 448,
+      "owner_b": 1024,
+      "applied": 3,
+      "gateway": {
+        "received": 3,
+        "queued": 0,
+        "forwarded": 3,
+        "superseded": 0,
+        "replica_cap": 0,
+        "low_utility": 0,
+        "queue_drop": 0,
+        "expired": 0,
+        "maxq": 1,
+        "global_topk": 0,
+        "stale_cell": 0,
+        "live_queued": 0,
+        "congested_ms": 0,
+        "pqueued": 0
+      }
+    },
+    "invalidation": {
+      "evidence": "SYNTHETIC_REGRESSION",
+      "owner_a_after_tombs": {
+        "911": null,
+        "912": null,
+        "913": null
+      },
+      "owner_b_same_digest": 1056,
+      "revived_911": 1056,
+      "owner_b_after_revive": 1056,
+      "gateway": {
+        "received": 8,
+        "queued": 0,
+        "forwarded": 8,
+        "superseded": 0,
+        "replica_cap": 0,
+        "low_utility": 0,
+        "queue_drop": 0,
+        "expired": 0,
+        "maxq": 4,
+        "global_topk": 0,
+        "stale_cell": 0,
+        "live_queued": 0,
+        "congested_ms": 0,
+        "pqueued": 0
+      },
+      "used_global_k_reset_for_owner": false
+    },
+    "connected_count": 8
+  }
+}

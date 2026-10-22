@@ -79,6 +79,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import fcntl
 import json
 import socket
 import struct
@@ -151,6 +152,7 @@ class Relay:
         self.forwarded = 0
         self.received = 0
         self.maxq = 0
+        self.drain_wait_s = 0.0
         self.current_cell = -1
         self.down_writer: asyncio.StreamWriter | None = None
         self.queue_event = asyncio.Event()
@@ -660,6 +662,7 @@ class Relay:
         self.forwarded = 0
         self.received = 0
         self.maxq = 0
+        self.drain_wait_s = 0.0
         self.rate_tokens = float(self.rate_burst_frames)
         self.rate_last = time.monotonic()
         self.current_cell = cell
@@ -735,7 +738,10 @@ class Relay:
                 continue
             try:
                 self.down_writer.write(data)
+                # Timing only. The wait is unchanged; the duration is logged.
+                drain_started = time.perf_counter()
                 await self.down_writer.drain()
+                self.drain_wait_s += time.perf_counter() - drain_started
             except (ConnectionResetError, BrokenPipeError, OSError):
                 self._requeue_front(data)
                 await asyncio.sleep(0.2)
@@ -791,6 +797,10 @@ class Relay:
             "event": "cell_stats", "cell": self.current_cell, "forwarded": self.forwarded,
             "drops": dict(self.drops), "maxq": self.maxq, "ewma_dq_s": self.ewma_dq,
             "queued": len(self.queue) + len(self.pqueue),
+            "pending_lineages": len(self.topk_best),
+            "inflight": len(self.recent),
+            "drain_wait_s": round(self.drain_wait_s, 6),
+            "write_queue_bytes": self._downstream_outq(),
         }), flush=True)
 
     async def stats_printer(self) -> None:
@@ -801,7 +811,24 @@ class Relay:
                 "pqueued": len(self.pqueue), "forwarded": self.forwarded,
                 "ewma_dq_s": round(self.ewma_dq, 4), "drops": dict(self.drops),
                 "downstream": self.down_writer is not None,
+                "pending_lineages": len(self.topk_best),
+                "inflight": len(self.recent),
+                "drain_wait_s": round(self.drain_wait_s, 6),
+                "write_queue_bytes": self._downstream_outq(),
             }), flush=True)
+
+    def _downstream_outq(self) -> int:
+        """Bytes sitting in the kernel send queue. -1 when the socket is absent."""
+        writer = self.down_writer
+        if writer is None:
+            return -1
+        sock = writer.get_extra_info("socket")
+        if sock is None:
+            return -1
+        try:
+            return struct.unpack("I", fcntl.ioctl(sock.fileno(), 0x5411, struct.pack("I", 0)))[0]
+        except (OSError, AttributeError):
+            return -1
 
 
 async def amain(args: argparse.Namespace) -> None:

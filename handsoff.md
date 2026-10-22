@@ -28,36 +28,34 @@
 
 ## 可变交接
 
-更新时间：2026-10-20 14:50（UTC+8）。F6-D1b 已提交在分支 `f6-d1b-coverage-dominance`。vLLM 已停。GPU 空闲。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。
+更新时间：2026-10-22 15:30（UTC+8）。P0-M1 到 P0-M3.6 已按 `analysis/p0_pressure_realism/EXPERIMENT_INDEX.md` 收成一包。Fig. 7(b) 在 `analysis/fig7b_fixed_k/`。论文没改。分支 `f6-d1b-coverage-dominance`。
 
 ### 现在在做的事
 
-加强方案已实现并重测 Fig. 6(d)。Krep=2 满员后，严格更大的 coverage 替换最弱 holder（coverage 更小，其次 instance id 更小）。相等 coverage 不替换。已转发的被替换 Owner 会先收到 tombstone，再转发新的 upsert。`Dispatcher.choose`、guard、代价模型没改。
+把这包证据送进 main。算法保持当前 StaticTopK：扩展合并、失效优先、覆盖占优的副本抑制、K=16、Owner 侧校验。Adaptive 仍不在论文算法里。
 
 ### 结论
 
-正式 D1 四对：平均 ΔTTFT（cap−full）+1.57 ms，中位数 +0.51 ms，样本 SD 2.83 ms，范围 −0.49 到 +5.76 ms。覆盖损失 0。路由变化 0/4。模型 regret 0.00 ms，标签 MODEL_DERIVED，不是 TTFT。两边请求的 cached token 都是 4096。
+Dispatcher 在测到的 4000 updates/s 以内没有饱和。这个数是下界。A4 外推的 7897/s 高于下界，不能判断。
 
-这是新策略的测量。旧的到达顺序结果仍是 `f6_d1/`：+1812.59 ms、覆盖损失 3072、路由变化 4/4。不要把两者相减，也不要拿去减论文里的 118–391 ms。
+Native msgpack 284529 B，Adapter 15552 B，KVSelect 出口 13120 B。94.534% 是表示转换。KVSelect 在这条 Trace 上再少的是 38 条 `superseded`、2432 B。Top-K 和 Replica 丢弃是 0。旧 UPSERT 仍能复活状态。满额 Top-K 丢掉 coverage 回退只在合成压力里出现。
 
-D0 相等 coverage，cap 仍留前两名。路由变化 2/4，都在 assignment B，覆盖损失 0。均值 −325.17 ms 只来自第一对正式试验（1435.5 vs 129.6 ms，同一 worker，两边都缓存 4096）。中位数 −0.05 ms。D2 后来的 1024 被丢掉，路由变化 0，覆盖损失 0，均值 −0.30 ms。D3 两对都选中空闲的 4096 owner，覆盖损失 0；均值被第一对的 1424.5 vs 115.8 ms 拉低，第二对 −0.10 ms。
+64 B 是 codec。104 B 是记账。两者不和 10 Mbit/s 排空率混用。4096 Reporter 的 155.7 Mbit/s 是同构外推，不是生产拥塞。
 
-30/30 有效。Pilot 2026102009 不进正式均值。种子是 2026102010–13，不是旧的 2026101910–13。
+Gateway 多记了 drain 等待和发送队列字节。准入没改。
 
 ### 路径
 
-`experiments/4t4/net/gateway_relay_4t4.py` 的 `_admit_replica`。
-`analysis/fig6_reconstruction/f6_d1b_coverage_dominance/`。
-报告 `F6_D1B_MEASURED_TTFT_REPORT.md`。表：`f6_d1_summary.csv`、`f6_d1_paired_results.csv`、`f6_d1_per_trial.csv`。
+先读 `analysis/p0_pressure_realism/EXPERIMENT_INDEX.md`。通信成本的三个数在 `m3_6_communication_evidence/MOTIVATION_EVIDENCE_SUMMARY.md`。论文句子在同目录的 `ICC_MOTIVATION_INTEGRATION_PLAN.md`，只是建议，没有写进 PDF。
 
 ### 机器
 
-四张 GPU 0 MiB。本轮 vLLM 已退出。`127.0.0.1:9710` 仍在听。9732/9733 没有残留。
+`127.0.0.1:9710` 仍在听。没有留下这几轮的 Gateway、Dispatcher 或 vLLM。
 
 ### 下一步
 
-不要 merge main。不要把这组数写成已经替换论文 Fig. 6(d)。
+停。等下一次 OODA。不要改论文，不要把 94.5% 写成算法收益，不要修版本或 Top-K 回退，不要为了找 Dispatcher 瓶颈再跑 Fan-in。
 
-### 不要提交、不要覆盖
+### 不要覆盖
 
-不要提交 `*.log` 和 `__pycache__`。不要覆盖 `analysis/fig6_reconstruction/f6_d1/`。不要改 `Dispatcher.choose`。`run_status.json` 里的 `8d4df0b` 是开跑时的 HEAD，保留规则在这次提交里。
+不要覆盖 C1 原始帧、formal4t4、`ksweep_ov30`。不要停 9710。运行 `*.log` 被 gitignore 排除，证据在各目录的 CSV 和 JSON。

@@ -1,0 +1,181 @@
+{
+  "capture_file_bytes": 290465,
+  "native": {
+    "messages": 212,
+    "events": 252,
+    "stored": 210,
+    "removed": 41,
+    "cleared": 1,
+    "hash_appearances": 6615,
+    "msgpack_payload_bytes": 284529,
+    "zmq_body_bytes": 286225,
+    "zmq_framing_bytes": 1696,
+    "tcp_wire_bytes": "NOT_MEASURED",
+    "seq_min": 0,
+    "seq_max": 211,
+    "seq_gaps": 0,
+    "recv_ns_first": 1792311069941330550,
+    "recv_ns_last": 1792311129826482113,
+    "duration_s": 59.885151563,
+    "mean_payload_Bps": 4751.244550173203,
+    "token_messages": 210,
+    "token_message_payload_bytes": 284449,
+    "reencoded_without_token_ids_bytes": 69372,
+    "derived_token_id_bytes": 215157,
+    "token_id_fraction_of_payload": 0.7561865398606118,
+    "reencode_failures": 0,
+    "recv_minus_batch_ts_s": {
+      "n": 212,
+      "min": 0.0005207061767578125,
+      "p50": 0.0015093088150024414,
+      "max": 0.0030426979064941406
+    },
+    "payload_windows": {
+      "0.001": {
+        "peak_bytes": 3772,
+        "p95_event_aligned_bytes": 2824.0,
+        "p95_uniform_grid_bytes": 0.0,
+        "uniform_empty_fraction": 0.9964749279038428,
+        "uniform_samples": 598853
+      },
+      "0.01": {
+        "peak_bytes": 3772,
+        "p95_event_aligned_bytes": 2824.0,
+        "p95_uniform_grid_bytes": 0.0,
+        "uniform_empty_fraction": 0.9647502796934226,
+        "uniform_samples": 59887
+      },
+      "0.1": {
+        "peak_bytes": 3772,
+        "p95_event_aligned_bytes": 2824.0,
+        "p95_uniform_grid_bytes": 2678.0,
+        "uniform_empty_fraction": 0.6537562604340568,
+        "uniform_samples": 5990
+      },
+      "1": {
+        "peak_bytes": 8769,
+        "p95_event_aligned_bytes": 5945.0,
+        "p95_uniform_grid_bytes": 5846.0,
+        "uniform_empty_fraction": 0.07333333333333333,
+        "uniform_samples": 600
+      }
+    },
+    "zmq_windows": {
+      "0.001": {
+        "peak_bytes": 3780,
+        "p95_event_aligned_bytes": 2832.0,
+        "p95_uniform_grid_bytes": 0.0,
+        "uniform_empty_fraction": 0.9964749279038428,
+        "uniform_samples": 598853
+      },
+      "0.01": {
+        "peak_bytes": 3780,
+        "p95_event_aligned_bytes": 2832.0,
+        "p95_uniform_grid_bytes": 0.0,
+        "uniform_empty_fraction": 0.9647502796934226,
+        "uniform_samples": 59887
+      },
+      "0.1": {
+        "peak_bytes": 3780,
+        "p95_event_aligned_bytes": 2832.0,
+        "p95_uniform_grid_bytes": 2686.0,
+        "uniform_empty_fraction": 0.6537562604340568,
+        "uniform_samples": 5990
+      },
+      "1": {
+        "peak_bytes": 8817,
+        "p95_event_aligned_bytes": 5985.0,
+        "p95_uniform_grid_bytes": 5878.0,
+        "uniform_empty_fraction": 0.07333333333333333,
+        "uniform_samples": 600
+      }
+    }
+  },
+  "codec": {
+    "FRAME": 64,
+    "packed_len": 64,
+    "header_len": 32,
+    "WIRE_BYTES": 104,
+    "wire_minus_frame": 40
+  },
+  "adapter": {
+    "records": 243,
+    "kinds": {
+      "UPSERT": 243
+    },
+    "bytes_at_codec": 15552,
+    "recv_ns_first": 1792311069941330550,
+    "recv_ns_last": 1792311129730191102,
+    "inside_native_window": true,
+    "distinct_timestamps": 204,
+    "busiest_timestamp_records": 40,
+    "busiest_timestamp_bytes": 2560,
+    "windows": {
+      "0.001": {
+        "peak_bytes": 2560,
+        "p95_event_aligned_bytes": 2560.0,
+        "p95_uniform_grid_bytes": 0.0,
+        "uniform_empty_fraction": 0.9966030540734918,
+        "uniform_samples": 597890
+      },
+      "0.01": {
+        "peak_bytes": 2560,
+        "p95_event_aligned_bytes": 2560.0,
+        "p95_uniform_grid_bytes": 0.0,
+        "uniform_empty_fraction": 0.9660311088810838,
+        "uniform_samples": 59790
+      },
+      "0.1": {
+        "peak_bytes": 2560,
+        "p95_event_aligned_bytes": 2560.0,
+        "p95_uniform_grid_bytes": 64.0,
+        "uniform_empty_fraction": 0.6657190635451505,
+        "uniform_samples": 5980
+      },
+      "1": {
+        "peak_bytes": 2816,
+        "p95_event_aligned_bytes": 2752.0,
+        "p95_uniform_grid_bytes": 256.0,
+        "uniform_empty_fraction": 0.08848080133555926,
+        "uniform_samples": 599
+      }
+    }
+  },
+  "gateway_cell_351": {
+    "log_cell_stats": {
+      "event": "cell_stats",
+      "cell": 351,
+      "forwarded": 205,
+      "drops": {
+        "superseded": 38
+      },
+      "maxq": 3,
+      "ewma_dq_s": 0.0010254125397492723,
+      "queued": 0,
+      "pending_lineages": 0,
+      "inflight": 0,
+      "drain_wait_s": 0.000998,
+      "write_queue_bytes": 0
+    },
+    "results_gateway": {
+      "received": 243,
+      "queued": 0,
+      "forwarded": 205,
+      "superseded": 38,
+      "replica_cap": 0,
+      "low_utility": 0,
+      "queue_drop": 0,
+      "expired": 0,
+      "maxq": 3,
+      "global_topk": 0,
+      "stale_cell": 0,
+      "live_queued": 0,
+      "congested_ms": 0,
+      "pqueued": 0
+    },
+    "dispatcher_applied": 205,
+    "tick_count": 31,
+    "tick_has_timestamp": false,
+    "egress_window_profile": "NOT_MEASURED"
+  }
+}
