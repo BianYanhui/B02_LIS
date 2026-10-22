@@ -28,6 +28,7 @@ def relay() -> object:
     # The live relay emits JSON telemetry.  Unit tests verify queue behavior
     # directly and deliberately keep stdout limited to the check summary.
     instance.emit_update = lambda *args, **kwargs: None
+    instance.current_cell = 17
     return instance
 
 
@@ -89,6 +90,71 @@ def main() -> None:
     rows.append({"policy": "StaticSemantic", "check": "replica cap and non-preemptive tombstone priority",
                  "status": "PASS" if r.drops["replica_cap"] == 1 and len(r.pqueue) == 1 else "FAIL",
                  "detail": json.dumps({"duplicate_holder": r.drops["replica_cap"], "priority_queue": len(r.pqueue)})})
+
+    r = relay()
+    configure(r, gw.MODE_FULLSYNC, dedup=2)
+    for owner, coverage in ((0, 1024), (1, 1024), (2, 4096)):
+        frame, sent = up(owner, owner=owner, coverage=coverage)
+        r.enqueue(frame, gw.K_UP, owner, owner, coverage, 7, sent)
+    dominated = [item for item in r.queue if id(item) not in r.superseded_ids]
+    kinds = [gw.HDR.unpack(item[:32])[0] for item in dominated]
+    owners = [gw.HDR.unpack(item[:32])[1] for item in dominated]
+    rows.append({
+        "policy": "FullSync",
+        "check": "strictly larger coverage replaces the weakest queued holder",
+        "status": "PASS" if (
+            r.replicas.get(7) == {1, 2}
+            and r.replica_coverage.get(7) == {1: 1024, 2: 4096}
+            and r.drops["replica_cap"] == 1
+            and kinds == [gw.K_UP, gw.K_UP]
+            and owners == [1, 2]
+        ) else "FAIL",
+        "detail": json.dumps({
+            "holders": sorted(r.replicas.get(7, ())),
+            "coverage": r.replica_coverage.get(7, {}),
+            "replica_cap": r.drops["replica_cap"],
+            "live_owners": owners,
+        }),
+    })
+
+    r = relay()
+    configure(r, gw.MODE_FULLSYNC, dedup=2)
+    for owner, coverage in ((0, 1024), (1, 1024)):
+        frame, sent = up(owner, owner=owner, coverage=coverage)
+        r.enqueue(frame, gw.K_UP, owner, owner, coverage, 7, sent)
+        r._dequeue()
+    frame, sent = up(2, owner=2, coverage=4096)
+    r.enqueue(frame, gw.K_UP, 2, 2, 4096, 7, sent)
+    forwarded_case = [gw.HDR.unpack(item[:32])[:2] for item in r.queue]
+    rows.append({
+        "policy": "FullSync",
+        "check": "already forwarded weaker holder is tombstoned before the larger upsert",
+        "status": "PASS" if (
+            r.replicas.get(7) == {1, 2}
+            and r.dominance_tombstones == 1
+            and forwarded_case == [(gw.K_TOMB, 0), (gw.K_UP, 2)]
+        ) else "FAIL",
+        "detail": json.dumps({
+            "holders": sorted(r.replicas.get(7, ())),
+            "tombstones": r.dominance_tombstones,
+            "queue": forwarded_case,
+        }),
+    })
+
+    r = relay()
+    configure(r, gw.MODE_FULLSYNC, dedup=2)
+    for owner, coverage in ((0, 4096), (1, 4096), (2, 1024)):
+        frame, sent = up(owner, owner=owner, coverage=coverage)
+        r.enqueue(frame, gw.K_UP, owner, owner, coverage, 7, sent)
+    rows.append({
+        "policy": "FullSync",
+        "check": "equal or smaller coverage does not replace an earlier holder",
+        "status": "PASS" if r.replicas.get(7) == {0, 1} and r.drops["replica_cap"] == 1 else "FAIL",
+        "detail": json.dumps({
+            "holders": sorted(r.replicas.get(7, ())),
+            "replica_cap": r.drops["replica_cap"],
+        }),
+    })
 
     r = relay()
     configure(r, gw.MODE_AGECOV)
@@ -433,7 +499,10 @@ def main() -> None:
             for holders in target.replicas.values():
                 if len(holders) > target.dedup:
                     return "dedup overflow"
-        balance = target.received - target.forwarded - sum(target.drops.values()) - target.live_depth()
+        balance = (
+            target.received + target.dominance_tombstones
+            - target.forwarded - sum(target.drops.values()) - target.live_depth()
+        )
         if balance != 0:
             return f"balance {balance}"
         return ""

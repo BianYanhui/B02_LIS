@@ -1,0 +1,2 @@
+status,label,reason
+NOT_RUN,NOT_MEASURED,Visibility lag was not measured. A drained queue of 0 from P0-C1 is not a scale result.

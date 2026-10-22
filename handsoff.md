@@ -28,42 +28,34 @@
 
 ## 可变交接
 
-更新时间：2026-10-19 17:20（UTC+8）。Fig. 6 重建已并入 main，合并提交 `3a8fe0c`。没有正在跑的实验。`/handsoff-skill` 没有对应 Skill 文件，这次没有调用。本机没有 GitHub CLI 登录，所以没有开 GitHub PR，是直接 merge 后推送 main。
+更新时间：2026-10-22 15:30（UTC+8）。P0-M1 到 P0-M3.6 已按 `analysis/p0_pressure_realism/EXPERIMENT_INDEX.md` 收成一包。Fig. 7(b) 在 `analysis/fig7b_fixed_k/`。论文没改。分支 `f6-d1b-coverage-dominance`。
 
 ### 现在在做的事
 
-Fig. 6(a)(b)(c)(d) 的证据已经收在 `analysis/fig6_reconstruction/`。索引是 `analysis/fig6_reconstruction/README.md`。下一模块还没开始。不要自己开新实验。
+把这包证据送进 main。算法保持当前 StaticTopK：扩展合并、失效优先、覆盖占优的副本抑制、K=16、Owner 侧校验。Adaptive 仍不在论文算法里。
 
-当前分支是 `main`。Fig. 6(b) 的测量代码是 `3a3ce7d`，结果是 `6e8ee8d`，索引提交是 `d06404e`。没有改 `experiments/4t4/` 的冻结网关和 `Dispatcher.choose`。旧的 `f6-*` 远程分支还在，内容和 main 里的这段历史相同，可以以后删。
+### 结论
 
-### 论文该引用哪一版
+Dispatcher 在测到的 4000 updates/s 以内没有饱和。这个数是下界。A4 外推的 7897/s 高于下界，不能判断。
 
-- Fig. 6(a)：`f6_a2/`，Case C。自然投递不合并。受控 inflight 窗口下转发更新减少均值 0.549，P95 可见性 16.84 s 到 4.09 s。
-- Fig. 6(b)：`f6_b1/`，条件收益。自然队列为空。冻结 ACK 窗口 0.792 s 下，决策层无效路由 FIFO 3/3、优先级 0/3。
-- Fig. 6(c)：`f6_f1_formal_ac/`。冻结 `Krep=2` 回放的重叠削减。不是在线副本上限，也不是 TTFT。
-- Fig. 6(d)：`f6_d1/`，Case A，负载 0。配对客户端 TTFT 均值差 1813 ms。61.44 ms 的模型 regret 不是这个延迟。
+Native msgpack 284529 B，Adapter 15552 B，KVSelect 出口 13120 B。94.534% 是表示转换。KVSelect 在这条 Trace 上再少的是 38 条 `superseded`、2432 B。Top-K 和 Replica 丢弃是 0。旧 UPSERT 仍能复活状态。满额 Top-K 丢掉 coverage 回退只在合成压力里出现。
 
-`f6_p0/` 到 `f6_p3/` 和 `analysis/p0_pressure_realism/` 留作阴性记录。F6-F1 的同覆盖度约 21% 不是 Fig. 6(a) 的扩展合并结论。候选图没有替换论文图。
+64 B 是 codec。104 B 是记账。两者不和 10 Mbit/s 排空率混用。4096 Reporter 的 155.7 Mbit/s 是同构外推，不是生产拥塞。
 
-### 丢掉的部分
+Gateway 多记了 drain 等待和发送队列字节。准入没改。
 
-没有删已入库的轮次。下列本地目录只忽略、不提交，文件还在磁盘上：
+### 路径
 
-- `ICC_KV_实验结果_20261005.zip`
-- `analysis/admission_overhead_4t4/`
-- `analysis/icc_kv_export/`
-- `supplemental_20260922_cp_queue_delay/`
-
-`analysis/icc_kv/` 本来就在 `.gitignore`。
+先读 `analysis/p0_pressure_realism/EXPERIMENT_INDEX.md`。通信成本的三个数在 `m3_6_communication_evidence/MOTIVATION_EVIDENCE_SUMMARY.md`。论文句子在同目录的 `ICC_MOTIVATION_INTEGRATION_PLAN.md`，只是建议，没有写进 PDF。
 
 ### 机器
 
-四张 T4 为 0 MiB。vLLM 已停。8000–8003、9730、9731 没有监听。`b02-gateway4t4` 仍在，`127.0.0.1:9710`。
+`127.0.0.1:9710` 仍在听。没有留下这几轮的 Gateway、Dispatcher 或 vLLM。
 
 ### 下一步
 
-用户指定下一个模块之前，不要开 GPU，不要重跑 Fig. 6，不要改 0.792 s 的 ACK 保持，不要改 `choose`，不要改论文图。正式矩阵的开跑方式仍是 `docs/icc_formal/`。
+停。等下一次 OODA。不要改论文，不要把 94.5% 写成算法收益，不要修版本或 Top-K 回退，不要为了找 Dispatcher 瓶颈再跑 Fan-in。
 
-### 不要提交、不要覆盖
+### 不要覆盖
 
-不要提交上面四个本地目录、`server_logs`、`*.log`、`*.pid`。不要改 `analysis/formal4t4/`、`analysis/icc_kv/`、KVSelect 核心算法。不要重启或重配 `b02-gateway4t4`，不要跑 `cell_rate_4t4.sh` 或 `restart_4t4.sh`。
+不要覆盖 C1 原始帧、formal4t4、`ksweep_ov30`。不要停 9710。运行 `*.log` 被 gitignore 排除，证据在各目录的 CSV 和 JSON。

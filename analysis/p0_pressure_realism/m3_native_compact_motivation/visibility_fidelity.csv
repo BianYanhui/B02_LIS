@@ -1,0 +1,9 @@
+case,source,query_origin,oracle_reusable_tokens,compact_rollback_tokens,tip_tombstone_tokens,false_positive_tokens,lost_reusable_tokens,incorrect_invalidation,c1_survivor_tokens,c1_advertised_tokens,c1_model_b_visible_tokens,lineages,max_false_positive_tokens_any_check,max_lost_tokens_any_check,mismatch_checks,updates,live_lineages
+partial_eviction_1040_to_448,TRACE_REPLAY,CONTROLLED_FROM_STORED_BLOCKS,448,448,0,0,0,0,448,1040,0,,,,,,
+end_of_trace_all_lineages,TRACE_REPLAY,CONTROLLED_FROM_STORED_BLOCKS,106000,106000,,0,0,0,,,,101,0,0,0,,
+consecutive_block_stored,SYNTHETIC,SYNTHETIC_QUERY,96,96,,0,0,,,,,,,,,2,1
+repeated_block_stored,SYNTHETIC,SYNTHETIC_QUERY,64,64,,0,0,,,,,,,,,1,1
+partial_block_removed,SYNTHETIC,SYNTHETIC_QUERY,48,48,,0,0,,,,,,,,,2,1
+full_prefix_removal,SYNTHETIC,SYNTHETIC_QUERY,0,0,,0,0,,,,,,,,,2,0
+all_blocks_cleared,SYNTHETIC,SYNTHETIC_QUERY,0,0,,0,0,,,,,,,,,2,0
+same_owner_two_lineages,SYNTHETIC,SYNTHETIC_QUERY,128,128,,0,0,,,,,,,,,2,2

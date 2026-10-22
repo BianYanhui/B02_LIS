@@ -1,0 +1,7 @@
+comparison,workload,coverage_tokens,observed_rejects,freshness_term_required,label,note
+pre_enqueue_utility_vs_coverage_gt_1024,reuse_intensive,1024,942,NO,DERIVED,"Age at these rejects is 0.1-1.4 ms. U=coverage-1024 at zero delay, so 1024 fails with the freshness term equal to 1."
+pre_enqueue_utility_vs_coverage_gt_1024,reuse_intensive,2048,0,NOT_EXERCISED,OBSERVED_ZERO,A 2048-token update needs age+EWMA >= 20.79 s to fail. None failed before enqueue.
+pre_enqueue_utility_vs_coverage_gt_1024,reuse_intensive,4096,0,NOT_EXERCISED,OBSERVED_ZERO,Threshold is 41.59 s. None failed before enqueue.
+pre_enqueue_utility_vs_coverage_gt_1024,original_compatible,2048,0,NOT_EXERCISED,OBSERVED_ZERO,Original prefixes are 2048/2560/3072. Pre-enqueue utility rejects are 0 at every rho.
+post_enqueue_low_utility_reason,both,2048_or_2560,NOT_A_FRESHNESS_COUNT,NOT_SEPARABLE,NOT_MEASURED,1dc24ec trim and the dequeue recheck both emit reason low_utility after enqueue. EWMA is absent. queue_age never reached 20.79 s in this bucket.
+policy_B_vs_C_end_to_end,NOT_RUN,,,,NOT_MEASURED,PressureCoverageThreshold16 and PressureUtilityOnly16 were not executed. The admission reject set already matches the threshold.

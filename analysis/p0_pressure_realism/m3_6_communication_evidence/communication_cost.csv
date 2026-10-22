@@ -1,0 +1,8 @@
+path,evidence,count,events,hash_appearances,bytes,byte_basis,duration_s,mean_Bps,mean_kbps,saved_bytes_from_native,reduction_from_native_pct,saved_bytes_from_adapter,reduction_from_adapter_pct,notes
+A_native_msgpack,MEASURED_NATIVE,212,252,6615,284529,msgpack_payload,59.885151563,4751.244550,38.009956,0,0,,,"212 ZMQ messages, seq 0-211, gaps 0. TCP wire bytes NOT_MEASURED."
+A_native_zmq_body,MEASURED_NATIVE,212,252,6615,286225,topic_plus_seq_plus_msgpack,59.885151563,4779.565427,38.236523,,,,,Empty topic and 8-byte seq. Framing overhead 1696 B. Capture-file header is not included.
+A_native_tcp,NOT_MEASURED,,,,,tcp_wire,,,,,,,,No packet capture in the C1 raw directory.
+B_adapter_codec64,TRACE_DERIVED,243,,,15552,codec_64B,59.885151563,259.697097,2.077577,268977,94.534125,0,0,"243 UPSERT. Bytes are count times the 64 B codec, not a captured compact pcap."
+B_adapter_accounting104,TRACE_DERIVED,243,,,25272,accounting_104B_not_codec,59.885151563,422.007782,3.376062,,,,,Historical WIRE_BYTES boundary. Excluded from scale ratios and from the 10 Mbps drain.
+C_kvselect_codec64,ACTUAL_GATEWAY_REPLAY,205,,,13120,codec_64B_times_forwarded_count,59.885151563,219.086028,1.752688,271409,95.388871,2432,15.637860,"Forwarded 205, superseded 38, replica_cap 0, global_topk 0. Mean is attributed to the native window. Egress timestamps NOT_MEASURED."
+C_kvselect_accounting104,ACTUAL_GATEWAY_REPLAY,205,,,21320,accounting_104B_not_codec,59.885151563,356.014796,2.848118,,,,,205 times 104. Excluded from scale ratios and from the 10 Mbps drain.

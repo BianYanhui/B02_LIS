@@ -1,0 +1,25 @@
+regime,seed,metric,k8,k16,delta_k8_minus_k16,lower_is,direction,label,k8_wins,k16_wins,ties,crossover_with_other_regime,note
+base_ultrahigh,0,loose_false_negative_rate,0.0,0.0,0.0,tie,tie,OBSERVED,,,,,
+base_ultrahigh,0,ttft_mean_ms,628.2086719323308,627.771118037594,0.43755389473687956,K16,K16,OBSERVED,,,,,
+base_ultrahigh,0,reused_tokens_mean,3293.3533834586465,3293.593984962406,-0.24060150375953526,,K16,OBSERVED,,,,,
+ov30_ultrahigh,0,loose_false_negative_rate,0.015037593984962405,0.022556390977443608,-0.007518796992481203,K8,K8,OBSERVED,,,,,
+ov30_ultrahigh,0,ttft_mean_ms,1718.7832899473685,1700.9331284360903,17.850161511278202,K16,K16,OBSERVED,,,,,
+ov30_ultrahigh,0,reused_tokens_mean,1476.5714285714287,1484.03007518797,-7.458646616541273,,K16,OBSERVED,,,,,
+base_ultrahigh,1,loose_false_negative_rate,0.0,0.0,0.0,tie,tie,OBSERVED,,,,,
+base_ultrahigh,1,ttft_mean_ms,609.4899633984962,588.0000528045113,21.489910593984973,K16,K16,OBSERVED,,,,,
+base_ultrahigh,1,reused_tokens_mean,3385.7443609022557,3385.7443609022557,0.0,,tie,OBSERVED,,,,,
+ov30_ultrahigh,1,loose_false_negative_rate,0.0,0.045112781954887216,-0.045112781954887216,K8,K8,OBSERVED,,,,,
+ov30_ultrahigh,1,ttft_mean_ms,1384.7292357293231,1422.3366218270676,-37.60738609774444,K8,K8,OBSERVED,,,,,
+ov30_ultrahigh,1,reused_tokens_mean,1576.1804511278197,1537.4436090225563,38.73684210526335,,K8,OBSERVED,,,,,
+base_ultrahigh,2,loose_false_negative_rate,0.0,0.0,0.0,tie,tie,OBSERVED,,,,,
+base_ultrahigh,2,ttft_mean_ms,668.9173475112782,678.0529049999999,-9.135557488721702,K8,K8,OBSERVED,,,,,
+base_ultrahigh,2,reused_tokens_mean,3293.3533834586465,3293.3533834586465,0.0,,tie,OBSERVED,,,,,
+ov30_ultrahigh,2,loose_false_negative_rate,0.007518796992481203,0.022556390977443608,-0.015037593984962405,K8,K8,OBSERVED,,,,,
+ov30_ultrahigh,2,ttft_mean_ms,1950.8552083007519,2063.772774225564,-112.91756592481192,K8,K8,OBSERVED,,,,,
+ov30_ultrahigh,2,reused_tokens_mean,1306.9473684210527,1299.0075187969924,7.939849624060344,,K8,OBSERVED,,,,,
+base_ultrahigh,ALL,loose_false_negative_rate,,,,,,DERIVED,0,0,3,NO,A crossover would need K16 to win this metric on one regime and K8 on the other.
+base_ultrahigh,ALL,ttft_mean_ms,,,,,,DERIVED,1,2,0,NO,A crossover would need K16 to win this metric on one regime and K8 on the other.
+base_ultrahigh,ALL,reused_tokens_mean,,,,,,DERIVED,0,1,2,NO,A crossover would need K16 to win this metric on one regime and K8 on the other.
+ov30_ultrahigh,ALL,loose_false_negative_rate,,,,,,DERIVED,3,0,0,NO,A crossover would need K16 to win this metric on one regime and K8 on the other.
+ov30_ultrahigh,ALL,ttft_mean_ms,,,,,,DERIVED,2,1,0,NO,A crossover would need K16 to win this metric on one regime and K8 on the other.
+ov30_ultrahigh,ALL,reused_tokens_mean,,,,,,DERIVED,2,1,0,NO,A crossover would need K16 to win this metric on one regime and K8 on the other.
